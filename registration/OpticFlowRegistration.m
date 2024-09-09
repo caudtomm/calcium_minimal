@@ -31,7 +31,7 @@ classdef OpticFlowRegistration < Registration
             movie_result = data_raw;
             movie = data_raw.stack;
             ref_img = obj.reference_img;
-            if isempty(ref_img); ref_img = nanmean(movie,3); end
+            if isempty(ref_img); ref_img = mean(movie,3,'omitmissing'); end
             obj.reference_img = ref_img;
             
 

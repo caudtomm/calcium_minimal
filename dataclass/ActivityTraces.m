@@ -55,7 +55,7 @@ classdef ActivityTraces
         % constraints (ex. PMT noise)
         function [techBase, techBaseMap] = defineTechnicalBaseline(obj)
             techBaseMap = obj.noLight.timeavg;
-            techBase = nanmean(techBaseMap,"all");
+            techBase = mean(techBaseMap,"all",'omitmissing');
         end
 
         % retrieve the baseline noise value given by technical
@@ -141,7 +141,7 @@ classdef ActivityTraces
             
             % fill in each roi's F(t)
             for i = 1:obj.N
-                traces = nanmean(obj.Fpx{i},2); % [t, 1, trials]
+                traces = mean(obj.Fpx{i},2,'omitmissing'); % [t, 1, trials]
 
                 % remove technical baseline
                 traces = traces - obj.techBase;

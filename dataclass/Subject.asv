@@ -73,6 +73,8 @@ classdef Subject
             FileIn = fullfile(obj.filelist(1).folder,obj.filelist(1).name);
             [A,result,framerate,zstep,zoom,motorpositions,scalingfactors] = ...
                 read_metadata_function(FileIn);
+            movie = double(loadTiffStack(FileIn));
+            [height,width,numberframes] = size(movie);
             
             % package metadata into structure
             scanimage_metadata.A = A;
@@ -82,6 +84,9 @@ classdef Subject
             scanimage_metadata.zoom = zoom;
             scanimage_metadata.motorpositions = motorpositions;
             scanimage_metadata.scalingfactors = scalingfactors;
+            scanimage_metadata.height = height;
+            scanimage_metadata.width = width;
+            scanimage_metadata.numberframes = numberframes;
         end
 
         % Method to define stimulus-triggered timestamps
@@ -164,7 +169,7 @@ classdef Subject
             obj.Tiff2Movie(obj.locations.rawtrials);
             obj.singletrial_meta = obj.loadSingletrialMeta();
             obj.anatomy_imgs = obj.retrieve_trial_anatomies();
-            obj.localcorr_imgs = obj.retrieve_localcorr_maps();
+            obj.localcorr_imgs = fish1.retrieve_localcorr_maps();
             obj = obj.setImagingDate;
             obj = update_currentstate(obj, 'newly constructed');
             obj.ROIcheckfiles = struct('to_keep',[],'to_discard',[],'is_complete',[]);

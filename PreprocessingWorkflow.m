@@ -79,9 +79,6 @@ movedirTC(sourceFolder,destinationFolder)
 
 fish1 = fish1.update_currentstate('Rigid alignment complete');
 
-
-% [fish1,~,~,stats] = fish1.registration('rigid');
-
 %% remove baseline
 
 % datapath = fish1.locations.rawtrials_rigidreg;
@@ -110,9 +107,9 @@ fish1.anatomy_imgs = fish1.retrieve_trial_anatomies(fish1.locations.rawtrials_ri
 fish1.reference_img = fish1.retrieve_ref_img(fish1.locations.rawtrials_rigidreg);
 fish1.localcorr_imgs = fish1.retrieve_localcorr_maps(fish1.locations.rawtrials_rigidreg);
 
-fish1.save2mat()
 fish1 = fish1.update_currentstate( ...
     'Trial anatomies and reference frame updated in Subject file');
+fish1.save2mat()
 
 fish1.visualize_anatomy_physFOV
 
@@ -160,20 +157,6 @@ fish1 = fish1.update_currentstate('Calcium traces extracted');
 
 % ReplaceBadWarpPeriods; % NEEDS TESTING
 
-%% ROI SELECTION
-% input_folder = fish1.locations.rawtrials_rigidreg;
-% fish1 = fish1.define_ROIs(input_folder,'manual')
-% fish1 = fish1.reload
-% %%
-% fish1.define_ROIs(input_folder,'automatic')
-% fish1 = fish1.update_currentstate('ROI selection complete');
-% fish1.save2mat(true)
-% 
-% %%
-% fish1.calculate_dFoverF
-% fish1 = fish1.update_currentstate('dF/F calculation complete');
-% fish1.save2mat(true)
-% 
 % %%
 % 
 % fish1.extract_data

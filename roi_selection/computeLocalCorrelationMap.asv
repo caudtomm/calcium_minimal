@@ -15,11 +15,14 @@ function local_corr_map = computeLocalCorrelationMap(M)
             % Extract the time series for the current pixel and its neighbors
             center_pixel_ts = squeeze(M(i, j, :));
             neighbors_ts = reshape(M(i-1:i+1, j-1:j+1, :), [], timepoints);
-            neighbors_ts(5,:) = []; % take out the same pixel 
+            neighbors_ts(5,:) 
             
             % Compute the correlation of the center pixel with all neighbors
-            correlations = corrcoef([center_pixel_ts';neighbors_ts]','rows','complete');
-            correlations = correlations(1,2:end); % corrcoef outputs a whole distance matrix
+            correlations = zeros(1,9);
+            for i_px = 1:9
+                thisneighbor = neighbors_ts(i_px,:)';
+                correlations(i_px) = corrcoef(center_pixel_ts, thisneighbor,'rows','complete');
+            end
             
             % Take the mean correlation as the local correlation
             local_corr_map(i, j) = mean(correlations(:));

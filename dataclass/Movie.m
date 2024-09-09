@@ -48,7 +48,7 @@ classdef Movie
         end
         
         function value = get.timeavg(obj)
-            value = nanmean(obj.stack,3);
+            value = mean(obj.stack,3,'omitmissing');
         end
 
         function obj = checkAgain(obj)
@@ -57,7 +57,7 @@ classdef Movie
             
             % re-compute
             [height,width,framecount] = size(movie);
-            zproj = nanmean(movie,3);
+            zproj = mean(movie,3,'omitmissing');
 
             % store
             obj.h = height;
