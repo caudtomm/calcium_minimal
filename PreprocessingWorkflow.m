@@ -107,9 +107,9 @@ fish1.anatomy_imgs = fish1.retrieve_trial_anatomies(fish1.locations.rawtrials_ri
 fish1.reference_img = fish1.retrieve_ref_img(fish1.locations.rawtrials_rigidreg);
 fish1.localcorr_imgs = fish1.retrieve_localcorr_maps(fish1.locations.rawtrials_rigidreg);
 
+fish1.save2mat()
 fish1 = fish1.update_currentstate( ...
     'Trial anatomies and reference frame updated in Subject file');
-fish1.save2mat()
 
 fish1.visualize_anatomy_physFOV
 
@@ -152,11 +152,7 @@ fish1 = fish1.update_currentstate('Calcium traces extracted');
 % fish1 = fish1.registration('opticflow');
 % or run StackDewobbler.m
 
-
-%% unwarping 2
-
-% ReplaceBadWarpPeriods; % NEEDS TESTING
-
+% 
 % %%
 % 
 % fish1.extract_data
