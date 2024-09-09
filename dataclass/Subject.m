@@ -73,6 +73,8 @@ classdef Subject
             FileIn = fullfile(obj.filelist(1).folder,obj.filelist(1).name);
             [A,result,framerate,zstep,zoom,motorpositions,scalingfactors] = ...
                 read_metadata_function(FileIn);
+            movie = double(loadTiffStack(FileIn));
+            [height,width,numberframes] = size(movie);
             
             % package metadata into structure
             scanimage_metadata.A = A;
@@ -82,6 +84,9 @@ classdef Subject
             scanimage_metadata.zoom = zoom;
             scanimage_metadata.motorpositions = motorpositions;
             scanimage_metadata.scalingfactors = scalingfactors;
+            scanimage_metadata.height = height;
+            scanimage_metadata.width = width;
+            scanimage_metadata.numberframes = numberframes;
         end
 
         % Method to define stimulus-triggered timestamps
@@ -164,7 +169,7 @@ classdef Subject
             obj.Tiff2Movie(obj.locations.rawtrials);
             obj.singletrial_meta = obj.loadSingletrialMeta();
             obj.anatomy_imgs = obj.retrieve_trial_anatomies();
-            obj.localcorr_imgs = obj.retrieve_localcorr_maps();
+            obj.localcorr_imgs = fish1.retrieve_localcorr_maps();
             obj = obj.setImagingDate;
             obj = update_currentstate(obj, 'newly constructed');
             obj.ROIcheckfiles = struct('to_keep',[],'to_discard',[],'is_complete',[]);
@@ -342,7 +347,7 @@ classdef Subject
             % extract average of selected frame range
             frame_range = obj.reference_img_meta.Frameavg_range(1) : ...
                 obj.reference_img_meta.Frameavg_range(2);
-            reference_image = mean(movie.stack(:,:,frame_range),3,'omitmissing');
+            reference_image = nanmean(movie.stack(:,:,frame_range),3);
         end
 
         function snip = retrieveSnippetfromCoords(obj, filenamejson)
@@ -579,7 +584,7 @@ classdef Subject
             [data.idx_by_stim_type, ~] = sortbyStimType(data);
             
             % trace quality check (manual 'bad cell' calling)
-%             data = checkTracesMan(data);
+            % data = checkTracesMan(data);
             
             %  denoise cell traces
             [data.tracesdn, fcutoff] = denoiseCellTraceData(data,0,obj.badperiods,'traces'); % butterworth filt 4 poles
@@ -629,7 +634,7 @@ classdef Subject
             if auto; b = true; else; b = prompt_overwrite(FileOut); end
             if ~b; return; end
             eval(strcat(obj.name,'=obj;'));
-            eval(strcat('save(FileOut,''',obj.name,''',''-v7.3'')'));
+            eval(strcat('save(FileOut,''',obj.name,''')'));
         end
         
         % Method to save a checkfiles file to the subject_datapath location
