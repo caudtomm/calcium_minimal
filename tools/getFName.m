@@ -7,8 +7,11 @@ fpath = '';
 
 % fname + fext
 fext = flip(extractBefore(flip(str),'.'));
-if isempty(fext); warning('Extension missing from Filename'); end
 fname = extractBefore(str, strcat('.',fext));
+if isempty(fext)
+    warning('Extension missing from Filename')
+    fname = str;
+end
 
 % extract file path if present
 if ~isempty(extractBefore(fname, '\'))

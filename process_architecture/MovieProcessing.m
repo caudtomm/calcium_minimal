@@ -1,7 +1,7 @@
 classdef (Abstract) MovieProcessing < SingleProcess
     % Any operation performed on a Tiff stack (2p movie)
     properties
-        data_raw Movie = Movie % setting directly is discouraged - if possible use method 'setDataRaw()' for more robust performance 
+        data_raw Movie = Movie('') % setting directly is discouraged - if possible use method 'setDataRaw()' for more robust performance 
     end
 
     properties (Abstract)

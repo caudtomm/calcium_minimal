@@ -169,10 +169,10 @@ classdef Subject
             obj.Tiff2Movie(obj.locations.rawtrials);
             obj.singletrial_meta = obj.loadSingletrialMeta();
             obj.anatomy_imgs = obj.retrieve_trial_anatomies();
-            obj.localcorr_imgs = fish1.retrieve_localcorr_maps();
+            obj.localcorr_imgs = obj.retrieve_localcorr_maps();
             obj = obj.setImagingDate;
             obj = update_currentstate(obj, 'newly constructed');
-            obj.ROIcheckfiles = struct('to_keep',[],'to_discard',[],'is_complete',[]);
+            % obj.ROIcheckfiles = struct('to_keep',[],'to_discard',[],'is_complete',[]);
 
             obj.save2mat();
         end
@@ -197,21 +197,35 @@ classdef Subject
             PathIn = fullfile(loc.subject_datapath, subdirectory);
             
             % load reference image
-            fname = strcat('*.',loc.datafile_ext);
+            fname = '*.mat';
             files = dir(fullfile(PathIn,fname));
-            switch numel(files)
-                case 0
-                    warn_notfound('raw reference image'); return
-                case 1
-                otherwise
-                    warning('more than one reference image available. selected: %s', ...
-                        files(1).name)
+            if ~isempty(files)
+                switch numel(files)
+                    case 1
+                    otherwise
+                        warning('more than one reference image available. selected: %s', ...
+                            files(1).name)
+                end
+                snip = load(fullfile(PathIn,files(1).name)).movie;
+                img = snip.timeavg;
+                img_meta = snip.metadata;
+            else
+                fname = strcat('*.',loc.datafile_ext);
+                files = dir(fullfile(PathIn,fname));
+                switch numel(files)
+                    case 0
+                        warn_notfound('raw reference image'); return
+                    case 1
+                    otherwise
+                        warning('more than one reference image available. selected: %s', ...
+                            files(1).name)
+                end
+                img = double(loadTiffStack(char(fullfile(PathIn,files(1).name))));
+                
+                % load metadata
+                fname = 'metadata.json';
+                img_meta = readJson(fullfile(PathIn,fname));
             end
-            img = double(loadTiffStack(char(fullfile(PathIn,files(1).name))));
-            
-            % load metadata
-            fname = 'metadata.json';
-            img_meta = readJson(fullfile(PathIn,fname));
         end
 
         % Method to load all raw trials and return a cell
@@ -226,8 +240,13 @@ classdef Subject
             result = {};
 
             for i_f = 1:numel(files)
-                thisfilename = fullfile(sourcedir,files(i_f).name);
-                thismovie = Movie(thisfilename);
+                thisfilename = find_daughter_file(fullfile(sourcedir,files(i_f).name),'mat');
+                if ~isempty(thisfilename)
+                    thismovie = load(thisfilename,'movie').movie;
+                else
+                    thisfilename = fullfile(sourcedir,files(i_f).name);
+                    thismovie = Movie(thisfilename);
+                end
 
                 thismeta = objectToPropsStruct(thismovie, {'stack'}); % stack is excluded because too heavy
                 result{i_f} = thismeta;
@@ -347,7 +366,7 @@ classdef Subject
             % extract average of selected frame range
             frame_range = obj.reference_img_meta.Frameavg_range(1) : ...
                 obj.reference_img_meta.Frameavg_range(2);
-            reference_image = nanmean(movie.stack(:,:,frame_range),3);
+            reference_image = mean(movie.stack(:,:,frame_range),3,'omitmissing');
         end
 
         function snip = retrieveSnippetfromCoords(obj, filenamejson)
@@ -479,10 +498,10 @@ classdef Subject
             
             cd(obj.locations.traces_src)
 
-            tracestmp = tracestmp.loadMovieData(obj,fname_PMToffmeta,fname_noLightmeta);
-
-            % calc more things
-            tracestmp = tracestmp.setDerivativeProperties();
+            % tracestmp = tracestmp.loadMovieData(obj,fname_PMToffmeta,fname_noLightmeta);
+            % 
+            % % calc more things
+            % tracestmp = tracestmp.setDerivativeProperties();
 
             % return
             cd(obj.locations.subject_datapath)
@@ -634,7 +653,7 @@ classdef Subject
             if auto; b = true; else; b = prompt_overwrite(FileOut); end
             if ~b; return; end
             eval(strcat(obj.name,'=obj;'));
-            eval(strcat('save(FileOut,''',obj.name,''')'));
+            eval(strcat('save(FileOut,''',obj.name,''',''-v7.3'')'));
         end
         
         % Method to save a checkfiles file to the subject_datapath location

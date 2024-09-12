@@ -106,7 +106,7 @@ n = 0;
 while ~overSeeked
     try
         tiff.setDirectory(guess);
-        guess = 2*guess; %double the guess
+        guess = guess+1; % increase guess by 1
     catch ex
         overSeeked = true; %we tried to seek past the last directory
     end
