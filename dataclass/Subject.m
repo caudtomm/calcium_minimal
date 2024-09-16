@@ -453,39 +453,39 @@ classdef Subject
         % Method to update single-trial ROI definition files with
         % debubbling and center-surround calculations for dF/F calculation.
         % THESE METHODS ACTUALLY NEED VALIDATION
-        function calculate_dFoverF(obj)
-            original_dir = pwd;
-            loc = obj.locations;
-            cd(fullfile(loc.subject_datapath,loc.defRois))
-
-            files = dir('*.mat');
-            for i_f = 1:numel(files)
-                fname = files(i_f).name;
-                disp(fname)
-                load(fname);
-
-                % isolate relevant bad periods
-                idx = obj.badperiods(:,1) == i_f;
-                thisbadperiods = obj.badperiods(idx,:);
-                
-                % eliminate bad periods from original traces (in case they
-                % hadn't been already
-                v = replace_badperiods_with_nans(plane{1}.timetraces,thisbadperiods);
-                plane{1}.timetraces = v;
-
-                % desurround only
-                v = desurround2(plane,[],0,1,thisbadperiods);
-                plane{1}.timetracesdes = v;
-
-                % debubbled desurround
-                v = debubbled_desurround(plane,num2str(i_f),thisbadperiods);
-                plane{1}.timetracesdebdes = v;
-            
-                save(fname,'plane','-v7.3');
-            end
-
-            cd(original_dir)
-        end
+        % function calculate_dFoverF(obj)
+        %     original_dir = pwd;
+        %     loc = obj.locations;
+        %     cd(fullfile(loc.subject_datapath,loc.defRois))
+        % 
+        %     files = dir('*.mat');
+        %     for i_f = 1:numel(files)
+        %         fname = files(i_f).name;
+        %         disp(fname)
+        %         load(fname);
+        % 
+        %         % isolate relevant bad periods
+        %         idx = obj.badperiods(:,1) == i_f;
+        %         thisbadperiods = obj.badperiods(idx,:);
+        % 
+        %         % eliminate bad periods from original traces (in case they
+        %         % hadn't been already
+        %         v = replace_badperiods_with_nans(plane{1}.timetraces,thisbadperiods);
+        %         plane{1}.timetraces = v;
+        % 
+        %         % desurround only
+        %         v = desurround2(plane,[],0,1,thisbadperiods);
+        %         plane{1}.timetracesdes = v;
+        % 
+        %         % debubbled desurround
+        %         v = debubbled_desurround(plane,num2str(i_f),thisbadperiods);
+        %         plane{1}.timetracesdebdes = v;
+        % 
+        %         save(fname,'plane','-v7.3');
+        %     end
+        % 
+        %     cd(original_dir)
+        % end
 
         function obj = defineTraces(obj, fname_PMToffmeta, fname_noLightmeta)
             arguments

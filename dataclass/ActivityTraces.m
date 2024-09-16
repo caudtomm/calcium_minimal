@@ -14,6 +14,7 @@ classdef ActivityTraces
         N double = 0
         T double = 0
         L double = 0 % single-valued trial duration [frames] (from subject)
+        framerate double = 0
 
         subject_ID char
         source_folder char = pwd
@@ -223,6 +224,7 @@ classdef ActivityTraces
             obj.subject_ID = subject.id;
             obj.source_folder = fullfile(subject.locations.subject_datapath,...
                 subject.locations.traces_src); 
+            obj.framerate = subject.framerate;
             obj.N = obj.extractN(subject);
             obj.L = subject.getNFrames;
             obj.T = obj.extractT(subject);

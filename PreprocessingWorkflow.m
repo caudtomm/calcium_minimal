@@ -73,6 +73,8 @@ b.Processor.reference_img=imgref;
 
 % run
 b = b.run;
+charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
+fish1.log{end+1} = charv;
 
 % move to layer 1 dir
 sourceFolder = fullfile(datapath, b.OutFolder);
@@ -94,6 +96,36 @@ movedirTC(sourceFolder,destinationFolder)
 fish1 = fish1.update_currentstate('Rigid alignment complete');
 cd(fish1.locations.subject_datapath)
 
+
+%% rigid frame-by-frame registration (directly on raw trials)
+
+% prep CLAHEd trials
+datapath = fish1.locations.rawtrials;
+fish1.Tiff2Movie(datapath)
+
+% initialize Batch Process
+b = BatchProcess(RigidRegistration);
+b.init.description = "Rigid alignment of raw trials to the raw reference image";
+b.includeFilter = [num2str(fish1.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
+b = b.setDataPath(datapath);
+imgref = fish1.reference_img;
+b.Processor.reference_img=imgref;
+
+% run
+b = b.run;
+charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
+fish1.log{end+1} = charv;
+
+% % move to layer 1 dir
+% sourceFolder = fullfile(datapath, b.OutFolder);
+% destinationFolder = fish1.locations.rawtrials_rigidreg;
+% movedirTC(sourceFolder,destinationFolder)
+
+fish1 = fish1.update_currentstate('Rigid alignment complete');
+fish1.save2mat()
+cd(fish1.locations.subject_datapath)
+
+
 %% remove baseline
 
 % datapath = fish1.locations.rawtrials_rigidreg;
@@ -106,6 +138,8 @@ cd(fish1.locations.subject_datapath)
 % 
 % % run
 % b = b.run;
+% charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
+% fish1.log{end+1} = charv;
 % 
 % % move to layer 1 dir
 % sourceFolder = fullfile(datapath, b.OutFolder);
@@ -129,6 +163,36 @@ fish1.save2mat()
 
 fish1.visualize_anatomy_physFOV
 cd(fish1.locations.subject_datapath)
+
+%% opticflow registration
+
+% prep raw trials
+datapath = fish1.locations.rawtrials;
+fish1.Tiff2Movie(datapath)
+
+% initialize Batch Process
+b = BatchProcess(OpticFlowRegistration);
+b.init.description = "OpticFlow alignment of raw trials to the rigidreg reference image";
+b.includeFilter = [num2str(fish1.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
+b = b.setDataPath(datapath);
+imgref = fish1.reference_img;
+b.Processor.reference_img=imgref;
+
+% run
+b = b.run;
+charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
+fish1.log{end+1} = charv;
+
+% move to layer 1 dir
+sourceFolder = fullfile(datapath, b.OutFolder);
+destinationFolder = fish1.locations.rawtrials_opticflowwarp;
+movedirTC(sourceFolder,destinationFolder)
+
+
+fish1 = fish1.update_currentstate('Opticflow alignment complete');
+fish1.save2mat()
+cd(fish1.locations.subject_datapath)
+
 
 %% ROI Selection
 

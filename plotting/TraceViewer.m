@@ -4,13 +4,32 @@ classdef TraceViewer
         idx logical % which traces to use
     end
 
+    methods (Static)
+        function v = catTraces(M)
+            % concatenates Traces:
+            % [t , roi , trial] -> [t x trial , roi]
+            arguments
+                M double
+            end
+
+            [T,N,ntrials] = size(M);
+
+            v = nan(T*ntrials,N);
+            
+            for i = 1:ntrials
+                interval = [1:T] + T*(i-1);
+                v(interval,:) = M(:,:,i);
+            end
+        end
+    end
+
     methods (Static, Access=protected)
         function h = plotStaggered(t,M)
             % plots the columns of M staggered in Y
 
             [nrows,ncols] = size(M);
             
-            scaling_fact = std(M,[],"all",'omitmissing');
+            scaling_fact = mad(M,[],"all",'omitmissing');
             M = M./scaling_fact;
 
             % space out data
@@ -75,8 +94,29 @@ classdef TraceViewer
             
             h = obj.plotStaggered(obj.traces.t, v);
             xlabel('time [s]')
-            ylabel('trials')
+            ylabel('trial #')
         end
+
+        function plotTracesInTime(obj, tracename, trials)
+            % plots single-cell traces side-by-side.
+            % Staggers cells. Default traces are dFoverF. Assumes input
+            % traces : [t, roi, trials]
+            arguments
+                obj
+                tracename = 'dFoverF'
+                trials double = [1:obj.traces.ntrials]
+            end
+            
+            M = obj.initializeTraces(tracename); % [t, roi, trial]
+            M = M(:,:,trials);
+            v = obj.catTraces(M);
+            t = linspace(0,size(M,3)*obj.traces.T,size(v,1));
+
+            h = obj.plotStaggered(t, v);
+            xlabel('time [s]')
+            ylabel('neuron #')
+        end
+
     end
 
 end

@@ -21,13 +21,10 @@ classdef Locations
         histeqtrials = 'trials_clahe';
         rawtrials_rigidreg = 'reg_stacks_raw';
         histeqtrials_rigidreg = 'reg_stacks_clahe';
-%         
-%         locations.warp.rawtrials_opticflow = 'trials_warp_of';
-%         locations.warp.rawtrials_opticflow_unchecked = 'flow_registration_results';
+        rawtrials_opticflowwarp = 'OFreg_stacks_raw';
+        histeqtrials_opticflowwarp = 'OFreg_stacks_clahe';
+
 %         locations.warp.rawtrials_bunwarpj = 'trials_warp_bunwarpj';
-%         
-%         locations.references.raw = fullfile('references','rawtrials');
-%         locations.references.histeq = fullfile('references','histeqtrials');
         
     end
 
