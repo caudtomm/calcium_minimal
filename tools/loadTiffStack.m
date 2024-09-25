@@ -48,7 +48,10 @@ if p.Results.option == 1
         
         if loadHeaders
             headerNames = tiff.getTagNames;
+            try
             headers{t} = getTag(tiff, 'ImageDescription');
+            catch
+            end
             try
                 headers{t} = [headers{t} getTag(tiff,'Software')];
             catch

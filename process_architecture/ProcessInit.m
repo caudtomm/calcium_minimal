@@ -15,6 +15,7 @@ classdef ProcessInit
         date_firstrun datetime = datetime("today")
         method char = ''
         reference_meta struct
+        internal_settings
     end
 
     methods (Static)

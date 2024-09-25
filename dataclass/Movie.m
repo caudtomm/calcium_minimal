@@ -74,7 +74,7 @@ classdef Movie
             if numel(obj.log)==2; obj.log = transpose(obj.log); end
         end
 
-        function save(obj, newpath, type)
+        function FileOut = save(obj, newpath, type)
             arguments
                 obj Movie
                 newpath char = ''
@@ -84,8 +84,8 @@ classdef Movie
             outpath = pwd;
             if ~isempty(newpath)
                 outpath = newpath;
-            elseif ~isempty(obj.path) && ~isempty(obj.path.orig_fpath)
-                outpath = obj.path.orig_fpath;
+            % elseif ~isempty(obj.path) && ~isempty(obj.path.orig_fpath)
+            %     outpath = obj.path.orig_fpath;
             end
 
             outfname = 'movie';
@@ -139,7 +139,10 @@ function [stack,scanimage_meta,path] = readSource(src)
             else
                 [stack, scanimage_meta] = loadTiffStack(src);
                 stack = double(stack);
-                scanimage_meta = convertScanimageMeta(scanimage_meta);
+                try
+                    scanimage_meta = convertScanimageMeta(scanimage_meta);
+                catch
+                end
                 path = getFileNameSpecs(src);
             end
             if isempty(path.orig_fpath)

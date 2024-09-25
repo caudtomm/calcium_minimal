@@ -432,24 +432,6 @@ classdef Subject
 
         %% Functional methods
 
-        % Method to visualize anatomical projections from all trials
-        function visualize_anatomy_physFOV(obj,anatomy)
-            % based on the output of obj.retrieve_trial_anatomies()
-
-            if ~exist("anatomy",'var') || isempty(anatomy)
-                anatomy = obj.anatomy_imgs;
-            end
-            ntrials = obj.getNTrials;
-
-            % figure 1
-            figure;
-            for i_trial = 1:ntrials
-                subplot(6,6,i_trial); imagesc(anatomy(:,:,i_trial));
-                title(num2str(i_trial))
-            end
-            subplot(6,6,36); imagesc(obj.reference_img); title('reference')
-        end
-
         % Method to update single-trial ROI definition files with
         % debubbling and center-surround calculations for dF/F calculation.
         % THESE METHODS ACTUALLY NEED VALIDATION

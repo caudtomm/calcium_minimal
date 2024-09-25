@@ -101,7 +101,7 @@ classdef Experiment
                 obj = obj.loadSubjects(subjectlist(i_sub));
                 obj.currentsubject = obj.subject{1};
 
-                cd(obj.currentsubject.locations.subject_datapath)
+                cd(obj.currentsubject.locations.sub)
 
                 % --------------------------------------
                 % VARIABLE SECTION

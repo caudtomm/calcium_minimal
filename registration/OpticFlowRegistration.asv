@@ -57,8 +57,8 @@ classdef OpticFlowRegistration < Registration
             % load operation results
             operation = load(fullfile(fpathout,'statistics.mat'));
 
-            % clean up: delete temporary tiff file
-            delete(TiffFilename)
+            
+            
         end
 
     end
