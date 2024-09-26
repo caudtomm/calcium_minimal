@@ -15,7 +15,7 @@ classdef RegistrationViewer
             obj.folder = foldername;
         end
 
-        function [v,h,collage] = subsampledMovieCollage(obj)
+        function collage = subsampledMovieCollage(obj)
             % retrieve file list
             fileList = {};
             for i = 1:numel(obj.sj.filelist)
@@ -58,28 +58,10 @@ classdef RegistrationViewer
                 % Insert the subsampled movie stack into the collage
                 collage((rowIdx-1)*x + (1:x), (colIdx-1)*y + (1:y), :) = subsampledStack;
             end
+
+            collage = Movie(collage);
+            collage.fs = movie.fs;
             
-            % Create a figure to display the collage
-            h = figure;
-            colormap(gray);
-        
-            v = VideoWriter(fullfile(obj.folder,'sidebyside.avi'));
-            open(v);
-
-            maxval = quantile(collage(:),.999);
-
-            % Play the collage frame by frame
-            for frame = 1:z
-                imagesc(collage(:, :, frame),[0 maxval]);
-                axis image;
-                title(['frame: ',num2str(frame)])
-                normframe = collage(:, :, frame)/maxval;
-                normframe(normframe>1) = 1;
-                normframe(normframe<0) = 0;
-                writeVideo(v,normframe);
-                % pause(1/16); % 16Hz playback
-            end
-
         end
 
     end

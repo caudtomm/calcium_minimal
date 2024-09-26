@@ -1,6 +1,7 @@
 function outbit = askBoolean(prompt)
 
 while true
+    prompt = strrep(prompt,'\','\\');
     x = input(prompt, 's');
     if strcmp(x,'y') || strcmp(x,'Y') || strcmp(x,'1') || strcmp(x,'yes')
         outbit = true; break

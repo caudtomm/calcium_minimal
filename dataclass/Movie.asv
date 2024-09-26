@@ -66,9 +66,7 @@ classdef Movie
             obj.timeavg = zproj;
         end
 
-        function v = getmaxval(obj)
-            v = mean(obj.stack,"all","omitmissing") + 4*std(obj.stack,[],"all","omitmissing");
-        end
+        function v = getmaxval(o)
         
         % Method to log operations and their hash address
         function obj = update_log(obj,charv)
@@ -88,9 +86,8 @@ classdef Movie
             h.Position = [50 50 1500 800];
             colormap("gray")
 
-            cspan = [0 obj.getmaxval];
-            xspan = [min(obj.stack,[],'all','omitmissing'), obj.getmaxval];
-            if isempty(framerate_Hz); framerate_Hz = 16; end
+            cspan = [0 mean(obj.stack,'all','omitmissing') + 3*std(obj.stack,[],"all","omitmissing")];
+            xspan = [min(obj.stack,[],'all','omitmissing'), max(obj.stack,[],'all','omitmissing')];
             
             tic
             while true
@@ -165,7 +162,6 @@ classdef Movie
 
                     if b
                         v = VideoWriter(FileOut);
-                        v.FrameRate = obj.fs;
                         open(v);
 
                         for frame = 1:obj.nfr
