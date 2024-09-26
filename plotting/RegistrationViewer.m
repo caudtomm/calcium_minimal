@@ -64,12 +64,18 @@ classdef RegistrationViewer
             h = figure;
             colormap(gray);
         
+            v = VideoWriter(fullfile(obj.folder,'sidebyside.avi'));
+            open(v);
+
             % Play the collage frame by frame
             for frame = 1:z
                 imagesc(collage(:, :, frame),[0 300]);
                 axis image;
-                pause(1/16); % 16Hz playback
+                title(['frame: ',num2str(frame)])
+                writeVideo(v,collage(:, :, frame));
+                % pause(1/16); % 16Hz playback
             end
+
         end
 
     end

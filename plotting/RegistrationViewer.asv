@@ -15,15 +15,13 @@ classdef RegistrationViewer
             obj.folder = foldername;
         end
 
-        function h = subsampledMovieCollage(obj)
+        function [h,collage] = subsampledMovieCollage(obj)
             % retrieve file list
-            currentDir = pwd;
-            cd(obj.folder)
             fileList = {};
-            for i = 1:numel(filenames)
-                fileList{end+1} = find_daughter_file(fullfile(obj.folder,obj.sj.filelist{i}))
+            for i = 1:numel(obj.sj.filelist)
+                fileList{end+1} = find_daughter_file(...
+                    fullfile(obj.folder,obj.sj.filelist(i).name),'mat');
             end
-            cd(currentDir)
 
 
             % Determine the number of files
@@ -34,6 +32,7 @@ classdef RegistrationViewer
             rows = ceil(numFiles / cols);
         
             % Load the first file to get the size of movie.stack
+            disp('Initializing...')
             load(fileList{1}, 'movie');
             [x, y, z] = size(movie.stack);
             
@@ -47,6 +46,7 @@ classdef RegistrationViewer
             % Add each movie to the collage
             for i = 1:numFiles
                 % Load the movie data
+                disp(fileList{i})
                 load(fileList{i}, 'movie');
                 
                 % Subsample the movie stack
@@ -64,12 +64,18 @@ classdef RegistrationViewer
             h = figure;
             colormap(gray);
         
+            v = VideoWriter(fullfile(obj.folder,'sidebyside.avi'));
+            open(v);
+
             % Play the collage frame by frame
             for frame = 1:z
-                imagesc(collage(:, :, frame), [0 1]);
+                imagesc(collage(:, :, frame),[0 300]);
                 axis image;
-                pause(1/16); % 16Hz playback
+                title(['frame: ',num2str(frame)])
+                writeVideo(v,collage(:, :, frame));
+                % pause(1/16); % 16Hz playback
             end
+
         end
 
     end
