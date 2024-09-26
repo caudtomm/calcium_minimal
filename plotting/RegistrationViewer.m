@@ -15,14 +15,13 @@ classdef RegistrationViewer
             obj.folder = foldername;
         end
 
-        function [h,collage] = subsampledMovieCollage(obj)
+        function [v,h,collage] = subsampledMovieCollage(obj)
             % retrieve file list
             fileList = {};
             for i = 1:numel(obj.sj.filelist)
                 fileList{end+1} = find_daughter_file(...
                     fullfile(obj.folder,obj.sj.filelist(i).name),'mat');
             end
-
 
             % Determine the number of files
             numFiles = length(fileList);
@@ -67,12 +66,17 @@ classdef RegistrationViewer
             v = VideoWriter(fullfile(obj.folder,'sidebyside.avi'));
             open(v);
 
+            maxval = quantile(collage(:),.999);
+
             % Play the collage frame by frame
             for frame = 1:z
-                imagesc(collage(:, :, frame),[0 300]);
+                imagesc(collage(:, :, frame),[0 maxval]);
                 axis image;
                 title(['frame: ',num2str(frame)])
-                writeVideo(v,collage(:, :, frame));
+                normframe = collage(:, :, frame)/maxval;
+                normframe(normframe>1) = 1;
+                normframe(normframe<0) = 0;
+                writeVideo(v,normframe);
                 % pause(1/16); % 16Hz playback
             end
 

@@ -37,7 +37,7 @@ if p.Results.option == 1
     w = tiff.getTag('ImageWidth');
     h = tiff.getTag('ImageLength');
     dataClass = class(read(tiff));
-    nFrames = findNoOfFrames(tiff,1001);
+    nFrames = findNoOfFrames(tiff,1);
     stack = zeros(h, w, nFrames, dataClass);
     if loadHeaders
         headers = cell(1, nFrames);
