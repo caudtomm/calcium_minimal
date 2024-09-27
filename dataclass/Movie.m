@@ -190,6 +190,9 @@ function [stack,scanimage_meta,path] = readSource(src)
     [stack, path] = deal([]);
 
     % read
+    if isnumeric(src)
+        src = double(src);
+    end
     switch class(src)
         case {'string','char'}  % src : filename
             src = char(src);
@@ -213,6 +216,7 @@ function [stack,scanimage_meta,path] = readSource(src)
             end
         case {'double'}         % src : numeric matrix defining the movie
             stack = src;
+            path.fname = 'movie';
     end
 end
 

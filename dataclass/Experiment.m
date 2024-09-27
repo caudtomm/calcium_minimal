@@ -116,10 +116,10 @@ classdef Experiment
                 p.sj = obj.currentsubject;
 
                 % make sure the subject has the correct reference image
-%                 p = p.updateSubject(p.sj.locations.rawtrials);
+                p = p.updateSubject(p.sj.locations.rawtrials);
                 
                 % registration
-%                 p = p.rigidregRaw;
+                p = p.rigidregRaw;
                 % then
                 p = p.opticflowregRaw;
                 % then (invalid - doesn't touch raw trials)
