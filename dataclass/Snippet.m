@@ -99,12 +99,12 @@ classdef Snippet < Movie
         end
 
         % save method (##store the output path to obj.path)
-        function obj = save(obj, newfname, newpath, type)
+        function FileOut = save(obj, newfname, newpath, type) % ## ----- arguments should be the same for all Movie subclasses
             arguments
                 obj
                 newfname char
                 newpath char = pwd
-                type char = 'json'
+                type char = 'mat'
             end
             type = char(type);
 
@@ -133,7 +133,7 @@ classdef Snippet < Movie
             end
 
             % run inherited save function
-            save@Movie(obj, newpath, type);
+            FileOut = save@Movie(obj, newpath, type);
         end
     end
 end

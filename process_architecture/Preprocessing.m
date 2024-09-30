@@ -89,7 +89,7 @@ classdef Preprocessing
             % move to layer 1 dir
             sourceFolder = fullfile(datapath, b.OutFolder);
             destinationFolder = obj.sj.locations.histeqtrials_rigidreg;
-            movedirTC(sourceFolder,destfish1inationFolder)
+            movedirTC(sourceFolder,destinationFolder)
             
             
             % apply computed shifts to the raw data
@@ -240,6 +240,46 @@ classdef Preprocessing
             obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');
             obj.sj.save2mat(obj.autosave)
             cd(obj.sj.locations.subject_datapath)
+        end
+
+        function obj = opticflowHisteq2Raw(obj)
+            % prep CLAHEd trials
+            datapath = obj.sj.locations.histeqtrials;
+            obj.sj.Tiff2Movie(datapath)
+            
+            % initialize Batch Process
+            b = BatchProcess(OpticFlowRegistration);
+            b.init.description = "Opticflow alignment of CLAHEd raw trials to the CLAHEd reference image";
+            b.includeFilter = [num2str(obj.sj.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
+            b = b.setDataPath(datapath);
+            imgref = obj.sj.loadReferenceImg(obj.sj.locations.references.histeq);
+            b.Processor.reference_img=imgref;
+            
+            % run
+            b = b.run;
+            charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
+            obj.sj.log{end+1} = charv;
+            
+            % move to layer 1 dir
+            sourceFolder = fullfile(datapath, b.OutFolder);
+            destinationFolder = obj.sj.locations.histeqtrials_opticflowwarp;
+            movedirTC(sourceFolder,destinationFolder)
+            
+            
+            % apply computed shifts to the raw data
+            datapath = obj.sj.locations.rawtrials;
+            b.init.detailed_description = "Result warp applied to raw trials";
+            b = b.applyresults(datapath);
+            
+            % move to layer 1 dir
+            sourceFolder = fullfile(datapath, b.OutFolder);
+            destinationFolder = obj.sj.locations.rawtrials_opticflowwarp_fromhisteq;
+            movedirTC(sourceFolder,destinationFolder)
+            
+            
+            obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');
+            cd(obj.sj.locations.subject_datapath)
+
         end
 
         function obj = selectROIs(obj)

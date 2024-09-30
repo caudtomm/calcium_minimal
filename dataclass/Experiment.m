@@ -119,11 +119,11 @@ classdef Experiment
                 p = p.updateSubject(p.sj.locations.rawtrials);
                 
                 % registration
-                p = p.rigidregRaw;
+                % p = p.rigidregRaw;
                 % then
-                p = p.opticflowregRaw;
-                % then (invalid - doesn't touch raw trials)
-                p = p.opticflowregHisteq;
+                % p = p.opticflowregRaw;
+                % then
+                p = p.opticflowHisteq2Raw;
 
                 obj.subjectTab.notes{i_sub} = 'done!';
                 writetable(obj.subjectTab,obj.record.tabpath,'Sheet',obj.record.sheet)
