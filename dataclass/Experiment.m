@@ -97,7 +97,7 @@ classdef Experiment
                     continue
                 end
 
-                % load the current subjecta
+                % load the current subject
                 obj = obj.loadSubjects(subjectlist(i_sub));
                 obj.currentsubject = obj.subject{1};
 
