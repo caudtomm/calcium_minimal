@@ -60,7 +60,7 @@ classdef RegistrationViewer
             end
 
             collage = Movie(collage);
-            collage.fs = movie.fs;
+            collage = collage.setFramerateHz(movie.fs);
             
         end
 

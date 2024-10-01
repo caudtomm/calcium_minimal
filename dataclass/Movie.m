@@ -18,7 +18,7 @@ classdef Movie
         metadata struct
 
     end
-    properties (SetAccess = private)
+    properties (SetAccess = protected)
         fs double       % framerate
         frameperiod double = 0
         imagingFovUm double = [0 0; 0 0; 0 0; 0 0]  % frame size [um]
@@ -48,6 +48,15 @@ classdef Movie
             end
         end
         
+        function obj = setFramerateHz(obj, value)
+            obj.fs = value;
+            obj.frameperiod = 1/value;
+        end
+
+        function obj = setFramePeriodSec(obj, value)
+            obj = obj.setFramerateHz(1/value);
+        end
+
         function value = get.timeavg(obj)
             value = mean(obj.stack,3,'omitmissing');
         end
