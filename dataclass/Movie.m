@@ -57,6 +57,16 @@ classdef Movie
             obj = obj.setFramerateHz(1/value);
         end
 
+        function obj = fliplr(obj)
+            obj.stack = fliplr(obj.stack);
+            obj = obj.checkAgain;
+        end
+
+        function obj = flipud(obj)
+            obj.stack = flipud(obj.stack);
+            obj = obj.checkAgain;
+        end
+
         function value = get.timeavg(obj)
             value = mean(obj.stack,3,'omitmissing');
         end

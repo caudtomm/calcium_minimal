@@ -67,12 +67,12 @@ classdef Preprocessing
             save(fout,'movie','-mat'); clear movie
             cd(obj.sj.locations.subject_datapath)
         end
-    
-        function obj = rigidregHisteq2Raw(obj)
+
+        function [obj, b] = rigidregHisteq(obj)
             % prep CLAHEd trials
             datapath = obj.sj.locations.histeqtrials;
             obj.sj.Tiff2Movie(datapath)
-            
+
             % initialize Batch Process
             b = BatchProcess(RigidRegistration);
             b.init.description = "Rigid alignment of CLAHEd raw trials to the CLAHEd reference image";
@@ -80,17 +80,20 @@ classdef Preprocessing
             b = b.setDataPath(datapath);
             imgref = obj.sj.loadReferenceImg(obj.sj.locations.references.histeq);
             b.Processor.reference_img=imgref;
-            
+
             % run
             b = b.run;
             charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
             obj.sj.log{end+1} = charv;
-            
+
             % move to layer 1 dir
             sourceFolder = fullfile(datapath, b.OutFolder);
             destinationFolder = obj.sj.locations.histeqtrials_rigidreg;
             movedirTC(sourceFolder,destinationFolder)
-            
+        end
+    
+        function [obj, b] = rigidregHisteq2Raw(obj)
+            [obj, b] = obj.rigidregHisteq();
             
             % apply computed shifts to the raw data
             datapath = obj.sj.locations.rawtrials;
@@ -108,7 +111,7 @@ classdef Preprocessing
 
         end
     
-        function obj = rigidregRaw(obj)
+        function [obj, b] = rigidregRaw(obj)
             % prep CLAHEd trials
             datapath = obj.sj.locations.rawtrials;
             obj.sj.Tiff2Movie(datapath)
@@ -136,7 +139,7 @@ classdef Preprocessing
             cd(obj.sj.locations.subject_datapath)
         end
     
-        function obj = removeMovieBaseline(obj)
+        function [obj, b] = removeMovieBaseline(obj)
             datapath = obj.sj.locations.rawtrials_rigidreg;
 
             % initialize Batch Process
@@ -212,7 +215,7 @@ classdef Preprocessing
             cd(obj.sj.locations.subject_datapath)
         end
     
-        function obj = opticflowregHisteq(obj)
+        function [obj, b] = opticflowregHisteq(obj)
             % prep raw trials
             datapath = obj.sj.locations.histeqtrials;
             obj.sj.Tiff2Movie(datapath)
@@ -242,29 +245,29 @@ classdef Preprocessing
             cd(obj.sj.locations.subject_datapath)
         end
 
-        function obj = opticflowHisteq2Raw(obj)
-            % prep CLAHEd trials
-            datapath = obj.sj.locations.histeqtrials;
-            obj.sj.Tiff2Movie(datapath)
-            
-            % initialize Batch Process
-            b = BatchProcess(OpticFlowRegistration);
-            b.init.description = "Opticflow alignment of CLAHEd raw trials to the CLAHEd reference image";
-            b.includeFilter = [num2str(obj.sj.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
-            b = b.setDataPath(datapath);
-            imgref = obj.sj.loadReferenceImg(obj.sj.locations.references.histeq);
-            b.Processor.reference_img=imgref;
-            
-            % run
-            b = b.run;
-            charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
-            obj.sj.log{end+1} = charv;
-            
-            % move to layer 1 dir
-            sourceFolder = fullfile(datapath, b.OutFolder);
-            destinationFolder = obj.sj.locations.histeqtrials_opticflowwarp;
-            movedirTC(sourceFolder,destinationFolder)
-            
+        function [obj, b] = opticflowHisteq2Raw(obj)
+            % % prep CLAHEd trials
+            % datapath = obj.sj.locations.histeqtrials;
+            % obj.sj.Tiff2Movie(datapath)
+            % 
+            % % initialize Batch Process
+            % b = BatchProcess(OpticFlowRegistration);
+            % b.init.description = "Opticflow alignment of CLAHEd raw trials to the CLAHEd reference image";
+            % b.includeFilter = [num2str(obj.sj.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
+            % b = b.setDataPath(datapath);
+            % imgref = obj.sj.loadReferenceImg(obj.sj.locations.references.histeq);
+            % b.Processor.reference_img=imgref;
+            % 
+            % % run
+            % b = b.run;
+            % charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
+            % obj.sj.log{end+1} = charv;
+            % 
+            % % move to layer 1 dir
+            % sourceFolder = fullfile(datapath, b.OutFolder);
+            % destinationFolder = obj.sj.locations.histeqtrials_opticflowwarp;
+            % movedirTC(sourceFolder,destinationFolder)
+            [obj,b] = obj.opticflowregHisteq();
             
             % apply computed shifts to the raw data
             datapath = obj.sj.locations.rawtrials;
@@ -280,6 +283,17 @@ classdef Preprocessing
             obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');
             cd(obj.sj.locations.subject_datapath)
 
+        end
+
+        function obj = allRegistration(obj)
+            % every registration protocol, done sequentially
+            obj = obj.rigidregRaw;
+            % then
+            obj = obj.rigidregHisteq2Raw;
+            % then
+            obj = obj.opticflowregRaw;
+            % then
+            obj = obj.opticflowHisteq2Raw;
         end
 
         function obj = selectROIs(obj)

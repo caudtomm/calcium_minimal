@@ -9,6 +9,21 @@ classdef Experiment
         summaryTab table = table()
     end
     
+    methods (Access = private)
+        function p = preprocessingHead(obj)
+            % startup preprocessing
+            p = Preprocessing;
+            p.autosave = true;
+            p.pl = false;
+    
+            % load subject into Preprocessing
+            p.sj = obj.currentsubject;
+    
+            % make sure the subject has the correct reference image
+            p = p.updateSubject(p.sj.locations.rawtrials);
+        end
+    end
+
     methods 
         function obj = Experiment(tabpath,sheet)
             arguments
@@ -87,13 +102,19 @@ classdef Experiment
             end
         end
 
-        function obj = processSubjects(obj)
+        function obj = processSubjects(obj,process_name,docheckifdone)
+            arguments
+                obj 
+                process_name char
+                docheckifdone logical = true
+            end
             % define complete list of subjects to process
             subjectlist = obj.subjectTab.name;
 
             for i_sub = 1:numel(subjectlist)
+
                 % check if already done: if so, skip
-                if strcmp(obj.subjectTab.notes{i_sub},'done!')
+                if docheckifdone & strcmp(obj.subjectTab.notes{i_sub},'done!')
                     continue
                 end
 
@@ -106,30 +127,18 @@ classdef Experiment
                 % --------------------------------------
                 % VARIABLE SECTION
                 %
-
-                % startup preprocessing
-                p = Preprocessing;
-                p.autosave = true;
-                p.pl = false;
-
-                % load subject into Preprocessing
-                p.sj = obj.currentsubject;
-
-                % make sure the subject has the correct reference image
-                p = p.updateSubject(p.sj.locations.rawtrials);
-                
-                % registration
-                % p = p.rigidregRaw;
-                % then
-                % p = p.opticflowregRaw;
-                % then
-                p = p.opticflowHisteq2Raw;
+                p = obj.preprocessingHead();
+                try
+                    p = p.(process_name); % ###
+                catch
+                    error('process unknown.')
+                end
+                %
+                % --------------------------------------
 
                 obj.subjectTab.notes{i_sub} = 'done!';
                 writetable(obj.subjectTab,obj.record.tabpath,'Sheet',obj.record.sheet)
 
-                %
-                % --------------------------------------
 
                 obj.subject = {};
             end
