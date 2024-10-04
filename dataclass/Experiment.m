@@ -122,7 +122,8 @@ classdef Experiment
                 obj = obj.loadSubjects(subjectlist(i_sub));
                 obj.currentsubject = obj.subject{1};
                 
-                newlocation = obj.currentsubject.locations.setDrive(obj.locations.drive);
+                obj.currentsubject.locations = ...
+                    obj.currentsubject.locations.setDrive(obj.locations.drive);
                 cdtol(newlocation.subject_datapath)
 
                 % --------------------------------------
@@ -139,7 +140,6 @@ classdef Experiment
 
                 obj.subjectTab.notes{i_sub} = 'done!';
                 writetable(obj.subjectTab,obj.record.tabpath,'Sheet',obj.record.sheet)
-
 
                 obj.subject = {};
             end

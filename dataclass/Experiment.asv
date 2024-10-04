@@ -121,8 +121,10 @@ classdef Experiment
                 % load the current subject
                 obj = obj.loadSubjects(subjectlist(i_sub));
                 obj.currentsubject = obj.subject{1};
-
-                cd(obj.currentsubject.locations.subject_datapath)
+                
+                obj.currentsubject.locations = ...
+                    obj.currentsubject.locations.setDrive(obj.locations.drive);
+                cdtol(newlocation.subject_datapath)
 
                 % --------------------------------------
                 % VARIABLE SECTION
@@ -138,7 +140,6 @@ classdef Experiment
 
                 obj.subjectTab.notes{i_sub} = 'done!';
                 writetable(obj.subjectTab,obj.record.tabpath,'Sheet',obj.record.sheet)
-
 
                 obj.subject = {};
             end

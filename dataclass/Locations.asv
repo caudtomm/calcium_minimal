@@ -64,8 +64,7 @@ classdef Locations
                 id char = ''
             end
             
-            % This will retain the existing drive, in case the id was
-            % empty.
+            % this will retain the existing drive, 
             obj.drive = obj.tungstenDrive(id);
 
             obj = obj.setGeneralDataPath(fullfile(obj.drive,obj.datafolder));
