@@ -21,6 +21,7 @@ classdef Locations
         histeqtrials = 'trials_clahe';
         rawtrials_rigidreg = 'reg_stacks_raw';
         histeqtrials_rigidreg = 'reg_stacks_clahe';
+        rawtrials_rigidreg_fromhisteq = 'reg_stacks_clahe2raw';
         rawtrials_opticflowwarp = 'OFreg_stacks_raw';
         histeqtrials_opticflowwarp = 'OFreg_stacks_clahe';
         rawtrials_opticflowwarp_fromhisteq = 'OFreg_stacks_clahe2raw';

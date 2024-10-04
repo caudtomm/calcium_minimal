@@ -121,8 +121,9 @@ classdef Experiment
                 % load the current subject
                 obj = obj.loadSubjects(subjectlist(i_sub));
                 obj.currentsubject = obj.subject{1};
-
-                cd(obj.currentsubject.locations.subject_datapath)
+                
+                newlocation = obj.currentsubject.locations.setDrive(obj.locations.drive);
+                cdtol(newlocation.subject_datapath)
 
                 % --------------------------------------
                 % VARIABLE SECTION

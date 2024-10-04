@@ -25,7 +25,7 @@ classdef Preprocessing
             locations = locations.setDataFolder(datafolder);
             
             % startup
-            cd(locations.subject_datapath)
+            cdtol(locations.subject_datapath)
             
             % Create a new Subject object (this is a new fish)
             subject = Subject('fish1',locations, group);
@@ -56,7 +56,7 @@ classdef Preprocessing
             movedirTC(sourceFolder,destinationFolder)
             
             % save a separate clahe reference
-            cd(destinationFolder)
+            cdtol(destinationFolder)
             ref = obj.sj.retrieveSnippetfromCoords(fullfile(obj.sj.locations.subject_datapath, ...
                 obj.sj.locations.references.raw,'metadata.json'));
             ref.metadata.Name = "Raw Reference Image (CLAHE)";
@@ -65,7 +65,7 @@ classdef Preprocessing
                 obj.sj.locations.references.histeq,[foutname,'.mat']);
             movie = ref; clear ref
             save(fout,'movie','-mat'); clear movie
-            cd(obj.sj.locations.subject_datapath)
+            cdtol(obj.sj.locations.subject_datapath)
         end
 
         function [obj, b] = rigidregHisteq(obj)
@@ -102,12 +102,12 @@ classdef Preprocessing
             
             % move to layer 1 dir
             sourceFolder = fullfile(datapath, b.OutFolder);
-            destinationFolder = obj.sj.locations.rawtrials_rigidreg;
+            destinationFolder = obj.sj.locations.rawtrials_rigidreg_fromhisteq;
             movedirTC(sourceFolder,destinationFolder)
             
             
             obj.sj = obj.sj.update_currentstate('Rigid alignment complete');
-            cd(obj.sj.locations.subject_datapath)
+            cdtol(obj.sj.locations.subject_datapath)
 
         end
     
@@ -129,14 +129,14 @@ classdef Preprocessing
             charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
             obj.sj.log{end+1} = charv;
             
-            % % move to layer 1 dir
-            % sourceFolder = fullfile(datapath, b.OutFolder);
-            % destinationFolder = obj.sj.locations.rawtrials_rigidreg;
-            % movedirTC(sourceFolder,destinationFolder)
+            % move to layer 1 dir
+            sourceFolder = fullfile(datapath, b.OutFolder);
+            destinationFolder = obj.sj.locations.rawtrials_rigidreg;
+            movedirTC(sourceFolder,destinationFolder)
             
             obj.sj = obj.sj.update_currentstate('Rigid alignment complete');
             obj.sj.save2mat(obj.autosave)
-            cd(obj.sj.locations.subject_datapath)
+            cdtol(obj.sj.locations.subject_datapath)
         end
     
         function [obj, b] = removeMovieBaseline(obj)
@@ -161,7 +161,7 @@ classdef Preprocessing
 
 
             obj.sj = obj.sj.update_currentstate('Movie baseline removed');
-            cd(obj.sj.locations.subject_datapath)
+            cdtol(obj.sj.locations.subject_datapath)
         end
     
         function obj = updateSubject(obj, loc)
@@ -182,7 +182,7 @@ classdef Preprocessing
                 SubjectViewer(obj.sj).visualize_anatomy_physFOV;
             end
 
-            cd(obj.sj.locations.subject_datapath)
+            cdtol(obj.sj.locations.subject_datapath)
         end
     
         function obj = opticflowregRaw(obj)
@@ -212,7 +212,7 @@ classdef Preprocessing
             
             obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');
             obj.sj.save2mat(obj.autosave)
-            cd(obj.sj.locations.subject_datapath)
+            cdtol(obj.sj.locations.subject_datapath)
         end
     
         function [obj, b] = opticflowregHisteq(obj)
@@ -242,7 +242,7 @@ classdef Preprocessing
             
             obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');
             obj.sj.save2mat(obj.autosave)
-            cd(obj.sj.locations.subject_datapath)
+            cdtol(obj.sj.locations.subject_datapath)
         end
 
         function [obj, b] = opticflowHisteq2Raw(obj)
@@ -281,7 +281,7 @@ classdef Preprocessing
             
             
             obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');
-            cd(obj.sj.locations.subject_datapath)
+            cdtol(obj.sj.locations.subject_datapath)
 
         end
 
@@ -294,6 +294,13 @@ classdef Preprocessing
             obj = obj.opticflowregRaw;
             % then
             obj = obj.opticflowHisteq2Raw;
+        end
+
+        function obj = allRigidReg(obj)
+            % every rigid registration protocol, done sequentially
+            obj = obj.rigidregRaw;
+            % then
+            obj = obj.rigidregHisteq2Raw;
         end
 
         function obj = selectROIs(obj)
@@ -327,13 +334,13 @@ classdef Preprocessing
             PMToffmeta = fullfile(loc.subject_datapath, loc.rawtrials, 'PMToff_metadata.json');
             noLightmeta = fullfile(loc.subject_datapath, loc.rawtrials, 'noLight_metadata.json');
             obj.sj = obj.sj.defineTraces(PMToffmeta,noLightmeta);
-            cd(obj.sj.locations.subject_datapath)
+            cdtol(obj.sj.locations.subject_datapath)
             
             refmovieforbackground = 'TC_240218_TC0028_240213beh1b2_sxpDp_odorexp004_RPB3144501500AG_00035_00001.tif';
             refmovieforbackground = fullfile(obj.sj.locations.general_datapath,refmovieforbackground);
             
             
-            cd(obj.sj.locations.traces_src)
+            cdtol(obj.sj.locations.traces_src)
             
             interval = 960:1100;
             obj.sj.traces = obj.sj.traces.setPMToff(Snippet(refmovieforbackground,interval));
@@ -342,7 +349,7 @@ classdef Preprocessing
             obj.sj.traces = obj.sj.traces.defineFundamentalProperties(obj.sj);
             obj.sj.traces = obj.sj.traces.setDerivativeProperties;
             
-            cd(obj.sj.locations.subject_datapath)
+            cdtol(obj.sj.locations.subject_datapath)
             
             
             obj.sj = obj.sj.update_currentstate('Calcium traces extracted');

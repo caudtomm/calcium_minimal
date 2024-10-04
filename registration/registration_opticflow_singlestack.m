@@ -34,5 +34,5 @@ options.save_options(fullfile(FileOut_path, 'options.json'));
 
 compensate_recording(options);
 
-cd(FileOut_path)
+cdtol(FileOut_path)
 end

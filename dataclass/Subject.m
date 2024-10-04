@@ -305,7 +305,7 @@ classdef Subject
             localCorr = nan(imHeight,imWidth,nTrials);
 
             % move to input folder
-            cd(fullfile(obj.locations.subject_datapath,input_folder))
+            cdtol(fullfile(obj.locations.subject_datapath,input_folder))
 
             % make a list of names for all the files to be loaded
             filenames = {};
@@ -335,7 +335,7 @@ classdef Subject
                 end
             else    
                 % move to input folder
-                cd(fullfile(obj.locations.subject_datapath,input_folder))
+                cdtol(fullfile(obj.locations.subject_datapath,input_folder))
     
                 % make a list of names for all the files to be loaded
                 filenames = {};
@@ -356,7 +356,7 @@ classdef Subject
 
         function reference_image = retrieve_ref_img(obj,input_folder)    
             % move to input folder
-            cd(fullfile(obj.locations.subject_datapath,input_folder))
+            cdtol(fullfile(obj.locations.subject_datapath,input_folder))
 
             reftrialnum = obj.reference_img_meta.Trial_relativenum;
             filename = find_daughter_file(obj.filelist(reftrialnum).name,'mat');
@@ -438,7 +438,7 @@ classdef Subject
         % function calculate_dFoverF(obj)
         %     original_dir = pwd;
         %     loc = obj.locations;
-        %     cd(fullfile(loc.subject_datapath,loc.defRois))
+        %     cdtol(fullfile(loc.subject_datapath,loc.defRois))
         % 
         %     files = dir('*.mat');
         %     for i_f = 1:numel(files)
@@ -466,7 +466,7 @@ classdef Subject
         %         save(fname,'plane','-v7.3');
         %     end
         % 
-        %     cd(original_dir)
+        %     cdtol(original_dir)
         % end
 
         function obj = defineTraces(obj, fname_PMToffmeta, fname_noLightmeta)
@@ -478,7 +478,7 @@ classdef Subject
 
             tracestmp = ActivityTraces(obj); % construct traces
             
-            cd(obj.locations.traces_src)
+            cdtol(obj.locations.traces_src)
 
             % tracestmp = tracestmp.loadMovieData(obj,fname_PMToffmeta,fname_noLightmeta);
             % 
@@ -486,7 +486,7 @@ classdef Subject
             % tracestmp = tracestmp.setDerivativeProperties();
 
             % return
-            cd(obj.locations.subject_datapath)
+            cdtol(obj.locations.subject_datapath)
             obj.traces = tracestmp;
         end
 
@@ -499,7 +499,7 @@ classdef Subject
             loc = obj.locations;
 
             % change directory to the subject's main
-            cd(loc.subject_datapath)
+            cdtol(loc.subject_datapath)
 
             % source single trial data files
             files = dir(fullfile(loc.defRois,'*.mat'));

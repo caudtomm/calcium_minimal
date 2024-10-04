@@ -1,7 +1,7 @@
 function registration_opticflow_moveresults(loc,do_correct)
 
 % go to results folder
-cd(loc.warp.rawtrials_opticflow_unchecked);
+cdtol(loc.warp.rawtrials_opticflow_unchecked);
 
 % create output folder
 
