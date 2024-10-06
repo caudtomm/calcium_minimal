@@ -158,6 +158,9 @@ classdef Movie
                 outfname = obj.path.fname;
             end
 
+            % check if the output path exists. if not, create it.
+            if ~exist(outpath,"dir"); mkdir(outpath); end
+
             switch type
                 case 'mat'
                     FileOut = fullfile(outpath,[outfname,'.mat']);

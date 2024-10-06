@@ -322,6 +322,29 @@ classdef Subject
             end
         end
 
+        function saveAnatomy(obj, thispath)
+            arguments
+                obj 
+                thispath char = ''
+            end
+
+            % init vars
+            outpath = 'anatomy_imgs';
+
+            images = obj.retrieve_trial_anatomies(thispath);
+        
+            % save as a tif movie
+            Movie(images).save(fullfile(thispath,outpath),'tif');
+
+            % save individually
+            for i_img = 1:size(images,3)
+                thisimg = Movie(images(:,:,i_img));
+                thisimg.path.fname = obj.filelist(i_img).name;
+                thisimg.save(fullfile(outpath),'tif');
+            end
+        end
+                
+
         % Method to retrieve average projections from physiological data.
         % You can manually store the result into obj.anatomy_imgs for 
         % future reference
@@ -345,6 +368,8 @@ classdef Subject
     
                 % open each file and extract anatomy image
                 for i_file = 1:ntrials
+                    disp(filenames{i_file})
+                    
                     % assumes that filenames refer to physiological Movie's
                     load(filenames{i_file},'movie');
                     anatomy(:,:,i_file) = movie.timeavg;

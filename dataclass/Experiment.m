@@ -81,6 +81,10 @@ classdef Experiment
                     continue
                 end
 
+                % take local tungsten drive name into account
+                thissubject.locations = ...
+                    thissubject.locations.setDrive(obj.locations.drive);
+
                 % save to properties                
                 subject_not_yet_in_this_experiment = ...
                     isempty(obj.summaryTab) || ...
@@ -100,6 +104,9 @@ classdef Experiment
                 end
                     
             end
+
+            % update current subject
+            obj.currentsubject = obj.subject{1};
         end
 
         function obj = processSubjects(obj,process_name,docheckifdone)
@@ -118,14 +125,10 @@ classdef Experiment
                     continue
                 end
 
-                % load the current subject
+                % load the current subject and move to its data directory
                 obj = obj.loadSubjects(subjectlist(i_sub));
-                obj.currentsubject = obj.subject{1};
+                cdtol(obj.currentsubject.locations.subject_datapath)
                 
-                obj.currentsubject.locations = ...
-                    obj.currentsubject.locations.setDrive(obj.locations.drive);
-                cdtol(newlocation.subject_datapath)
-
                 % --------------------------------------
                 % VARIABLE SECTION
                 %
@@ -144,6 +147,26 @@ classdef Experiment
                 obj.subject = {};
             end
             
+        end
+
+        function obj = saveAnatomiesToFiles(obj)
+            % define complete list of subjects to process
+            subjectlist = obj.subjectTab.name;
+
+            for i_sub = 2:numel(subjectlist)
+                disp(subjectlist(i_sub))
+                
+                % load the current subject and move to its data directory
+                obj = obj.loadSubjects(subjectlist(i_sub));
+                cdtol(obj.currentsubject.locations.subject_datapath)
+
+                folders = dir(pwd); % includes files, too.
+                for i = 3:numel(folders)
+                    if ~folders(i).isdir; continue; end
+
+                    obj.currentsubject.saveAnatomy(folders(i).name);
+                end
+            end
         end
 
     end

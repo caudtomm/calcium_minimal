@@ -1,6 +1,6 @@
-function cdtol(path)
+function cdtol(thispath)
 % tolerant cd, works with Unix and Windows
 
-cd(fullfile(strrep(path,'\','/')))
+cd(fullfile(strrep(thispath,'\','/')))
 
 end
