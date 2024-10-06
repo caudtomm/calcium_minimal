@@ -322,14 +322,14 @@ classdef Subject
             end
         end
 
-        function saveAnatomy(obj, thispath)
+        function saveTrialAvgs(obj, thispath)
             arguments
                 obj 
                 thispath char = ''
             end
 
             % init vars
-            outpath = 'anatomy_imgs';
+            outpath = 'trialavgs';
 
             images = obj.retrieve_trial_anatomies(thispath);
         
@@ -386,12 +386,10 @@ classdef Subject
             reftrialnum = obj.reference_img_meta.Trial_relativenum;
             filename = find_daughter_file(obj.filelist(reftrialnum).name,'mat');
 
-            load(filename,'movie');
-
             % extract average of selected frame range
             frame_range = obj.reference_img_meta.Frameavg_range(1) : ...
                 obj.reference_img_meta.Frameavg_range(2);
-            reference_image = mean(movie.stack(:,:,frame_range),3,'omitmissing');
+            reference_image = Snippet(filename,frame_range).timeavg;
         end
 
         function snip = retrieveSnippetfromCoords(obj, filenamejson)
