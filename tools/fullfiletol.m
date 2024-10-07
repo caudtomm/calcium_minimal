@@ -1,4 +1,4 @@
-function outputpath = fullfiletol(thispath)
+function outputpath = fullfiletol(varargin)
 % tolerant fullfile, works with Unix and Windows
 
 % Combine input arguments into a single path
