@@ -403,11 +403,11 @@ classdef Subject
 
             if ~do_save; return; end
             
-            % Saving
+            % Saving as files
             disp(['Saving to ... ', output_folder])
             if ~exist(output_folder,'dir'); mkdir(output_folder); end
-            snip.save('',output_folder,'mat')
-            FileOut = fullfile(output_folder,[snip.path.fname, '.tif']);
+            snip.save('',output_folder,'mat')                                  % Saving the whole Snippet
+            FileOut = fullfile(output_folder,[snip.path.fname, '.tif']);    % Saving the image as Tiff
             saveastiff(reference_image,FileOut)
         end
 
