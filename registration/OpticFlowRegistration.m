@@ -44,7 +44,7 @@ classdef OpticFlowRegistration < Registration
                 % name the output tiff file
                 fpathout = obj.hash;
                 if obj.init.batch_run; fpathout = ['batch_',obj.init.superHash]; end
-                fpathout = fullfile(obj.init.original_path,fpathout,movie_result.path.fname);
+                fpathout = fullfiletol(obj.init.original_path,fpathout,movie_result.path.fname);
     
                 % flow registration settings
                 options = OF_options(...
@@ -70,10 +70,10 @@ classdef OpticFlowRegistration < Registration
                 [~,warp,idx_valid] = compensate_recording(options);
     
                 % load result stack into movie
-                movie_result.stack = Movie(fullfile(fpathout,'compensated.TIFF')).stack;
+                movie_result.stack = Movie(fullfiletol(fpathout,'compensated.TIFF')).stack;
     
                 % load operation results
-                operation = load(fullfile(fpathout,'statistics.mat'));
+                operation = load(fullfiletol(fpathout,'statistics.mat'));
                 operation.warp = warp;
                 operation.idx_valid = idx_valid;
     

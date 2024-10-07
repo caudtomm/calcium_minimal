@@ -63,7 +63,7 @@ classdef Experiment
                 thisloc = thisloc.setSubjectID(thissubjectname);
 
                 % look for pre-existing subject file
-                FileIn = fullfile(thisloc.subject_datapath,fname);
+                FileIn = fullfiletol(thisloc.subject_datapath,fname);
                 if isfile(FileIn)
                     fprintf('found : %s ...',fname)
                     thissubject = load(FileIn,'fish1').fish1;
@@ -129,7 +129,7 @@ classdef Experiment
 
                 % load the current subject and move to its data directory
                 obj = obj.loadSubjects(subjectlist(i_sub),false,true);
-                cdtol(obj.currentsubject.locations.subject_datapath)
+                cd(obj.currentsubject.locations.subject_datapath)
                 
                 % --------------------------------------
                 % VARIABLE SECTION
@@ -158,7 +158,7 @@ classdef Experiment
                 
                 % load the current subject and move to its data directory
                 obj = obj.loadSubjects(subjectlist(i_sub),false,true);
-                cdtol(obj.currentsubject.locations.subject_datapath)
+                cd(obj.currentsubject.locations.subject_datapath)
 
                 folders = dir(pwd); % includes files, too.
                 for i = 3:numel(folders)
@@ -178,7 +178,7 @@ classdef Experiment
 
                 % load the current subject and move to its data directory
                 obj = obj.loadSubjects(subjectlist(i_sub),false,true);
-                cdtol(obj.currentsubject.locations.subject_datapath)
+                cd(obj.currentsubject.locations.subject_datapath)
 
                 folders = dir(pwd); % includes files, too.
                 for i = 3:numel(folders)

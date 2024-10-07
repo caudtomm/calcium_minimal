@@ -20,7 +20,7 @@ classdef RegistrationViewer
             fileList = {};
             for i = 1:numel(obj.sj.filelist)
                 fileList{end+1} = find_daughter_file(...
-                    fullfile(obj.folder,obj.sj.filelist(i).name),'mat');
+                    fullfiletol(obj.folder,obj.sj.filelist(i).name),'mat');
             end
 
             % Determine the number of files

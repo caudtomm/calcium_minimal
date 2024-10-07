@@ -51,11 +51,11 @@ classdef Locations
     methods
         function obj = Locations()
             obj = obj.setGeneralDataPath(...
-                fullfile(obj.drive, ...
+                fullfiletol(obj.drive, ...
                 obj.datafolder));
 
-            obj.references.raw = fullfile('references','rawtrials');
-            obj.references.histeq = fullfile('references','histeqtrials');
+            obj.references.raw = fullfiletol('references','rawtrials');
+            obj.references.histeq = fullfiletol('references','histeqtrials');
         end
 
         function obj = setDrive(obj, id)
@@ -68,7 +68,7 @@ classdef Locations
             % empty.
             obj.drive = obj.tungstenDrive(id);
 
-            obj = obj.setGeneralDataPath(fullfile(obj.drive,obj.datafolder));
+            obj = obj.setGeneralDataPath(fullfiletol(obj.drive,obj.datafolder));
 
         end
 
@@ -82,7 +82,7 @@ classdef Locations
                 obj.general_datapath = id;
             end % else, keep existing
 
-            obj = obj.setSubjectDataPath(fullfile(obj.general_datapath,obj.subject_ID));
+            obj = obj.setSubjectDataPath(fullfiletol(obj.general_datapath,obj.subject_ID));
 
         end
         
@@ -106,7 +106,7 @@ classdef Locations
                 obj.subject_ID = id;
             end % else, keep existing
 
-            obj = obj.setSubjectDataPath(fullfile(obj.general_datapath,obj.subject_ID));
+            obj = obj.setSubjectDataPath(fullfiletol(obj.general_datapath,obj.subject_ID));
 
         end
 
@@ -120,7 +120,7 @@ classdef Locations
                 obj.datafolder = id;
             end % else, keep existing
 
-            obj = obj.setGeneralDataPath(fullfile(obj.drive,obj.datafolder));
+            obj = obj.setGeneralDataPath(fullfiletol(obj.drive,obj.datafolder));
 
         end
     end

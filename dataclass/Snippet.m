@@ -123,7 +123,7 @@ classdef Snippet < Movie
                 i = 1;
                 while true
                     obj.path.fname = [basename,num2str(i)];
-                    files = dir(fullfile(newpath,[obj.path.fname,'.*']));
+                    files = dir(fullfiletol(newpath,[obj.path.fname,'.*']));
                     if isempty(files)
                         break
                     else

@@ -163,7 +163,7 @@ classdef Movie
 
             switch type
                 case 'mat'
-                    FileOut = fullfile(outpath,[outfname,'.mat']);
+                    FileOut = fullfiletol(outpath,[outfname,'.mat']);
                     b = prompt_overwrite(FileOut);
         
                     obj.path = getFileNameSpecs(FileOut);
@@ -174,7 +174,7 @@ classdef Movie
                     end
                     
                 case 'tif'
-                    FileOut = fullfile(outpath,[outfname,'.tif']);
+                    FileOut = fullfiletol(outpath,[outfname,'.tif']);
                     b = prompt_overwrite(FileOut);
         
                     movie = obj.stack;
@@ -183,7 +183,7 @@ classdef Movie
                     end
 
                 case 'avi'
-                    FileOut = fullfile(outpath,[outfname,'.avi']);
+                    FileOut = fullfiletol(outpath,[outfname,'.avi']);
                     b = prompt_overwrite(FileOut);
 
                     if b

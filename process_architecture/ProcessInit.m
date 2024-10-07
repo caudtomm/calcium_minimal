@@ -49,14 +49,14 @@ classdef ProcessInit
             switch type
                 case 'mat'
                     % save init as mat file
-                    FileOut = fullfile(outpath,[fname,'.mat']);
+                    FileOut = fullfiletol(outpath,[fname,'.mat']);
                     b = prompt_overwrite(FileOut);
                     if b
                         save(FileOut,'init');
                     end
                 case 'json'
                     % save init as json file
-                    FileOut = fullfile(outpath,[fname,'.json']);
+                    FileOut = fullfiletol(outpath,[fname,'.json']);
                     b = prompt_overwrite(FileOut);
                     if b
                         fid = fopen(FileOut,'w');
