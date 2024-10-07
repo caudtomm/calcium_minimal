@@ -173,7 +173,7 @@ classdef Experiment
             % define complete list of subjects to process
             subjectlist = obj.subjectTab.name;
 
-            for i_sub = 2:numel(subjectlist)
+            for i_sub = 1:numel(subjectlist)
                 disp(subjectlist(i_sub))
 
                 % load the current subject and move to its data directory
@@ -184,7 +184,9 @@ classdef Experiment
                 for i = 3:numel(folders)
                     if ~folders(i).isdir; continue; end
 
-                    obj.currentsubject.retrieve_ref_img(folders(i).name,true);
+                    try % some folders don't actually contain trials
+                        obj.currentsubject.retrieve_ref_img(folders(i).name,true);
+                    end
                 end             
                 
             end
