@@ -149,7 +149,7 @@ classdef Experiment
             
         end
 
-        function obj = saveAnatomiesToFiles(obj)
+        function obj = saveTrialAvgsToFiles(obj)
             % define complete list of subjects to process
             subjectlist = obj.subjectTab.name;
 
@@ -164,9 +164,31 @@ classdef Experiment
                 for i = 3:numel(folders)
                     if ~folders(i).isdir; continue; end
 
-                    obj.currentsubject.saveAnatomy(folders(i).name);
+                    obj.currentsubject.saveTrialAvgs(folders(i).name);
                 end
             end
+        end
+
+        function obj = saveAnatomicalReferencesToFiles(obj)
+            % define complete list of subjects to process
+            subjectlist = obj.subjectTab.name;
+
+            for i_sub = 2:numel(subjectlist)
+                disp(subjectlist(i_sub))
+
+                % load the current subject and move to its data directory
+                obj = obj.loadSubjects(subjectlist(i_sub));
+                cdtol(obj.currentsubject.locations.subject_datapath)
+
+                folders = dir(pwd); % includes files, too.
+                for i = 3:numel(folders)
+                    if ~folders(i).isdir; continue; end
+
+                    obj.currentsubject.retrieve_ref_img(folders(i).name,true);
+                end             
+                
+            end
+            
         end
 
     end

@@ -343,7 +343,6 @@ classdef Subject
                 thisimg.save(fullfile(outpath),'tif');
             end
         end
-                
 
         % Method to retrieve average projections from physiological data.
         % You can manually store the result into obj.anatomy_imgs for 
@@ -356,7 +355,7 @@ classdef Subject
                 for i_file = 1:ntrials
                     anatomy(:,:,i_file) = obj.singletrial_meta{i_file}.timeavg;
                 end
-            else    
+            else
                 % move to input folder
                 cdtol(fullfile(obj.locations.subject_datapath,input_folder))
     
@@ -379,7 +378,16 @@ classdef Subject
 
         end
 
-        function reference_image = retrieve_ref_img(obj,input_folder)    
+        function reference_image = retrieve_ref_img(obj,input_folder, do_save)
+            arguments
+                obj
+                input_folder char
+                do_save logical = false
+            end
+
+            % specify output location
+            output_folder = fullfile(obj.locations.subject_datapath,'references',input_folder);
+
             % move to input folder
             cdtol(fullfile(obj.locations.subject_datapath,input_folder))
 
@@ -389,7 +397,18 @@ classdef Subject
             % extract average of selected frame range
             frame_range = obj.reference_img_meta.Frameavg_range(1) : ...
                 obj.reference_img_meta.Frameavg_range(2);
-            reference_image = Snippet(filename,frame_range).timeavg;
+            snip = Snippet(filename,frame_range);
+            snip.path.fname = getFileNameSpecs(filename).fname; % to have a nice name when saving, if applicable
+            reference_image = snip.timeavg;
+
+            if ~do_save; return; end
+            
+            % Saving
+            disp(['Saving to ... ', output_folder])
+            if ~exist(output_folder,'dir'); mkdir(output_folder); end
+            snip.save('',output_folder,'mat')
+            FileOut = fullfile(output_folder,[snip.path.fname, '.tif']);
+            saveastiff(reference_image,FileOut)
         end
 
         function snip = retrieveSnippetfromCoords(obj, filenamejson)
