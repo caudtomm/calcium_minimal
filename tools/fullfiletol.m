@@ -1,8 +1,10 @@
-function fullfiletol(thispath)
+function outputpath = fullfiletol(thispath)
 % tolerant fullfile, works with Unix and Windows
 
-% the internal fullfile acts normally to bind char vectors.
+% Combine input arguments into a single path
+combinedPath = fullfile(varargin{:});
+
 % the external fullfile converts all Unix slashes to Windows slashes, if applicable.
-fullfile(strrep(fullfile(thispath),'\','/'))
+outputpath = fullfile(strrep(combinedPath,'\','/'));
 
 end
