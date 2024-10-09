@@ -3,5 +3,12 @@ function movedirTC(sourceFolder,destinationFolder)
         warning(['Overwriting ',destinationFolder])
         rmdir(destinationFolder,"s")
     end
-    eval(sprintf('!move "%s" "%s"',sourceFolder,destinationFolder))
+    
+    if ispc
+        system(sprintf('move "%s" "%s"', sourceFolder, destinationFolder));
+    elseif isunix
+        system(sprintf('mv "%s" "%s"', sourceFolder, destinationFolder));
+    else
+        error('Unsupported operating system');
+    end
 end

@@ -135,9 +135,11 @@ classdef Experiment
                 % VARIABLE SECTION
                 %
                 p = obj.preprocessingHead();
-                try
-                    p = p.(process_name); % ###
-                catch
+                validMethods = methods(p);
+                
+                if ismember(process_name, validMethods)
+                    p = p.(process_name);
+                else
                     error('process unknown.')
                 end
                 %

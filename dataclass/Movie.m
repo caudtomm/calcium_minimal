@@ -112,8 +112,8 @@ classdef Movie
             xspan = [min(obj.stack,[],'all','omitmissing'), obj.getmaxval];
             if isempty(framerate_Hz); framerate_Hz = 16; end
             
-            tic
-            while true
+            tic % initialize
+            while true % cycle
                 for frame =  1:obj.nfr
                     % stop if the figure was closed manually
                     if isempty(findobj(h)); return; end
@@ -127,8 +127,15 @@ classdef Movie
                     title(['frame: ',num2str(frame)])
 
                     subplot(122)
-                    histogram(thisframe(:))
+                    b = histogram(thisframe(:));
                     xlim(xspan)
+                    % superimpose color span
+                    hold on
+                    line([cspan(1),cspan(1)],[0,max(b.Values)*2/3],...
+                        'Color','r','LineStyle','--','LineWidth',2);
+                    line([cspan(2),cspan(2)],[0,max(b.Values)*2/3],...
+                        'Color','r','LineStyle','--','LineWidth',2);
+                    hold off
                     
                     % wait for the right amount of time to match the
                     % desired framerate
@@ -139,11 +146,12 @@ classdef Movie
             end
         end
 
-        function FileOut = save(obj, newpath, type)
+        function FileOut = save(obj, newpath, type, newfname)
             arguments
                 obj Movie
                 newpath char = ''
                 type char = 'mat'
+                newfname char = ''
             end
             
             outpath = pwd;
@@ -154,7 +162,9 @@ classdef Movie
             end
 
             outfname = 'movie';
-            if ~isempty(obj.path) && ~isempty(obj.path.fname)
+            if ~isempty(newfname)
+                outfname = newfname;
+            elseif ~isempty(obj.path) && ~isempty(obj.path.fname)
                 outfname = obj.path.fname;
             end
 

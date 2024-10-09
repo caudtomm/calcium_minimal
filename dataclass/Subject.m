@@ -283,11 +283,16 @@ classdef Subject
                 
                 thismovie = Movie(thisfilename);
 
+                % make sure the framerate is specified
+                if isempty(thismovie.fs)
+                    thismovie = thismovie.setFramerateHz(obj.framerate);
+                end
+
                 % retrieve badperiods for this trial
                 idx = obj.badperiods(:,1) == i_f;
                 thismovie.badperiods = obj.badperiods(idx,:);
                 
-                thismovie.save('','mat')
+                thismovie.save(sourcedir,'mat')
             end
         end
         
@@ -389,6 +394,7 @@ classdef Subject
             output_folder = fullfiletol(obj.locations.subject_datapath,'references',input_folder);
 
             % move to input folder
+            orig_path = pwd;
             cd(fullfiletol(obj.locations.subject_datapath,input_folder))
 
             reftrialnum = obj.reference_img_meta.Trial_relativenum;
@@ -400,13 +406,16 @@ classdef Subject
             snip = Snippet(filename,frame_range);
             snip.path.fname = getFileNameSpecs(filename).fname; % to have a nice name when saving, if applicable
             reference_image = snip.timeavg;
+            
+            % return to original folder
+            cd(fullfiletol(orig_path))
 
             if ~do_save; return; end
             
             % Saving as files
             disp(['Saving to ... ', output_folder])
             if ~exist(output_folder,'dir'); mkdir(output_folder); end
-            snip.save('',output_folder,'mat')                                  % Saving the whole Snippet
+            snip.save(output_folder,'mat')                                  % Saving the whole Snippet
             FileOut = fullfiletol(output_folder,[snip.path.fname, '.tif']);    % Saving the image as Tiff
             saveastiff(reference_image,FileOut)
         end

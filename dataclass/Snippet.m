@@ -99,12 +99,12 @@ classdef Snippet < Movie
         end
 
         % save method (##store the output path to obj.path)
-        function FileOut = save(obj, newfname, newpath, type) % ## ----- arguments should be the same for all Movie subclasses
+        function FileOut = save(obj, newpath, type, newfname)
             arguments
                 obj
-                newfname char
                 newpath char = pwd
                 type char = 'mat'
+                newfname char = ''
             end
             type = char(type);
 

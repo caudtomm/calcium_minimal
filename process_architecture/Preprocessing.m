@@ -5,6 +5,21 @@ classdef Preprocessing
         pl logical = true % whether to plot stuff
     end
 
+    methods (Access = protected)
+        function obj = tail_sequence(obj,destinationFolder)
+            
+            % save anatomy images for each trial
+            obj.sj.saveTrialAvgs(destinationFolder);
+            % save anatomical reference, based on the results of this
+            % method
+            obj.sj.retrieve_ref_img(destinationFolder,true);
+            % save a side-by-side subsampled avi movie of the results for
+            % all the trials, for easy supervicial visual inspection
+            RegistrationViewer(obj.sj,destinationFolder). ...
+                subsampledMovieCollage.save(destinationFolder,'avi','sidebyside');
+        end
+    end
+
     methods
         function obj = Preprocessing()
             
@@ -66,6 +81,9 @@ classdef Preprocessing
             movie = ref; clear ref
             save(fout,'movie','-mat'); clear movie
             cd(obj.sj.locations.subject_datapath)
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
         end
 
         function [obj, b] = rigidregHisteq(obj)
@@ -90,6 +108,9 @@ classdef Preprocessing
             sourceFolder = fullfiletol(datapath, b.OutFolder);
             destinationFolder = obj.sj.locations.histeqtrials_rigidreg;
             movedirTC(sourceFolder,destinationFolder)
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
         end
     
         function [obj, b] = rigidregHisteq2Raw(obj)
@@ -104,6 +125,9 @@ classdef Preprocessing
             sourceFolder = fullfiletol(datapath, b.OutFolder);
             destinationFolder = obj.sj.locations.rawtrials_rigidreg_fromhisteq;
             movedirTC(sourceFolder,destinationFolder)
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
             
             
             obj.sj = obj.sj.update_currentstate('Rigid alignment complete');
@@ -133,6 +157,9 @@ classdef Preprocessing
             sourceFolder = fullfiletol(datapath, b.OutFolder);
             destinationFolder = obj.sj.locations.rawtrials_rigidreg;
             movedirTC(sourceFolder,destinationFolder)
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
             
             obj.sj = obj.sj.update_currentstate('Rigid alignment complete');
             obj.sj.save2mat(obj.autosave)
@@ -158,6 +185,9 @@ classdef Preprocessing
             destinationFolder = [obj.sj.locations.rawtrials_rigidreg,'_rmbase'];
             movedirTC(sourceFolder,destinationFolder)
             obj.sj.locations.rawtrials_rigidreg = destinationFolder;
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
 
 
             obj.sj = obj.sj.update_currentstate('Movie baseline removed');
@@ -185,7 +215,7 @@ classdef Preprocessing
             cd(obj.sj.locations.subject_datapath)
         end
     
-        function obj = opticflowregRaw(obj)
+        function [obj, b] = opticflowregRaw(obj)
             % prep raw trials
             datapath = obj.sj.locations.rawtrials;
             obj.sj.Tiff2Movie(datapath)
@@ -208,6 +238,9 @@ classdef Preprocessing
             sourceFolder = fullfiletol(datapath, b.OutFolder);
             destinationFolder = obj.sj.locations.rawtrials_opticflowwarp;
             movedirTC(sourceFolder,destinationFolder)
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
             
             
             obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');
@@ -238,6 +271,9 @@ classdef Preprocessing
             sourceFolder = fullfiletol(datapath, b.OutFolder);
             destinationFolder = obj.sj.locations.histeqtrials_opticflowwarp;
             movedirTC(sourceFolder,destinationFolder)
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
             
             
             obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');
@@ -278,6 +314,9 @@ classdef Preprocessing
             sourceFolder = fullfiletol(datapath, b.OutFolder);
             destinationFolder = obj.sj.locations.rawtrials_opticflowwarp_fromhisteq;
             movedirTC(sourceFolder,destinationFolder)
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
             
             
             obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');

@@ -16,6 +16,9 @@ classdef RegistrationViewer
         end
 
         function collage = subsampledMovieCollage(obj)
+            orig_folder = fullfiletol(pwd);
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+            
             % retrieve file list
             fileList = {};
             for i = 1:numel(obj.sj.filelist)
@@ -60,8 +63,11 @@ classdef RegistrationViewer
             end
 
             collage = Movie(collage);
-            collage = collage.setFramerateHz(movie.fs);
+            collage = collage.setFramerateHz(obj.sj.framerate);
+            collage.path.fname = 'sidebyside';
             
+            % return to original location
+            cd(orig_folder)
         end
 
     end
