@@ -36,17 +36,19 @@ classdef Experiment
             obj.name = string(sheet);
         end
 
-        function obj = loadSubjects(obj,subjectnames,create)
+        function obj = loadSubjects(obj,subjectnames,create,do_overwrite)
             arguments
                 obj
                 subjectnames cell = obj.subjectTab.name
                 create logical = true;
+                do_overwrite logical = false; % if true, previously loaded subject are discarded
             end
 
             % initialize
             loc = obj.locations;
             nsubjects = numel(subjectnames);
             fname = 'fish1.mat';
+            if do_overwrite; obj.subject = {}; end
 
             % execute
             for i_subject = 1:nsubjects
@@ -61,7 +63,7 @@ classdef Experiment
                 thisloc = thisloc.setSubjectID(thissubjectname);
 
                 % look for pre-existing subject file
-                FileIn = fullfile(thisloc.subject_datapath,fname);
+                FileIn = fullfiletol(thisloc.subject_datapath,fname);
                 if isfile(FileIn)
                     fprintf('found : %s ...',fname)
                     thissubject = load(FileIn,'fish1').fish1;
@@ -80,6 +82,10 @@ classdef Experiment
                     disp('')
                     continue
                 end
+
+                % take local tungsten drive name into account
+                thissubject.locations = ...
+                    thissubject.locations.setDrive(obj.locations.drive);
 
                 % save to properties                
                 subject_not_yet_in_this_experiment = ...
@@ -100,6 +106,9 @@ classdef Experiment
                 end
                     
             end
+
+            % update current subject
+            obj.currentsubject = obj.subject{end};
         end
 
         function obj = processSubjects(obj,process_name,docheckifdone)
@@ -118,21 +127,19 @@ classdef Experiment
                     continue
                 end
 
-                % load the current subject
-                obj = obj.loadSubjects(subjectlist(i_sub));
-                obj.currentsubject = obj.subject{1};
+                % load the current subject and move to its data directory
+                obj = obj.loadSubjects(subjectlist(i_sub),false,true);
+                cd(obj.currentsubject.locations.subject_datapath)
                 
-                obj.currentsubject.locations = ...
-                    obj.currentsubject.locations.setDrive(obj.locations.drive);
-                cdtol(newlocation.subject_datapath)
-
                 % --------------------------------------
                 % VARIABLE SECTION
                 %
                 p = obj.preprocessingHead();
-                try
-                    p = p.(process_name); % ###
-                catch
+                validMethods = methods(p);
+                
+                if ismember(process_name, validMethods)
+                    p = p.(process_name);
+                else
                     error('process unknown.')
                 end
                 %
@@ -140,8 +147,52 @@ classdef Experiment
 
                 obj.subjectTab.notes{i_sub} = 'done!';
                 writetable(obj.subjectTab,obj.record.tabpath,'Sheet',obj.record.sheet)
+            end
+            
+        end
 
-                obj.subject = {};
+        function obj = saveTrialAvgsToFiles(obj)
+            % define complete list of subjects to process
+            subjectlist = obj.subjectTab.name;
+
+            for i_sub = 1:numel(subjectlist)
+                disp(subjectlist(i_sub))
+                
+                % load the current subject and move to its data directory
+                obj = obj.loadSubjects(subjectlist(i_sub),false,true);
+                cd(obj.currentsubject.locations.subject_datapath)
+
+                folders = dir(pwd); % includes files, too.
+                for i = 3:numel(folders)
+                    if ~folders(i).isdir; continue; end
+
+                    obj.currentsubject.saveTrialAvgs(folders(i).name);
+                end
+            end
+        end
+
+        function obj = saveAnatomicalReferencesToFiles(obj)
+            % define complete list of subjects to process
+            subjectlist = obj.subjectTab.name;
+
+            for i_sub = 1:numel(subjectlist)
+                disp(subjectlist(i_sub))
+
+                % load the current subject and move to its data directory
+                obj = obj.loadSubjects(subjectlist(i_sub),false,true);
+                cd(obj.currentsubject.locations.subject_datapath)
+
+                folders = dir(pwd); % includes files, too.
+                for i = 3:numel(folders)
+                    if ~folders(i).isdir; continue; end
+
+                    try % some folders don't actually contain trials
+                        obj.currentsubject.retrieve_ref_img(folders(i).name,true);
+                    catch
+                        % just skip
+                    end
+                end             
+                
             end
             
         end

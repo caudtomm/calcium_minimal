@@ -1,12 +1,12 @@
 function registration_opticflow_moveresults(loc,do_correct)
 
 % go to results folder
-cdtol(loc.warp.rawtrials_opticflow_unchecked);
+cd(loc.warp.rawtrials_opticflow_unchecked);
 
 % create output folder
 
 outputfolder = loc.warp.rawtrials_opticflow;
-FileOut_path = fullfile(loc.subject_datapath,outputfolder);
+FileOut_path = fullfiletol(loc.subject_datapath,outputfolder);
 
 mkdir(FileOut_path);
 
@@ -34,9 +34,9 @@ for i_f = 1:numel(filelist)
     end
     
     % prepare input and output names
-    statsname = fullfile(foldername,'statistics.mat');
-    inputname = fullfile(foldername,'compensated.tiff');
-    outputname = fullfile(FileOut_path,filename);
+    statsname = fullfiletol(foldername,'statistics.mat');
+    inputname = fullfiletol(foldername,'compensated.tiff');
+    outputname = fullfiletol(FileOut_path,filename);
     
 
     disp(filename)
@@ -55,7 +55,7 @@ for i_f = 1:numel(filelist)
 end
 
 saveMatrixToCSV(allbadperiods, ...
-    fullfile(outputfolder,'auto_badperiods.csv'), ...
+    fullfiletol(outputfolder,'auto_badperiods.csv'), ...
     {'relative trial num', ...
     'bad period start frame (included)', ...
     'bad period end frame (included)'});
@@ -67,8 +67,8 @@ end
 function thisbw = replace_badwarp_opticflow(loc,inputname,outputname,statsname)
     loc.warptag = '';
     loc.fspecs = getFileNameSpecs(inputname);
-    loc.rawpath = fullfile(loc.subject_datapath,loc.rawtrials_rigidreg);
-    loc.WarpConnectPath = fullfile( ...
+    loc.rawpath = fullfiletol(loc.subject_datapath,loc.rawtrials_rigidreg);
+    loc.WarpConnectPath = fullfiletol( ...
         loc.rawpath,loc.warp.rawtrials_opticflow_unchecked, ...
         loc.fspecs.orig_fpath);
     loc.rawfname = loc.fspecs.orig_fpath;

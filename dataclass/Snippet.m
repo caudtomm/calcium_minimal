@@ -99,12 +99,12 @@ classdef Snippet < Movie
         end
 
         % save method (##store the output path to obj.path)
-        function FileOut = save(obj, newfname, newpath, type) % ## ----- arguments should be the same for all Movie subclasses
+        function FileOut = save(obj, newpath, type, newfname)
             arguments
                 obj
-                newfname char
                 newpath char = pwd
                 type char = 'mat'
+                newfname char = ''
             end
             type = char(type);
 
@@ -123,7 +123,7 @@ classdef Snippet < Movie
                 i = 1;
                 while true
                     obj.path.fname = [basename,num2str(i)];
-                    files = dir(fullfile(newpath,[obj.path.fname,'.*']));
+                    files = dir(fullfiletol(newpath,[obj.path.fname,'.*']));
                     if isempty(files)
                         break
                     else

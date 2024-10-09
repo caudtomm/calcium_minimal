@@ -37,11 +37,11 @@ classdef Subject
         % Method to set list of files
         function [files,trialnum,min_trialnum] = setFileList(obj)
             loc = obj.locations;
-            relative_pathin = fullfile(loc.subject_ID, loc.rawtrials);
+            relative_pathin = fullfiletol(loc.subject_ID, loc.rawtrials);
 
             fprintf(strcat('\nSource folder: ', strrep(relative_pathin, '\','\\'),'.\n\n'))
 
-            files = dir(fullfile(loc.general_datapath, relative_pathin, ...
+            files = dir(fullfiletol(loc.general_datapath, relative_pathin, ...
                 strcat('*.',loc.datafile_ext)));
 
             % order by trial number
@@ -61,7 +61,7 @@ classdef Subject
         function [stim_series, ch2stimtype_map] = setStimSeries(obj)
             loc = obj.locations;
             fname = strcat(loc.subject_ID,'_',num2str(obj.min_trialnum, '%05.f'));
-            FileIn = fullfile(loc.subject_datapath,loc.rawtrials,fname);
+            FileIn = fullfiletol(loc.subject_datapath,loc.rawtrials,fname);
             [stim_series, ch2stimtype, ch2stimtype_map] = read_stim_series(FileIn);
             stim_series = horzcat(array2table(stim_series, ...
                 'VariableNames',{'trialnum' 'odor_channel' 'frame_onset','frame_offset'}), ...
@@ -70,7 +70,7 @@ classdef Subject
 
         % Method to read imaging metadata from scanimage-a
         function [framerate, scanimage_metadata] = setScanimageMetadata(obj) % FROM THE FIRST FILE
-            FileIn = fullfile(obj.filelist(1).folder,obj.filelist(1).name);
+            FileIn = fullfiletol(obj.filelist(1).folder,obj.filelist(1).name);
             [A,result,framerate,zstep,zoom,motorpositions,scalingfactors] = ...
                 read_metadata_function(FileIn);
             movie = double(loadTiffStack(FileIn));
@@ -135,7 +135,7 @@ classdef Subject
             % the latest completely ROId file
             [~, latest_complete_idx] = max(arrayfun(@(x) getFileNameSpecs(x{:}).trial_num, complete_files));
             fname = getFileNameSpecs(complete_files{latest_complete_idx}).fname;
-            FileIn = fullfile(obj.locations.subject_datapath,obj.locations.defRois,[fname,'_defROIs.mat']);
+            FileIn = fullfiletol(obj.locations.subject_datapath,obj.locations.defRois,[fname,'_defROIs.mat']);
             load(FileIn);
             p_ann = plane{1}.ROI_map;
         end
@@ -194,11 +194,11 @@ classdef Subject
 
             [img,img_meta] = deal([]);
             loc = obj.locations;
-            PathIn = fullfile(loc.subject_datapath, subdirectory);
+            PathIn = fullfiletol(loc.subject_datapath, subdirectory);
             
             % load reference image
             fname = '*.mat';
-            files = dir(fullfile(PathIn,fname));
+            files = dir(fullfiletol(PathIn,fname));
             if ~isempty(files)
                 switch numel(files)
                     case 1
@@ -206,12 +206,12 @@ classdef Subject
                         warning('more than one reference image available. selected: %s', ...
                             files(1).name)
                 end
-                snip = load(fullfile(PathIn,files(1).name)).movie;
+                snip = load(fullfiletol(PathIn,files(1).name)).movie;
                 img = snip.timeavg;
                 img_meta = snip.metadata;
             else
                 fname = strcat('*.',loc.datafile_ext);
-                files = dir(fullfile(PathIn,fname));
+                files = dir(fullfiletol(PathIn,fname));
                 switch numel(files)
                     case 0
                         warn_notfound('raw reference image'); return
@@ -220,11 +220,11 @@ classdef Subject
                         warning('more than one reference image available. selected: %s', ...
                             files(1).name)
                 end
-                img = double(loadTiffStack(char(fullfile(PathIn,files(1).name))));
+                img = double(loadTiffStack(char(fullfiletol(PathIn,files(1).name))));
                 
                 % load metadata
                 fname = 'metadata.json';
-                img_meta = readJson(fullfile(PathIn,fname));
+                img_meta = readJson(fullfiletol(PathIn,fname));
             end
         end
 
@@ -233,18 +233,18 @@ classdef Subject
         function result = loadSingletrialMeta(obj,sourcedir)
             loc = obj.locations;
             if ~exist('sourcedir','var') || isempty(sourcedir)
-                sourcedir = fullfile(loc.subject_datapath,loc.rawtrials);
+                sourcedir = fullfiletol(loc.subject_datapath,loc.rawtrials);
             end
             files = obj.filelist;
 
             result = {};
 
             for i_f = 1:numel(files)
-                thisfilename = find_daughter_file(fullfile(sourcedir,files(i_f).name),'mat');
+                thisfilename = find_daughter_file(fullfiletol(sourcedir,files(i_f).name),'mat');
                 if ~isempty(thisfilename)
                     thismovie = load(thisfilename,'movie').movie;
                 else
-                    thisfilename = fullfile(sourcedir,files(i_f).name);
+                    thisfilename = fullfiletol(sourcedir,files(i_f).name);
                     thismovie = Movie(thisfilename);
                 end
 
@@ -256,7 +256,7 @@ classdef Subject
         % Method to load BADPERIOD coordinates
         function badperiods = loadBadperiods(obj)
             loc = obj.locations;
-            FileIn = fullfile(loc.subject_datapath,loc.rawtrials,[loc.subject_ID,'_badperiods.csv']);
+            FileIn = fullfiletol(loc.subject_datapath,loc.rawtrials,[loc.subject_ID,'_badperiods.csv']);
             badperiods.data = [];
             if exist(FileIn,'file'); badperiods = importdata(FileIn); end
             if isstruct(badperiods)
@@ -269,13 +269,13 @@ classdef Subject
         function Tiff2Movie(obj, sourcedir)
             loc = obj.locations;
             if ~exist('sourcedir','var') || isempty(sourcedir)
-                sourcedir = fullfile(loc.subject_datapath,loc.rawtrials);
+                sourcedir = fullfiletol(loc.subject_datapath,loc.rawtrials);
             end
             files = obj.filelist;
 
             for i_f = 1:numel(files)
-                thisfilename = fullfile(sourcedir,files(i_f).name);
-                thismatfilename = fullfile(sourcedir,[extractBefore(files(i_f).name,'.'),'.mat']);
+                thisfilename = fullfiletol(sourcedir,files(i_f).name);
+                thismatfilename = fullfiletol(sourcedir,[extractBefore(files(i_f).name,'.'),'.mat']);
                 if exist(thismatfilename,'file')
                     warning('Output file already found: skipped')
                     continue
@@ -283,11 +283,16 @@ classdef Subject
                 
                 thismovie = Movie(thisfilename);
 
+                % make sure the framerate is specified
+                if isempty(thismovie.fs)
+                    thismovie = thismovie.setFramerateHz(obj.framerate);
+                end
+
                 % retrieve badperiods for this trial
                 idx = obj.badperiods(:,1) == i_f;
                 thismovie.badperiods = obj.badperiods(idx,:);
                 
-                thismovie.save('','mat')
+                thismovie.save(sourcedir,'mat')
             end
         end
         
@@ -305,7 +310,7 @@ classdef Subject
             localCorr = nan(imHeight,imWidth,nTrials);
 
             % move to input folder
-            cdtol(fullfile(obj.locations.subject_datapath,input_folder))
+            cd(fullfiletol(obj.locations.subject_datapath,input_folder))
 
             % make a list of names for all the files to be loaded
             filenames = {};
@@ -322,6 +327,28 @@ classdef Subject
             end
         end
 
+        function saveTrialAvgs(obj, thispath)
+            arguments
+                obj 
+                thispath char = ''
+            end
+
+            % init vars
+            outpath = 'trialavgs';
+
+            images = obj.retrieve_trial_anatomies(thispath);
+        
+            % save as a tif movie
+            Movie(images).save(fullfiletol(thispath,outpath),'tif');
+
+            % save individually
+            for i_img = 1:size(images,3)
+                thisimg = Movie(images(:,:,i_img));
+                thisimg.path.fname = obj.filelist(i_img).name;
+                thisimg.save(fullfiletol(outpath),'tif');
+            end
+        end
+
         % Method to retrieve average projections from physiological data.
         % You can manually store the result into obj.anatomy_imgs for 
         % future reference
@@ -333,9 +360,9 @@ classdef Subject
                 for i_file = 1:ntrials
                     anatomy(:,:,i_file) = obj.singletrial_meta{i_file}.timeavg;
                 end
-            else    
+            else
                 % move to input folder
-                cdtol(fullfile(obj.locations.subject_datapath,input_folder))
+                cd(fullfiletol(obj.locations.subject_datapath,input_folder))
     
                 % make a list of names for all the files to be loaded
                 filenames = {};
@@ -345,6 +372,8 @@ classdef Subject
     
                 % open each file and extract anatomy image
                 for i_file = 1:ntrials
+                    disp(filenames{i_file})
+                    
                     % assumes that filenames refer to physiological Movie's
                     load(filenames{i_file},'movie');
                     anatomy(:,:,i_file) = movie.timeavg;
@@ -354,19 +383,41 @@ classdef Subject
 
         end
 
-        function reference_image = retrieve_ref_img(obj,input_folder)    
+        function reference_image = retrieve_ref_img(obj,input_folder, do_save)
+            arguments
+                obj
+                input_folder char
+                do_save logical = false
+            end
+
+            % specify output location
+            output_folder = fullfiletol(obj.locations.subject_datapath,'references',input_folder);
+
             % move to input folder
-            cdtol(fullfile(obj.locations.subject_datapath,input_folder))
+            orig_path = pwd;
+            cd(fullfiletol(obj.locations.subject_datapath,input_folder))
 
             reftrialnum = obj.reference_img_meta.Trial_relativenum;
             filename = find_daughter_file(obj.filelist(reftrialnum).name,'mat');
 
-            load(filename,'movie');
-
             % extract average of selected frame range
             frame_range = obj.reference_img_meta.Frameavg_range(1) : ...
                 obj.reference_img_meta.Frameavg_range(2);
-            reference_image = mean(movie.stack(:,:,frame_range),3,'omitmissing');
+            snip = Snippet(filename,frame_range);
+            snip.path.fname = getFileNameSpecs(filename).fname; % to have a nice name when saving, if applicable
+            reference_image = snip.timeavg;
+            
+            % return to original folder
+            cd(fullfiletol(orig_path))
+
+            if ~do_save; return; end
+            
+            % Saving as files
+            disp(['Saving to ... ', output_folder])
+            if ~exist(output_folder,'dir'); mkdir(output_folder); end
+            snip.save(output_folder,'mat')                                  % Saving the whole Snippet
+            FileOut = fullfiletol(output_folder,[snip.path.fname, '.tif']);    % Saving the image as Tiff
+            saveastiff(reference_image,FileOut)
         end
 
         function snip = retrieveSnippetfromCoords(obj, filenamejson)
@@ -415,7 +466,7 @@ classdef Subject
         function loadDATAfile(obj)
             loc = obj.locations;
 
-            files = dir(fullfile(loc.subject_datapath,'*_DATA*.mat'));
+            files = dir(fullfiletol(loc.subject_datapath,'*_DATA*.mat'));
             switch numel(files)
                 case 0
                     error('DATA file not found.')
@@ -425,7 +476,7 @@ classdef Subject
                     for i = 1:numel(files); disp(files(i).name); end
                     disp('Last file was loaded.')
             end
-            FileIn = fullfile(files(1).folder,files(end).name);
+            FileIn = fullfiletol(files(1).folder,files(end).name);
             load(FileIn)
             disp('... DATA LOADED.')
         end
@@ -438,7 +489,7 @@ classdef Subject
         % function calculate_dFoverF(obj)
         %     original_dir = pwd;
         %     loc = obj.locations;
-        %     cdtol(fullfile(loc.subject_datapath,loc.defRois))
+        %     cd(fullfiletol(loc.subject_datapath,loc.defRois))
         % 
         %     files = dir('*.mat');
         %     for i_f = 1:numel(files)
@@ -466,7 +517,7 @@ classdef Subject
         %         save(fname,'plane','-v7.3');
         %     end
         % 
-        %     cdtol(original_dir)
+        %     cd(original_dir)
         % end
 
         function obj = defineTraces(obj, fname_PMToffmeta, fname_noLightmeta)
@@ -478,7 +529,7 @@ classdef Subject
 
             tracestmp = ActivityTraces(obj); % construct traces
             
-            cdtol(obj.locations.traces_src)
+            cd(obj.locations.traces_src)
 
             % tracestmp = tracestmp.loadMovieData(obj,fname_PMToffmeta,fname_noLightmeta);
             % 
@@ -486,7 +537,7 @@ classdef Subject
             % tracestmp = tracestmp.setDerivativeProperties();
 
             % return
-            cdtol(obj.locations.subject_datapath)
+            cd(obj.locations.subject_datapath)
             obj.traces = tracestmp;
         end
 
@@ -499,19 +550,19 @@ classdef Subject
             loc = obj.locations;
 
             % change directory to the subject's main
-            cdtol(loc.subject_datapath)
+            cd(loc.subject_datapath)
 
             % source single trial data files
-            files = dir(fullfile(loc.defRois,'*.mat'));
+            files = dir(fullfiletol(loc.defRois,'*.mat'));
 
             % identify common units
             disp('Identifying common units.')
-            [is_common, ~] = findCommonUnits(fullfile(loc.defRois,{files(:).name}),.9,.9);
+            [is_common, ~] = findCommonUnits(fullfiletol(loc.defRois,{files(:).name}),.9,.9);
             disp(' ')
             
             % load sample data for initialization
             disp('Loading sample data for initialization from:')
-            FileIn = fullfile(loc.defRois,files(1).name);
+            FileIn = fullfiletol(loc.defRois,files(1).name);
             disp(FileIn); load(FileIn)
             
             % initialize vars
@@ -545,7 +596,7 @@ classdef Subject
             disp(' ');disp(' ')
             
             for i_f = 1:numel(files)
-                filename = fullfile(loc.defRois,files(i_f).name);
+                filename = fullfiletol(loc.defRois,files(i_f).name);
                 disp(strcat('Loading: ',strrep(filename,'\','\\'),' ...'))
                 if ~exist(filename,'file'); warning(strcat(strrep(filename,'\','\\'),' not found! - skipped.')); continue; end
                 load(filename)
@@ -631,7 +682,7 @@ classdef Subject
             loc = obj.locations;
             fpath = loc.subject_datapath;
             fname = strcat(obj.name,'.mat');
-            FileOut = fullfile(fpath,fname);
+            FileOut = fullfiletol(fpath,fname);
             if auto; b = true; else; b = prompt_overwrite(FileOut); end
             if ~b; return; end
             eval(strcat(obj.name,'=obj;'));
@@ -643,7 +694,7 @@ classdef Subject
             if ~exist('auto','var'); auto = false; end
             loc = obj.locations;
             fname = [loc.subject_ID,'_check.mat'];
-            FileOut = fullfile(loc.subject_datapath,fname);
+            FileOut = fullfiletol(loc.subject_datapath,fname);
             if auto; b = true; else; b = prompt_overwrite(FileOut); end
             if ~b; return; end
             disp(['Saving: ',fname,' ... '])
@@ -657,7 +708,7 @@ classdef Subject
         function obj = reload(obj)
             loc = obj.locations;
             fname = [obj.name,'.mat'];
-            FileIn = fullfile(loc.subject_datapath,fname);
+            FileIn = fullfiletol(loc.subject_datapath,fname);
             check_exist(FileIn);
             fprintf('Loading: %s',FileIn)
             load(FileIn)

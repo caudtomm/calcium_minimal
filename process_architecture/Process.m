@@ -44,7 +44,7 @@ classdef (Abstract) Process
                 filename char = [obj.hash,'.mat']
             end
             if isfolder(filename)
-                filename = fullfile(filename, [obj.hash,'.mat']);
+                filename = fullfiletol(filename, [obj.hash,'.mat']);
             end
             process = obj;
             save(filename,'process','-mat')

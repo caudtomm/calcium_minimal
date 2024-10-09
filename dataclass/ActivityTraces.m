@@ -222,7 +222,7 @@ classdef ActivityTraces
             % define all immutable properties 
             % (determined entirely by the Subject)
             obj.subject_ID = subject.id;
-            obj.source_folder = fullfile(subject.locations.subject_datapath,...
+            obj.source_folder = fullfiletol(subject.locations.subject_datapath,...
                 subject.locations.traces_src); 
             obj.framerate = subject.framerate;
             obj.N = obj.extractN(subject);

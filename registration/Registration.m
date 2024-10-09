@@ -52,7 +52,6 @@ classdef (Abstract) Registration < MovieProcessing
             obj.operation = op;
         end
 
-
     end
 
 end

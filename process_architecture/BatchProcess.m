@@ -29,9 +29,9 @@ classdef BatchProcess < Process
                     dataPath = item;
                     % Apply filters if specified
                     if exist('includeFilter', 'var') && ~isempty(includeFilter)
-                        files = dir(fullfile(item, ['*',includeFilter]));  % List all files
+                        files = dir(fullfiletol(item, ['*',includeFilter]));  % List all files
                     else
-                        files = dir(fullfile(item, '*'));
+                        files = dir(fullfiletol(item, '*'));
                     end
                     dataFiles = {files.name};
 
@@ -46,7 +46,7 @@ classdef BatchProcess < Process
             end
             
             % Filter for files
-            dataFiles = dataFiles(isfile(fullfile(dataPath,dataFiles)));
+            dataFiles = dataFiles(isfile(fullfiletol(dataPath,dataFiles)));
 
             % check dataPath validity
             if isempty(dataPath) || ~isfolder(dataPath)
@@ -129,15 +129,15 @@ classdef BatchProcess < Process
                 obj.results = cell(1, nData);
             end
             % create results directory
-            outpath = fullfile(obj.DataPath,obj.OutFolder);
+            outpath = fullfiletol(obj.DataPath,obj.OutFolder);
             mkdir(outpath);
             % create inits directory
-            outpath_inits = fullfile(outpath,'inits');
+            outpath_inits = fullfiletol(outpath,'inits');
             mkdir(outpath_inits);
 
             % call specific process FOR each file;
             for idx = 1:nData 
-                data = obj.loadData(fullfile(obj.DataPath, obj.DataList{idx}));
+                data = obj.loadData(fullfiletol(obj.DataPath, obj.DataList{idx}));
                 fields = fieldnames(data);
                 data = data.(fields{1});
                 try

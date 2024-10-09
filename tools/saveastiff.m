@@ -215,7 +215,7 @@ if ~isempty(pathstr)
     if ~exist(pathstr, 'dir')
         mkdir(pathstr);
     end
-    cdtol(pathstr);
+    cd(pathstr);
 end
 %% Write image data to a file
 file_opening_error_count = 0;
@@ -266,7 +266,7 @@ for d = 1:depth
     end
 end
 tfile.close();
-if exist('path_parent', 'var'), cdtol(path_parent); end
+if exist('path_parent', 'var'), cd(path_parent); end
 tElapsed = toc(tStart);
 if options.message
     display(sprintf('The file was saved successfully. Elapsed time : %.3f s.', tElapsed));
@@ -293,10 +293,10 @@ catch exception
             if exist('fname', 'var') && exist('fext', 'var')
                 delete([fname fext]);
             end
-            if exist('path_parent', 'var'), cdtol(path_parent); end
+            if exist('path_parent', 'var'), cd(path_parent); end
             rethrow(exception);
     end
-    if exist('path_parent', 'var'), cdtol(path_parent); end
+    if exist('path_parent', 'var'), cd(path_parent); end
 end
 res = errcode;
 end

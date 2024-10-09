@@ -2,7 +2,7 @@ function daughterfile = find_daughter_file(basename,obligate_ext)
     % change cd
     thisdir = pwd;
     srcdir = getFileNameSpecs(basename).orig_fpath;
-    if ~isempty(srcdir); cdtol(srcdir); end
+    if ~isempty(srcdir); cd(srcdir); end
     basename = getFileNameSpecs(basename).fname;
 
     % search is carried out in the current directory
@@ -18,9 +18,9 @@ function daughterfile = find_daughter_file(basename,obligate_ext)
 
     % search daughters
     idx = contains(files, basename);
-    daughterfile = fullfile(srcdir,files{find(idx,1)});
+    daughterfile = fullfiletol(srcdir,files{find(idx,1)});
     if sum(idx)>1; warning('%s daugther files found: used %s',num2str(sum(idx)),daughterfile); end
 
     % return to original dir
-    cdtol(thisdir)
+    cd(thisdir)
 end
