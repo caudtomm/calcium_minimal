@@ -55,7 +55,7 @@ classdef Preprocessing
         end
     
         function obj = claheRawTrials(obj)
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             datapath = obj.sj.locations.rawtrials;
             
             % initialize Batch Process
@@ -81,7 +81,7 @@ classdef Preprocessing
                 obj.sj.locations.references.histeq,[foutname,'.mat']);
             movie = ref; clear ref
             save(fout,'movie','-mat'); clear movie
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
 
             % save anatomy and visualization results to disk
             obj = obj.tail_sequence(destinationFolder);
@@ -89,7 +89,7 @@ classdef Preprocessing
 
         function [obj, b] = rigidregHisteq(obj)
             % prep CLAHEd trials
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             datapath = obj.sj.locations.histeqtrials;
             obj.sj.Tiff2Movie(datapath)
 
@@ -119,7 +119,7 @@ classdef Preprocessing
             [obj, b] = obj.rigidregHisteq();
             
             % apply computed shifts to the raw data
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             datapath = obj.sj.locations.rawtrials;
             b.init.detailed_description = "Result shifts applied to raw trials";
             b = b.applyresults(datapath);
@@ -134,13 +134,13 @@ classdef Preprocessing
             
             
             obj.sj = obj.sj.update_currentstate('Rigid alignment complete');
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
 
         end
     
         function [obj, b] = rigidregRaw(obj)
             % prep CLAHEd trials
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             datapath = obj.sj.locations.rawtrials;
             obj.sj.Tiff2Movie(datapath)
             
@@ -167,11 +167,11 @@ classdef Preprocessing
             
             obj.sj = obj.sj.update_currentstate('Rigid alignment complete');
             obj.sj.save2mat(obj.autosave)
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
         end
     
         function [obj, b] = removeMovieBaseline(obj)
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             datapath = obj.sj.locations.rawtrials_rigidreg;
 
             % initialize Batch Process
@@ -196,7 +196,7 @@ classdef Preprocessing
 
 
             obj.sj = obj.sj.update_currentstate('Movie baseline removed');
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
         end
     
         function obj = updateSubject(obj, loc)
@@ -205,7 +205,7 @@ classdef Preprocessing
                 loc char = obj.sj.locations.rawtrials_rigidreg
             end
 
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             
             obj.sj.anatomy_imgs = obj.sj.retrieve_trial_anatomies(loc);
             obj.sj.reference_img = obj.sj.retrieve_ref_img(loc);
@@ -219,15 +219,15 @@ classdef Preprocessing
                 SubjectViewer(obj.sj).visualize_anatomy_physFOV;
             end
 
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
         end
     
         function [obj, b] = opticflowregRaw(obj)
             % prep raw trials
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             datapath = obj.sj.locations.rawtrials;
             obj.sj.Tiff2Movie(datapath)
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             
             % initialize Batch Process
             b = BatchProcess(OpticFlowRegistration);
@@ -254,15 +254,15 @@ classdef Preprocessing
             
             obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');
             obj.sj.save2mat(obj.autosave)
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
         end
     
         function [obj, b] = opticflowregHisteq(obj)
             % prep raw trials
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             datapath = obj.sj.locations.histeqtrials;
             obj.sj.Tiff2Movie(datapath)
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             
             % initialize Batch Process
             b = BatchProcess(OpticFlowRegistration);
@@ -289,7 +289,7 @@ classdef Preprocessing
             
             obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');
             obj.sj.save2mat(obj.autosave)
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
         end
 
         function [obj, b] = opticflowHisteq2Raw(obj)
@@ -317,7 +317,7 @@ classdef Preprocessing
             [obj,b] = obj.opticflowregHisteq();
             
             % apply computed shifts to the raw data
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             datapath = obj.sj.locations.rawtrials;
             b.init.detailed_description = "Result warp applied to raw trials";
             b = b.applyresults(datapath);
@@ -332,7 +332,7 @@ classdef Preprocessing
             
             
             obj.sj = obj.sj.update_currentstate('Opticflow alignment complete');
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
 
         end
 
@@ -385,13 +385,13 @@ classdef Preprocessing
             PMToffmeta = fullfiletol(loc.subject_datapath, loc.rawtrials, 'PMToff_metadata.json');
             noLightmeta = fullfiletol(loc.subject_datapath, loc.rawtrials, 'noLight_metadata.json');
             obj.sj = obj.sj.defineTraces(PMToffmeta,noLightmeta);
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             
             refmovieforbackground = 'TC_240218_TC0028_240213beh1b2_sxpDp_odorexp004_RPB3144501500AG_00035_00001.tif';
             refmovieforbackground = fullfiletol(obj.sj.locations.general_datapath,refmovieforbackground);
             
             
-            cd(obj.sj.locations.traces_src)
+            cd(fullfiletol(obj.sj.locations.traces_src))
             
             interval = 960:1100;
             obj.sj.traces = obj.sj.traces.setPMToff(Snippet(refmovieforbackground,interval));
@@ -400,7 +400,7 @@ classdef Preprocessing
             obj.sj.traces = obj.sj.traces.defineFundamentalProperties(obj.sj);
             obj.sj.traces = obj.sj.traces.setDerivativeProperties;
             
-            cd(obj.sj.locations.subject_datapath)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
             
             
             obj.sj = obj.sj.update_currentstate('Calcium traces extracted');
