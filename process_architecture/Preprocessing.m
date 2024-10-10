@@ -55,6 +55,7 @@ classdef Preprocessing
         end
     
         function obj = claheRawTrials(obj)
+            cd(obj.sj.locations.subject_datapath)
             datapath = obj.sj.locations.rawtrials;
             
             % initialize Batch Process
@@ -88,6 +89,7 @@ classdef Preprocessing
 
         function [obj, b] = rigidregHisteq(obj)
             % prep CLAHEd trials
+            cd(obj.sj.locations.subject_datapath)
             datapath = obj.sj.locations.histeqtrials;
             obj.sj.Tiff2Movie(datapath)
 
@@ -117,6 +119,7 @@ classdef Preprocessing
             [obj, b] = obj.rigidregHisteq();
             
             % apply computed shifts to the raw data
+            cd(obj.sj.locations.subject_datapath)
             datapath = obj.sj.locations.rawtrials;
             b.init.detailed_description = "Result shifts applied to raw trials";
             b = b.applyresults(datapath);
@@ -137,6 +140,7 @@ classdef Preprocessing
     
         function [obj, b] = rigidregRaw(obj)
             % prep CLAHEd trials
+            cd(obj.sj.locations.subject_datapath)
             datapath = obj.sj.locations.rawtrials;
             obj.sj.Tiff2Movie(datapath)
             
@@ -167,6 +171,7 @@ classdef Preprocessing
         end
     
         function [obj, b] = removeMovieBaseline(obj)
+            cd(obj.sj.locations.subject_datapath)
             datapath = obj.sj.locations.rawtrials_rigidreg;
 
             % initialize Batch Process
@@ -199,6 +204,8 @@ classdef Preprocessing
                 obj 
                 loc char = obj.sj.locations.rawtrials_rigidreg
             end
+
+            cd(obj.sj.locations.subject_datapath)
             
             obj.sj.anatomy_imgs = obj.sj.retrieve_trial_anatomies(loc);
             obj.sj.reference_img = obj.sj.retrieve_ref_img(loc);
@@ -217,8 +224,10 @@ classdef Preprocessing
     
         function [obj, b] = opticflowregRaw(obj)
             % prep raw trials
+            cd(obj.sj.locations.subject_datapath)
             datapath = obj.sj.locations.rawtrials;
             obj.sj.Tiff2Movie(datapath)
+            cd(obj.sj.locations.subject_datapath)
             
             % initialize Batch Process
             b = BatchProcess(OpticFlowRegistration);
@@ -250,8 +259,10 @@ classdef Preprocessing
     
         function [obj, b] = opticflowregHisteq(obj)
             % prep raw trials
+            cd(obj.sj.locations.subject_datapath)
             datapath = obj.sj.locations.histeqtrials;
             obj.sj.Tiff2Movie(datapath)
+            cd(obj.sj.locations.subject_datapath)
             
             % initialize Batch Process
             b = BatchProcess(OpticFlowRegistration);
@@ -306,6 +317,7 @@ classdef Preprocessing
             [obj,b] = obj.opticflowregHisteq();
             
             % apply computed shifts to the raw data
+            cd(obj.sj.locations.subject_datapath)
             datapath = obj.sj.locations.rawtrials;
             b.init.detailed_description = "Result warp applied to raw trials";
             b = b.applyresults(datapath);
