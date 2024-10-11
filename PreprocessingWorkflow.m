@@ -19,20 +19,27 @@ p = p.createSubject(subjectID,group,datafolder,odordelay);
 % or
 p.sj = fish1; clear fish1
 
+%% fundamentals
+% remove bad periods from raw trials
+p = p.removeBadPeriodsFromOrigTrialData;
+
 %% histogram equalization
 p = p.claheRawTrials;
 
-
 %% registration
+p = p.allRegistration;
+% ## TODO:
+% > implement bUnwarpJ
+% > fix rigidreg
+% > apply warp to ROI map
 
-p = p.rigidregHisteq2Raw;
-% or
-p = p.rigidregRaw;
-% or
-p = p.opticflowregRaw;
-% or (invalid - doesn't touch raw trials)
-p = p.opticflowregHisteq;
+% extract diagnostics for goodness of registration
+% > shift statistics
+% > rate of change of border size (indicates sudden shifts)
 
+% review registration results
+
+%% pick the best registration results
 p = p.updateSubject(p.sj.locations.rawtrials_opticflowwarp);
 
 %% traces

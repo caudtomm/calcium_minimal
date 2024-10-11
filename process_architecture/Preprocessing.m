@@ -54,6 +54,26 @@ classdef Preprocessing
 
         end
     
+        function obj = removeBadPeriodsFromOrigTrialData(obj)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+            datapath = obj.sj.locations.orig_trialdata;
+            
+            % initialize Batch Process
+            b = BatchProcess(BasicMovieProcessor('remove_badperiods'));
+            b.init.description = "Raw trials (no bad periods)";
+            b = b.setDataPath(datapath);            
+            
+            % run
+            b = b.run;
+            
+            % move to layer 1 dir
+            sourceFolder = fullfiletol(datapath, b.OutFolder);
+            destinationFolder = obj.sj.locations.rawtrials;
+            movedirTC(sourceFolder,destinationFolder)
+
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+        end
+
         function obj = claheRawTrials(obj)
             cd(fullfiletol(obj.sj.locations.subject_datapath))
             datapath = obj.sj.locations.rawtrials;

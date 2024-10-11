@@ -16,15 +16,16 @@ classdef Locations
                                 % to another specified folder name
                                 % property of the same Location object
         
+        orig_trialdata char = 'orig_trialdata'
         rawtrials char = 'trials'
         references struct = struct()
-        histeqtrials = 'trials_clahe';
-        rawtrials_rigidreg = 'reg_stacks_raw';
-        histeqtrials_rigidreg = 'reg_stacks_clahe';
-        rawtrials_rigidreg_fromhisteq = 'reg_stacks_clahe2raw';
-        rawtrials_opticflowwarp = 'OFreg_stacks_raw';
-        histeqtrials_opticflowwarp = 'OFreg_stacks_clahe';
-        rawtrials_opticflowwarp_fromhisteq = 'OFreg_stacks_clahe2raw';
+        histeqtrials char = 'trials_clahe'
+        rawtrials_rigidreg char = 'reg_stacks_raw'
+        histeqtrials_rigidreg char = 'reg_stacks_clahe'
+        rawtrials_rigidreg_fromhisteq char = 'reg_stacks_clahe2raw'
+        rawtrials_opticflowwarp char = 'OFreg_stacks_raw'
+        histeqtrials_opticflowwarp char = 'OFreg_stacks_clahe'
+        rawtrials_opticflowwarp_fromhisteq char = 'OFreg_stacks_clahe2raw'
 
 %         locations.warp.rawtrials_bunwarpj = 'trials_warp_bunwarpj';
         
