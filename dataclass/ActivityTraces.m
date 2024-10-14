@@ -29,6 +29,7 @@ classdef ActivityTraces
         F0 double % F0 for each ROI, per trial [roi, trial]
         Fpx cell % each {roi} is a [t, px, trials] matrix of raw intensity values
         F double % average F per cell [t, roi, trials] (techBase removed)
+        background_avgF double % avg F of the background ROIs [t,1,trial]
 
         dFoverF double
         
@@ -92,10 +93,25 @@ classdef ActivityTraces
             techNoise = var(obj.noLight.stack,[],'all');
         end
         
+        % Average F of all pixels from background ROIs [t, 1, trial]
+        function BGavgF = defineBGavgF(obj)
+            % initialize vars
+            traces = [];
+
+            % pool pixelwise F(t)'s for each roi
+            for i = 1:numel(obj.background_IDs)
+                thisroi = obj.background_IDs(i);
+                traces = [traces , obj.Fpx{thisroi}]; % [t, px, trials]
+            end
+
+            % remove technical baseline
+            BGavgF = mean(traces,2,'omitmissing') - obj.techBase;
+        end
+
         % F0 for each ROI, per trial [roi, trial]
         function F0 = defineF0(obj)
             % compute (lowest 10th percentile of each ROI's per trial)
-            F0 = squeeze(quantile(obj.F,.1,1)); % [roi, trials]
+            F0 = squeeze(quantile(obj.F - obj.background_avgF,.1,1)); % [roi, trials]
         end
         
         % fluorescence noise for each ROI [t, roi, trial]
@@ -184,16 +200,18 @@ classdef ActivityTraces
             F0rep = shiftdim(obj.F0,-1); % [1,roi,trials]
             F0rep = repmat(F0rep,[obj.L,1,1]);
 
+            % prepare background_avgF matrix for algebra
+
             % compute
-            dFoverF = (obj.F - F0rep) ./ F0rep;
+            dFoverF = (obj.F - obj.background_avgF - F0rep) ./ F0rep;
 
-            % get average dFoverF for background ROIs
-            background_dFoverF = mean(dFoverF(:,obj.background_IDs,:),2,'omitmissing'); % [t,1,trials]
-            background_dFoverF_rep = repmat(background_dFoverF,[1,obj.Nrois,1]);
-
-            % subtract background average from all dFoverF (this is
-            % intended to remove global artefacts and fluctuations)
-            dFoverF = dFoverF - background_dFoverF_rep;
+            % % get average dFoverF for background ROIs
+            % background_dFoverF = mean(dFoverF(:,obj.background_IDs,:),2,'omitmissing'); % [t,1,trials]
+            % background_dFoverF_rep = repmat(background_dFoverF,[1,obj.Nrois,1]);
+            % 
+            % % subtract background average from all dFoverF (this is
+            % % intended to remove global artefacts and fluctuations)
+            % dFoverF = dFoverF - background_dFoverF_rep;
         end
         
         % SKETCH
@@ -269,6 +287,7 @@ classdef ActivityTraces
         function obj = setDerivativeProperties(obj)
             obj.Fnoise = obj.defineFnoise();
             obj.F = obj.defineF();
+            obj.background_avgF = obj.defineBGavgF();
             obj.F0 = obj.defineF0();
 
             obj.dFoverF = obj.definedFoverF();
