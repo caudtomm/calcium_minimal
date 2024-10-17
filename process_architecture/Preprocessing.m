@@ -210,7 +210,9 @@ classdef Preprocessing
             obj.sj.anatomy_imgs = obj.sj.retrieve_trial_anatomies(loc);
             obj.sj.reference_img = obj.sj.retrieve_ref_img(loc);
             obj.sj.localcorr_imgs = obj.sj.retrieve_localcorr_maps(loc);
-            
+
+            % store as Subject traces source location
+            obj.sj.locations.traces_src = loc;
             obj.sj = obj.sj.update_currentstate( ...
                 'Trial anatomies and reference frame updated in Subject file');
             obj.sj.save2mat(obj.autosave)
@@ -376,10 +378,7 @@ classdef Preprocessing
             obj.sj.save2mat(obj.autosave)
         end
 
-        function obj = extractCalciumTraces(obj)
-            % address to find the source movies
-            obj.sj.locations.traces_src = obj.sj.locations.rawtrials_rigidreg;
-            
+        function obj = extractCalciumTraces(obj)            
             loc = obj.sj.locations;
             
             PMToffmeta = fullfiletol(loc.subject_datapath, loc.rawtrials, 'PMToff_metadata.json');

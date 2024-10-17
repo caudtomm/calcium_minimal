@@ -678,7 +678,11 @@ classdef Subject
 
         % Method to save object to MAT file
         function save2mat(obj,auto)
-            if ~exist('auto','var'); auto = false; end
+            arguments
+                obj 
+                auto logical = false
+            end
+
             loc = obj.locations;
             fpath = loc.subject_datapath;
             fname = strcat(obj.name,'.mat');
@@ -688,7 +692,7 @@ classdef Subject
             eval(strcat(obj.name,'=obj;'));
             eval(strcat('save(FileOut,''',obj.name,''',''-v7.3'')'));
         end
-        
+
         % Method to save a checkfiles file to the subject_datapath location
         function saveROIcheckfiles2mat(obj,auto)            % DELETE this function as soon as it becomes obsolete
             if ~exist('auto','var'); auto = false; end

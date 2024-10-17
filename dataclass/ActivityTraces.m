@@ -7,6 +7,8 @@ classdef ActivityTraces
         Nrois double
         neuron_IDs double
         background_IDs double
+
+        goodNeuron_IDs double
     end
     properties (SetAccess=immutable)
         ntrials double = 0
@@ -16,8 +18,7 @@ classdef ActivityTraces
         L double = 0 % single-valued trial duration [frames] (from subject)
         framerate double = 0
 
-        subject_ID char
-        source_folder char = pwd
+        subject_locations Locations
     end
     properties % so called 'derivative properties', because they are derived from everything else
         techBase double = 0
@@ -106,12 +107,14 @@ classdef ActivityTraces
 
             % remove technical baseline
             BGavgF = mean(traces,2,'omitmissing') - obj.techBase;
+            % BGavgF = quantile(traces - obj.techBase,.1,2);
         end
 
         % F0 for each ROI, per trial [roi, trial]
         function F0 = defineF0(obj)
             % compute (lowest 10th percentile of each ROI's per trial)
-            F0 = squeeze(quantile(obj.F - obj.background_avgF,.1,1)); % [roi, trials]
+            % F0 = squeeze(quantile(obj.F - obj.background_avgF,.1,1)); % [roi, trials]
+            F0 = squeeze(quantile(obj.F,.1,1)); % [roi, trials]
         end
         
         % fluorescence noise for each ROI [t, roi, trial]
@@ -203,15 +206,32 @@ classdef ActivityTraces
             % prepare background_avgF matrix for algebra
 
             % compute
-            dFoverF = (obj.F - obj.background_avgF - F0rep) ./ F0rep;
+            % dFoverF = (obj.F - obj.background_avgF - F0rep) ./ F0rep;
+            dFoverF = (obj.F - F0rep) ./ F0rep;
 
             % % get average dFoverF for background ROIs
-            % background_dFoverF = mean(dFoverF(:,obj.background_IDs,:),2,'omitmissing'); % [t,1,trials]
-            % background_dFoverF_rep = repmat(background_dFoverF,[1,obj.Nrois,1]);
-            % 
-            % % subtract background average from all dFoverF (this is
-            % % intended to remove global artefacts and fluctuations)
-            % dFoverF = dFoverF - background_dFoverF_rep;
+            background_dFoverF = mean(dFoverF(:,obj.background_IDs,:),2,'omitmissing'); % [t,1,trials]
+            background_dFoverF_rep = repmat(background_dFoverF,[1,obj.Nrois,1]);
+
+            % subtract background average from all dFoverF (this is
+            % intended to remove global artefacts and fluctuations)
+            dFoverF = dFoverF - background_dFoverF_rep./2;
+        end
+
+        function goodNeuron_IDs = defineGoodNeurons(obj)
+            minval = -10;
+            maxval = 20;
+
+            IDX = [];
+            for i = 1:obj.ntrials
+            [~,idx] = find(obj.dFoverF(:,:,i) > maxval | obj.dFoverF(:,:,i) < minval);
+            IDX = [IDX;idx];
+            end
+            IDX = unique(IDX);
+
+            idx = ones(obj.N,1);
+            idx(IDX) = 0;
+            goodNeuron_IDs = find(idx);
         end
         
         % SKETCH
@@ -239,9 +259,7 @@ classdef ActivityTraces
 
             % define all immutable properties 
             % (determined entirely by the Subject)
-            obj.subject_ID = subject.id;
-            obj.source_folder = fullfiletol(subject.locations.subject_datapath,...
-                subject.locations.traces_src); 
+            obj.subject_locations = subject.locations;
             obj.framerate = subject.framerate;
             obj.N = obj.extractN(subject);
             obj.L = subject.getNFrames;
@@ -291,6 +309,8 @@ classdef ActivityTraces
             obj.F0 = obj.defineF0();
 
             obj.dFoverF = obj.definedFoverF();
+            
+            obj.goodNeuron_IDs = obj.defineGoodNeurons();
         end
 
         % Setter for read-only property 'PMToff' (type Movie)
@@ -313,6 +333,38 @@ classdef ActivityTraces
             obj.noLight = newval;
         end
         
+        % Method to save Traces to a standalone mat file, with
+        % minimal additional info if required (mode='light')
+        function save(FileOut,mode, auto)
+            arguments
+                FileOut char = ''
+                mode char = 'full'
+                auto logical = false
+            end
+            
+            % in case this was input as ''
+            if isempty(FileOut)
+                fname = [obj.subject_locations.subject_ID,'_traces.mat'];
+                FileOut = fullfiletol(obj.subject_locations.subject_datapath,fname);
+            end
+
+            % check for preexisting file with the same name
+            if auto; b = true; else; b = prompt_overwrite(FileOut); end
+            if ~b; return; end
+
+            % CONSTRUCT THE traces FILE
+            traces = obj;
+            switch mode
+                case 'full'
+                case 'light'
+                    traces.Fpx = {};
+                otherwise
+                    error('Specified saving mode is unknown for object of type %s',class(traces))
+            end
+
+            %save to file
+            save(FileOut,"traces",'-v7.3');
+        end
     end
 
 end

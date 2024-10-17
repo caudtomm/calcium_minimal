@@ -33,7 +33,7 @@ p = p.opticflowregRaw;
 % or (invalid - doesn't touch raw trials)
 p = p.opticflowregHisteq;
 
-p = p.updateSubject(p.sj.locations.rawtrials_opticflowwarp);
+p = p.updateSubject(p.sj.locations.rawtrials_opticflowwarp_fromhisteq);
 
 %% traces
 
