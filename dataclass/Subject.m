@@ -7,7 +7,7 @@ classdef Subject
         imaging_date
         group
         traces ActivityTraces
-        odor_delay {mustBeNonnegative}
+        odor_delay double {mustBeNonnegative}
         notes string = "" 
 
         reference_img double
@@ -178,14 +178,6 @@ classdef Subject
         end
         
         %% Setter methods
-
-        function n = getNTrials(obj)
-            n = numel(obj.filelist);
-        end
-
-        function L = getNFrames(obj)
-            L = numel(obj.singletrial_meta{1}.scanimage_meta);
-        end
 
         % Method to load and set the calcium imaging reference image (1 for
         % each plane, concatenated in Z)
@@ -455,6 +447,14 @@ classdef Subject
         end
 
         %% Getter methods
+
+        function n = getNTrials(obj)
+            n = numel(obj.filelist);
+        end
+
+        function L = getNFrames(obj)
+            L = obj.singletrial_meta{1}.nfr;
+        end
 
         % Method to set list of files
         function filenames = getFileNames(obj)

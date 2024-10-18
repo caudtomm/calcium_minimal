@@ -24,7 +24,7 @@ classdef ActivityTraces
         stim_series table
         badtrials double = []
         badperiods    
-        anatomy double    
+        reference_img double    
     end
     properties % so called 'derivative properties', because they are derived from everything else
         techBase double = 0
@@ -326,8 +326,8 @@ classdef ActivityTraces
             obj.odor_delay = subject.odor_delay;
             obj.stim_series = subject.stim_series;
             obj.badtrials = subject.badtrials;
-            obj.badperiods = subject.badperiods;   
-            obj.anatomy = subject.reference_img;
+            obj.badperiods    
+            reference_img double  
 
             obj = assignROIs(obj,subject);
         end
@@ -361,7 +361,7 @@ classdef ActivityTraces
             [obj.techNoise, obj.techNoiseMap] = obj.defineTechnicalNoise();
             
             % extract pixelwise raw intensity values for each ROI
-            [obj.Fpx,obj.intercell] = obj.extractFpx(subject);
+            obj.Fpx = obj.extractFpx(subject);
         end
 
         function obj = setDerivativeProperties(obj)

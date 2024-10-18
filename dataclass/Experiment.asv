@@ -20,8 +20,8 @@ classdef Experiment
             % load subject into Preprocessing
             p.sj = obj.currentsubject;
     
-            % % make sure the subject has the correct reference image
-            % p = p.updateSubject(p.sj.locations.rawtrials);
+            % make sure the subject has the correct reference image
+            p = p.updateSubject(p.sj.locations.rawtrials);
         end
     end
 
@@ -130,6 +130,7 @@ classdef Experiment
 
                 thissubjectname = subjectnames{i_subject};
                 disp(thissubjectname)
+                idx = strcmp(obj.subjectTab.name,thissubjectname);
 
                 % create Locations object for the Subject
                 thisloc = loc; % copy all the information of the experiment's Locations
@@ -154,7 +155,6 @@ classdef Experiment
                 thistraces.subject_locations = ...
                     thistraces.subject_locations.setDrive(obj.locations.drive);
 
-
                 % save to properties
                 
                 % check if already loaded
@@ -168,7 +168,6 @@ classdef Experiment
                         break
                     end
                 end
-                % actually save
                 obj.traces{idx} = thistraces;
                     
             end

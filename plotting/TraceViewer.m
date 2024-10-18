@@ -71,9 +71,10 @@ classdef TraceViewer
         function obj = TraceViewer(traces, rois_touse)
             arguments
                 traces ActivityTraces
-                rois_touse double = traces.neuron_IDs
+                rois_touse double = traces.goodNeuron_IDs
             end
             obj.traces = traces;
+
 
             % convert input roi names to use into boolean indices
             allrois = unique(traces.ROImap); allrois = allrois(allrois ~= 0);
