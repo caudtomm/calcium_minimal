@@ -127,6 +127,7 @@ classdef Experiment
             % execute
             for i_subject = 1:nsubjects
                 disp('')
+                disp('')
 
                 thissubjectname = subjectnames{i_subject};
                 disp(thissubjectname)
@@ -136,17 +137,17 @@ classdef Experiment
                 thisloc = thisloc.setSubjectID(thissubjectname);
 
                 % look for pre-existing traces file
-                fname = [thissubjectname,'_traces.mat'];
+                fname = [thissubjectname,'_traceslight.mat'];
                 FileIn = fullfiletol(thisloc.subject_datapath,fname);
                 if isfile(FileIn)
                     fprintf('found : %s ...',fname)
                     thistraces = load(FileIn).traces;
                     fprintf(' loaded.')
-                    disp('')
+                    disp(''); disp('')
                 else
                     fprintf('not found : %s ...',fname)
                     fprintf(' skipped.')
-                    disp('')
+                    disp(''); disp('')
                     continue
                 end
 
@@ -158,20 +159,21 @@ classdef Experiment
                 % save to properties
                 
                 % check if already loaded
-                ntraces = numel(obj.traces);
-                idx = ntraces+1;
-                for i_traces = 1:ntraces
-                    if strcmp(thissubjectname, thistraces.subject_locations.subject_ID)
-                        disp(['found preloaded traces for : ',thissubjectname])
-                        disp('OVERWRITING')
-                        idx = i_traces;
-                        break
-                    end
+                idx = numel(obj.traces)+1;
+                idx_matching_subjectname = find(cellfun(@(x) ...
+                    strcmp(x.subject_locations.subject_ID, thissubjectname), obj.traces),1);
+                if ~isempty(idx_matching_subjectname)
+                    disp(['found preloaded traces for : ',thissubjectname])
+                    disp('OVERWRITING')
+                    idx = idx_matching_subjectname;
                 end
                 % actually save
                 obj.traces{idx} = thistraces;
                     
             end
+
+            disp('')
+            disp('')
         end
         
         function obj = processSubjects(obj,process_name,docheckifdone)

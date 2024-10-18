@@ -8,17 +8,14 @@ classdef ActivityTraces
         neuron_IDs double
         background_IDs double
 
-        goodNeuron_IDs double
 
         ntrials double = 0
         t double = []
-        N double = 0
         T double = 0
         L double = 0 % single-valued trial duration [frames] (from subject)
         framerate double = 0
 
         % inherited from Subject
-        subject_locations Locations
         subject_group char
         odor_delay double {mustBeNonnegative}
         stim_series table
@@ -44,6 +41,12 @@ classdef ActivityTraces
         %           medianF : median F [t,1,trial]
 
         dFoverF double
+
+        subject_locations Locations
+        
+        % only temporarily public
+        goodNeuron_IDs double
+        N double = 0
         
         % currently not implemented #### TODO in separate ActivityTraces = Process(ActivityTraces)
         baseline_periods cell % periods of inactivity for each ROI
@@ -271,25 +274,6 @@ classdef ActivityTraces
             dFoverF = obj.filter(dFoverF,obj.framerate);
         end
 
-        function [goodNeuron_IDs, newN] = defineGoodNeurons(obj)
-            minval = -10;
-            maxval = 20;
-
-            IDX = [];
-            for i = 1:obj.ntrials
-            [~,idx] = find(obj.dFoverF(:,:,i) > maxval | obj.dFoverF(:,:,i) < minval);
-            IDX = [IDX;idx];
-            end
-            IDX = unique(IDX);
-
-            idx = ones(obj.N,1);
-            idx(IDX) = 0;
-            goodNeuron_IDs = find(idx);
-
-            % update to N
-            newN = numel(goodNeuron_IDs);
-        end
-        
         % SKETCH
         function [centeravg, surroundavg, centermovie, surroundmovie] = ...
                 defineCenterSurround(obj)
@@ -372,9 +356,76 @@ classdef ActivityTraces
 
             obj.dFoverF = obj.definedFoverF();
             
-            [obj.goodNeuron_IDs, obj.N] = obj.defineGoodNeurons();
+            [obj.goodNeuron_IDs, obj.N, obj.dFoverF] = obj.defineGoodNeurons(true);
         end
 
+        function [goodNeuron_IDs, newN, newdFoverF] = defineGoodNeurons(obj, do_capBadValues) % only temporarily public
+            arguments
+                obj 
+                do_capBadValues logical = false;
+            end
+            
+            newdFoverF = obj.dFoverF;
+
+            % minval = -10;
+            % maxval = 20;
+            minval = quantile(obj.dFoverF(:),.001);
+            maxval = quantile(obj.dFoverF(:),.999);
+
+            IDX = [];
+            for i = 1:obj.ntrials % necessary because 'find' will only give the column number with 2D matrix inputs
+                thistrial = obj.dFoverF(:,:,i);
+                [~,idx] = find(thistrial > maxval | thistrial < minval);
+                [idx_actuallybad,~] = findActualBaddies();
+                IDX = [IDX;idx_actuallybad];
+                
+                if do_capBadValues
+                    % 'correct' all bad values by capping. Of course, you
+                    % should ignore 'actually bad units' anyways, by using
+                    % the index array in obj.goodNeuron_IDs
+
+                    % values too high
+                    thistrial(thistrial > maxval) = maxval;
+
+                    % values too low
+                    thistrial(thistrial < minval) = minval;
+
+                    % store to output
+                    newdFoverF(:,:,i) = thistrial;
+                end
+
+            end
+            IDX = unique(IDX);
+
+            idx = ones(obj.N,1);
+            idx(IDX) = 0;
+            goodNeuron_IDs = find(idx);
+
+            % update to N
+            newN = numel(goodNeuron_IDs);
+
+
+            function [idx_actuallybad,idx_isolatedBadValues] = findActualBaddies()
+                th = .1; % percentage threshold of bad values in a trial, required to label the unit as 'bad'
+
+                idx_actuallybad = [];
+                idx_isolatedBadValues = [];
+
+                rois = unique(idx);
+
+                for i_roi = 1:numel(rois)
+                    portion_badvals = sum(idx==rois(i_roi))/obj.L;
+
+                    if portion_badvals > th
+                        idx_actuallybad = [idx_actuallybad; rois(i_roi)];
+                    else
+                        idx_isolatedBadValues = [idx_isolatedBadValues; rois(i_roi)];
+                    end
+                end
+
+            end
+        end
+        
         % Setter for read-only property 'PMToff' (type Movie)
         function obj = setPMToff(obj, newval)
             arguments

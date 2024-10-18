@@ -29,7 +29,11 @@ classdef TraceViewer
 
             [nrows,ncols] = size(M);
             
-            scaling_fact = mad(M,[],"all",'omitmissing');
+            try
+                scaling_fact = mad(M,1,"all");
+            catch
+                scaling_fact = std(M,[],"all",'omitmissing');
+            end
             M = M./scaling_fact;
 
             % space out data
