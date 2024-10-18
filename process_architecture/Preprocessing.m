@@ -5,6 +5,26 @@ classdef Preprocessing
         pl logical = true % whether to plot stuff
     end
 
+    methods (Static)
+        function ROImap_out = pruneROIs(ROImap_in)
+            arguments
+                ROImap_in double
+            end
+
+            % initialize output
+            ROImap_out = zeros(size(ROImap_in));
+
+            labs = unique(ROImap_in); labs(labs==0) = [];
+            nrois = numel(labs);
+
+            for i_roi = 1:nrois
+                thisroi = ROImap_in == labs(i_roi);
+                
+                ROImap_out(thisroi) = i_roi;
+            end
+        end
+    end
+
     methods (Access = protected)
         function obj = tail_sequence(obj,destinationFolder)
             
@@ -363,6 +383,7 @@ classdef Preprocessing
                 obj.sj.localcorr_imgs,...
                 obj.sj.backgroundROImap,...
                 'Select background ROIs (N->E->S->W)');
+            obj.sj.backgroundROImap = obj.pruneROIs(obj.sj.backgroundROImap);
             
             % select cell ROIs
             if exist("plane",'var'); obj.sj.ROImap = plane{1}.ROI_map; end
@@ -371,6 +392,7 @@ classdef Preprocessing
                 obj.sj.localcorr_imgs,...
                 obj.sj.ROImap,...
                 'Select neuronal somata');
+            obj.sj.ROImap = obj.pruneROIs(obj.sj.ROImap);
             
             % save
             obj.sj = obj.sj.update_currentstate( ...
@@ -380,6 +402,10 @@ classdef Preprocessing
 
         function obj = extractCalciumTraces(obj)            
             loc = obj.sj.locations;
+
+            % temporary
+            obj.sj.backgroundROImap = obj.pruneROIs(obj.sj.backgroundROImap);
+            obj.sj.ROImap = obj.pruneROIs(obj.sj.ROImap);
             
             PMToffmeta = fullfiletol(loc.subject_datapath, loc.rawtrials, 'PMToff_metadata.json');
             noLightmeta = fullfiletol(loc.subject_datapath, loc.rawtrials, 'noLight_metadata.json');
@@ -400,10 +426,24 @@ classdef Preprocessing
             obj.sj.traces = obj.sj.traces.setDerivativeProperties;
             
             cd(fullfiletol(obj.sj.locations.subject_datapath))
-            
+
+            obj.sj.traces.save('','full',obj.autosave);
+            obj.sj.traces.save('','light',obj.autosave);
+
+            obj.sj.traces.Fpx = {};          
             
             obj.sj = obj.sj.update_currentstate('Calcium traces extracted');
             obj.sj.save2mat(obj.autosave)
+
+        end
+
+        function obj = TracesQC(obj)
+            % trace quality check (manual 'bad cell' calling)
+            obj = checkTracesMan(obj);
+
+            % anatomical segmentation
+            
+
         end
 
     end
