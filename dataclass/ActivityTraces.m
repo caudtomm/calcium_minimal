@@ -498,6 +498,7 @@ classdef ActivityTraces
             map = obj.ROImap;
             map(~ismember(map,obj.goodNeuron_IDs)) = 0;
             data.ROI_map_common = map;
+            
             data.idx_by_stim_type = sortbyStimType(data);
             data.traces = traceFormat(obj.dFoverF(:,obj.goodNeuron_IDs,:));
             data.stim_on_sec = obj.stim_series.frame_onset(1)/obj.framerate;

@@ -35,14 +35,16 @@ p = p.updateSubject(src);
 
 p = p.selectROIs; % manual input required
 
+p.sj = p.sj.setImagingInfo; % temporary
 p.sj = p.sj.setManually; % manual input required
+p.sj.save2mat(p.autosave);
 
 p = p.extractCalciumTraces(false);
 
 p = p.TracesQC; % manual input required
 
-p.sj.traces.save('','full',obj.autosave);
-p.sj.traces.save('','light',obj.autosave);
+p.sj.traces.save('','full',p.autosave);
+p.sj.traces.save('','light',p.autosave);
 
 %% construct Experiment
 

@@ -125,25 +125,7 @@ classdef Subject
             end
         end
 
-        % Method to set the imaging info
-        function obj = setImagingInfo(obj)
-            str = obj.singletrial_meta{1}.path.date;
-            mydate = datestr(datenum(str ,'yyyymmdd'),'dd/mm/yyyy');
-            obj.imaging_date = mydate;
-
-            fspecs = getFileNameSpecs(obj.filelist(1).name);
-            obj.owner = fspecs.owner;
-            obj.tg_line = fspecs.subject_line;
-            obj.withinday_id = fspecs.subject;
-            obj.region = fspecs.region;
-            obj.protocol = fspecs.stim_type;
-            obj.method = fspecs.method;
-            obj.extra_info = fspecs.extra;
-        end
-
-        function obj = defineManually(obj)
-            obj.anat_regions = selectAnatRegions(obj,false);
-        end
+        
         
         % Method to load a pre-existing annotation for ROI selection
         function p_ann = load_partial_annotation(obj)
@@ -194,6 +176,9 @@ classdef Subject
             obj.anatomy_imgs = obj.retrieve_trial_anatomies();
             obj.localcorr_imgs = obj.retrieve_localcorr_maps();
             obj = obj.setImagingInfo;
+
+            
+
             obj = update_currentstate(obj, 'newly constructed');
             % obj.ROIcheckfiles = struct('to_keep',[],'to_discard',[],'is_complete',[]);
 
@@ -241,6 +226,27 @@ classdef Subject
                 fname = 'metadata.json';
                 img_meta = readJson(fullfiletol(PathIn,fname));
             end
+        end
+
+        % Method to set the imaging info
+        function obj = setImagingInfo(obj)
+            str = obj.singletrial_meta{1}.path.date;
+            mydate = datestr(datenum(str ,'yyyymmdd'),'dd/mm/yyyy');
+            obj.imaging_date = mydate;
+
+            fspecs = getFileNameSpecs(obj.filelist(1).name);
+            obj.owner = fspecs.owner;
+            obj.tg_line = fspecs.subject_line;
+            obj.withinday_id = fspecs.subject;
+            obj.region = fspecs.region;
+            obj.protocol = fspecs.stim_type;
+            obj.method = fspecs.method;
+            obj.extra_info = fspecs.extra;
+        end
+        
+        % setter for secundary properties requiring user input
+        function obj = setManually(obj)
+            obj.anat_regions = selectAnatRegions(obj,false);
         end
 
         % Method to load all raw trials and return a cell
