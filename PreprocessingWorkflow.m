@@ -38,6 +38,9 @@ p = p.updateSubject(p.sj.locations.rawtrials_opticflowwarp_fromhisteq);
 %% traces
 
 p = p.selectROIs;
+
+p.sj = p.sj.setManually;
+
 p = p.extractCalciumTraces;
 
 

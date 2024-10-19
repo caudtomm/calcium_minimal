@@ -437,14 +437,5 @@ classdef Preprocessing
 
         end
 
-        function obj = TracesQC(obj)
-            % trace quality check (manual 'bad cell' calling)
-            obj = checkTracesMan(obj);
-
-            % anatomical segmentation
-            
-
-        end
-
     end
 end

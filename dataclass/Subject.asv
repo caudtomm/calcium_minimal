@@ -4,10 +4,9 @@ classdef Subject
         id
         name
         log cell = {}
-        imaging_date
         group
         traces ActivityTraces
-        odor_delay {mustBeNonnegative}
+        odor_delay double {mustBeNonnegative}
         notes string = "" 
 
         reference_img double
@@ -21,6 +20,15 @@ classdef Subject
         min_trialnum
         stim_series
         ch2stimtype_map
+
+        % fspecs
+        imaging_date
+        owner char = getFileNameSpecs(obj.filelist(1).name).owner
+        tg_line char = getFileNameSpecs(obj.filelist(1).name).subject_line
+        withinday_id char = getFileNameSpecs(obj.filelist(1).name).subject
+        region char = getFileNameSpecs(obj.filelist(1).name).region
+        protocol char = getFileNameSpecs(obj.filelist(1).name).stim_type
+        method char = getFileNameSpecs(obj.filelist(1).name).method
 
         ROImap double = []
         backgroundROImap double = []
@@ -115,7 +123,7 @@ classdef Subject
             end
         end
 
-        % Method to set the imaging date
+        % Method to set the imaging info
         function obj = setImagingDate(obj)
             str = obj.singletrial_meta{1}.path.date;
             mydate = datestr(datenum(str ,'yyyymmdd'),'dd/mm/yyyy');
@@ -178,14 +186,6 @@ classdef Subject
         end
         
         %% Setter methods
-
-        function n = getNTrials(obj)
-            n = numel(obj.filelist);
-        end
-
-        function L = getNFrames(obj)
-            L = numel(obj.singletrial_meta{1}.scanimage_meta);
-        end
 
         % Method to load and set the calcium imaging reference image (1 for
         % each plane, concatenated in Z)
@@ -456,6 +456,14 @@ classdef Subject
 
         %% Getter methods
 
+        function n = getNTrials(obj)
+            n = numel(obj.filelist);
+        end
+
+        function L = getNFrames(obj)
+            L = obj.singletrial_meta{1}.nfr;
+        end
+
         % Method to set list of files
         function filenames = getFileNames(obj)
             filenames = {obj.filelist(:).name}';
@@ -689,28 +697,6 @@ classdef Subject
             FileOut = fullfiletol(fpath,fname);
             if auto; b = true; else; b = prompt_overwrite(FileOut); end
             if ~b; return; end
-            eval(strcat(obj.name,'=obj;'));
-            eval(strcat('save(FileOut,''',obj.name,''',''-v7.3'')'));
-        end
-        
-        % Method to save dFoverF traces to a standalone mat file, with
-        % minimal additional info
-        function saveTraces2mat(obj,auto)
-            arguments
-                obj 
-                auto logical = false
-            end
-            
-            loc = obj.locations;
-            fpath = loc.subject_datapath;
-            fname = strcat(obj.name,'.mat');
-            FileOut = fullfiletol(fpath,fname);
-            if auto; b = true; else; b = prompt_overwrite(FileOut); end
-            if ~b; return; end
-
-            % CONSTRUCT THE traces FILE
-            tracesout = obj.traces; tracesout()
-
             eval(strcat(obj.name,'=obj;'));
             eval(strcat('save(FileOut,''',obj.name,''',''-v7.3'')'));
         end

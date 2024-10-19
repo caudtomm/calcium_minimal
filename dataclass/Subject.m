@@ -4,7 +4,6 @@ classdef Subject
         id
         name
         log cell = {}
-        imaging_date
         group
         traces ActivityTraces
         odor_delay double {mustBeNonnegative}
@@ -22,12 +21,23 @@ classdef Subject
         stim_series
         ch2stimtype_map
 
+        % fspecs
+        imaging_date
+        owner char
+        tg_line char
+        withinday_id char
+        region char
+        protocol char
+        method char
+        extra_info char
+
         ROImap double = []
         backgroundROImap double = []
         framerate
         scanimage_metadata
         badtrials double = []
         badperiods
+        anat_regions
         
         process_log cell = {}
         currentstate
@@ -115,13 +125,26 @@ classdef Subject
             end
         end
 
-        % Method to set the imaging date
-        function obj = setImagingDate(obj)
+        % Method to set the imaging info
+        function obj = setImagingInfo(obj)
             str = obj.singletrial_meta{1}.path.date;
             mydate = datestr(datenum(str ,'yyyymmdd'),'dd/mm/yyyy');
             obj.imaging_date = mydate;
+
+            fspecs = getFileNameSpecs(obj.filelist(1).name);
+            obj.owner = fspecs.owner;
+            obj.tg_line = fspecs.subject_line;
+            obj.withinday_id = fspecs.subject;
+            obj.region = fspecs.region;
+            obj.protocol = fspecs.stim_type;
+            obj.method = fspecs.method;
+            obj.extra_info = fspecs.extra;
         end
 
+        function obj = defineManually(obj)
+            obj.anat_regions = selectAnatRegions(obj,false);
+        end
+        
         % Method to load a pre-existing annotation for ROI selection
         function p_ann = load_partial_annotation(obj)
             obj.reload;
@@ -170,7 +193,7 @@ classdef Subject
             obj.singletrial_meta = obj.loadSingletrialMeta();
             obj.anatomy_imgs = obj.retrieve_trial_anatomies();
             obj.localcorr_imgs = obj.retrieve_localcorr_maps();
-            obj = obj.setImagingDate;
+            obj = obj.setImagingInfo;
             obj = update_currentstate(obj, 'newly constructed');
             % obj.ROIcheckfiles = struct('to_keep',[],'to_discard',[],'is_complete',[]);
 
