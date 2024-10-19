@@ -352,6 +352,7 @@ classdef ActivityTraces
             obj.badtrials = subject.badtrials;
             obj.badperiods = subject.badperiods;   
             obj.anatomy = subject.reference_img;
+            obj.anat_regions = subject.anat_regions;
 
             obj = assignROIs(obj,subject);
         end
@@ -503,10 +504,7 @@ classdef ActivityTraces
             series.data = data;
         end
         
-        function obj = defineManualStuff(obj)
-            % manual selection of anatomical regions
-            obj.anat_regions = selectAnatRegions(obj, false);
-            
+        function obj = defineManualStuff(obj)            
             % manual identification of bad units
             badunits = checkTracesMan(obj);
             obj.goodNeuron_IDs(ismember(obj.goodNeuron_IDs,badunits)) = [];
