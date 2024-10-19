@@ -14,7 +14,6 @@ classdef ActivityTraces
         T double = 0
         L double = 0 % single-valued trial duration [frames] (from subject)
         framerate double = 0
-        anat_regions
 
         % inherited from Subject
         subject_group char
@@ -23,6 +22,7 @@ classdef ActivityTraces
         badtrials double = []
         badperiods    
         anatomy double    
+        anat_regions
     end
     properties
         % so called 'derivative properties', because they are derived from everything else
@@ -352,6 +352,7 @@ classdef ActivityTraces
             obj.badtrials = subject.badtrials;
             obj.badperiods = subject.badperiods;   
             obj.anatomy = subject.reference_img;
+            obj.anat_regions = subject.anat_regions;
 
             obj = assignROIs(obj,subject);
         end
@@ -466,19 +467,21 @@ classdef ActivityTraces
             end
         end
 
-        function series = convertToSeries(obj, subject)
+        function series = convert2Series(obj, subject)
             arguments
                 obj 
-                subject Subject = ''
+                subject = [];
             end
 
             if isempty(subject)
                 FileIn = fullfile(obj.subject_locations.subject_datapath,'fish1.mat');
-                subject = load(FileIn).fish1;
-            end
+                disp('Subject input missing. Loading:'); disp(FileIn)
+                fprintf('...')
 
-            series.group = obj.subject_group;
-            series.data = []; % init
+                subject = load(FileIn);
+                fprintf(' loaded.')
+                disp(''); disp('')
+            end
 
             % construct data structure
             data.L = obj.L;
@@ -492,22 +495,26 @@ classdef ActivityTraces
             data.meta.fspecs = getFileNameSpecs(subject.filelist(1).name);
             data.seriesid = subject.id;
 
-            data.ROI_map_common = obj.ROImap(ismember(obj.ROImap,obj.goodNeuron_IDs));
+            map = obj.ROImap;
+            map(~ismember(map,obj.goodNeuron_IDs)) = 0;
+            data.ROI_map_common = map;
             data.idx_by_stim_type = sortbyStimType(data);
             data.traces = obj.dFoverF;
             data.stim_on_sec = obj.stim_series.frame_onset(1)/obj.framerate;
             data.stim_off_sec = obj.stim_series.frame_offset(1)/obj.framerate;
             data.response_window = [data.stim_on_sec , data.stim_off_sec];
             data.f0_window = data.response_window - diff(data.response_window) - 3; % same duration, until 3 sec before response_window
-            anat_regions = obj.anat_regions;
+            data.anat_regions = obj.anat_regions;
+
+            % store to output
+            series.group = obj.subject_group;
+            series.data = data;
         end
         
-        function obj = defineManualStuff(obj)
-            % manual selection of anatomical regions
-            obj.anat_regions = selectAnatRegions(traces, false);
-            
+        function obj = setManually(obj)            
             % manual identification of bad units
-            obj = checkTracesMan(obj);
+            badunits = checkTracesMan(obj);
+            obj.goodNeuron_IDs(ismember(obj.goodNeuron_IDs,badunits)) = [];
         end
 
         function bad_unit_labs = checkTracesMan(obj)
@@ -537,7 +544,8 @@ classdef ActivityTraces
                     
                     to_del = [to_del; y];
                     remaining_idx(y) = [];
-                    
+                    thistraces = traces(:,remaining_idx,i_trial);
+                    imagesc(thistraces)
                 end
                 
                 close(gcf)

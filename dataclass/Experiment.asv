@@ -127,6 +127,7 @@ classdef Experiment
             % execute
             for i_subject = 1:nsubjects
                 disp('')
+                disp('')
 
                 thissubjectname = subjectnames{i_subject};
                 disp(thissubjectname)
@@ -158,20 +159,21 @@ classdef Experiment
                 % save to properties
                 
                 % check if already loaded
-                ntraces = numel(obj.traces);
-                idx = ntraces+1;
-                for i_traces = 1:ntraces
-                    if strcmp(thissubjectname, thistraces.subject_locations.subject_ID)
-                        disp(['found preloaded traces for : ',thissubjectname])
-                        disp('OVERWRITING')
-                        idx = i_traces;
-                        break
-                    end
+                idx = numel(obj.traces)+1;
+                idx_matching_subjectname = find(cellfun(@(x) ...
+                    strcmp(x.subject_locations.subject_ID, thissubjectname), obj.traces),1);
+                if ~isempty(idx_matching_subjectname)
+                    disp(['found preloaded traces for : ',thissubjectname])
+                    disp('OVERWRITING')
+                    idx = idx_matching_subjectname;
                 end
                 % actually save
                 obj.traces{idx} = thistraces;
                     
             end
+
+            disp('')
+            disp('')
         end
         
         function obj = processSubjects(obj,process_name,docheckifdone)
@@ -231,6 +233,20 @@ classdef Experiment
 
                     obj.currentsubject.saveTrialAvgs(folders(i).name);
                 end
+            end
+        end
+
+        function experiment = convert2BackwardCompatibleStruct(obj, name)
+            arguments
+                obj 
+                name char = 'new_experiment'
+            end
+
+            experiment.name = name;
+            experiment.summaryTable = obj.subjectTab;
+
+            for i = 1:numel(obj.traces)
+                 experiment.series{i} = obj.traces{i}.convert2Series;
             end
         end
 

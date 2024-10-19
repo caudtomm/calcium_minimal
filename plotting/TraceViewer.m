@@ -189,7 +189,7 @@ classdef TraceViewer
         end
 
         function h = plotAvgResponse(obj)
-            
+            % to do
         end
 
     end

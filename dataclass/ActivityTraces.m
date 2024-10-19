@@ -475,12 +475,17 @@ classdef ActivityTraces
 
             if isempty(subject)
                 FileIn = fullfile(obj.subject_locations.subject_datapath,'fish1.mat');
-                subject = load(FileIn).fish1;
+                disp('Subject input missing. Loading:'); disp(FileIn)
+                fprintf('...')
+
+                subject = load(FileIn);
+                fprintf(' loaded.')
+                disp(''); disp('')
             end
 
             % construct data structure
             data.L = obj.L;
-            data.N = obj.Nrois;
+            data.N = obj.N;
             data.common_units = obj.goodNeuron_IDs;
             data.trials = subject.filelist;
             data.trial_num = 1:obj.ntrials;
@@ -490,9 +495,11 @@ classdef ActivityTraces
             data.meta.fspecs = getFileNameSpecs(subject.filelist(1).name);
             data.seriesid = subject.id;
 
-            data.ROI_map_common = obj.ROImap(ismember(obj.ROImap,obj.goodNeuron_IDs));
+            map = obj.ROImap;
+            map(~ismember(map,obj.goodNeuron_IDs)) = 0;
+            data.ROI_map_common = map;
             data.idx_by_stim_type = sortbyStimType(data);
-            data.traces = obj.dFoverF;
+            data.traces = traceFormat(obj.dFoverF(:,obj.goodNeuron_IDs,:));
             data.stim_on_sec = obj.stim_series.frame_onset(1)/obj.framerate;
             data.stim_off_sec = obj.stim_series.frame_offset(1)/obj.framerate;
             data.response_window = [data.stim_on_sec , data.stim_off_sec];

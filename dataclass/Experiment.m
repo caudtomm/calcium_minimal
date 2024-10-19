@@ -246,7 +246,7 @@ classdef Experiment
             experiment.summaryTable = obj.subjectTab;
 
             for i = 1:numel(obj.traces)
-                 experiment.series{i} = obj.traces(i).convert2Series;
+                 experiment.series{i} = obj.traces{i}.convert2Series;
             end
         end
 
