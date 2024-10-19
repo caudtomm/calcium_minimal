@@ -504,7 +504,7 @@ classdef ActivityTraces
             series.data = data;
         end
         
-        function obj = defineManualStuff(obj)            
+        function obj = setManually(obj)            
             % manual identification of bad units
             badunits = checkTracesMan(obj);
             obj.goodNeuron_IDs(ismember(obj.goodNeuron_IDs,badunits)) = [];

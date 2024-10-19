@@ -37,12 +37,16 @@ p = p.updateSubject(p.sj.locations.rawtrials_opticflowwarp_fromhisteq);
 
 %% traces
 
-p = p.selectROIs;
+p = p.selectROIs; % manual input required
 
-p.sj = p.sj.setManually;
+p.sj = p.sj.setManually; % manual input required
 
-p = p.extractCalciumTraces;
+p = p.extractCalciumTraces(false);
 
+p = p.TracesQC; % manual input required
+
+p.sj.traces.save('','full',obj.autosave);
+p.sj.traces.save('','light',obj.autosave);
 
 %% unwarping 1
 % fish1 = fish1.registration('opticflow');

@@ -400,7 +400,11 @@ classdef Preprocessing
             obj.sj.save2mat(obj.autosave)
         end
 
-        function obj = extractCalciumTraces(obj)            
+        function obj = extractCalciumTraces(obj, do_save)    
+            arguments
+                obj 
+                do_save logical = true
+            end
             loc = obj.sj.locations;
 
             % temporary
@@ -427,14 +431,22 @@ classdef Preprocessing
             
             cd(fullfiletol(obj.sj.locations.subject_datapath))
 
-            obj.sj.traces.save('','full',obj.autosave);
-            obj.sj.traces.save('','light',obj.autosave);
+            if do_save
+                obj.sj.traces.save('','full',obj.autosave);
+                obj.sj.traces.save('','light',obj.autosave);
+            end
 
             obj.sj.traces.Fpx = {};          
             
             obj.sj = obj.sj.update_currentstate('Calcium traces extracted');
             obj.sj.save2mat(obj.autosave)
 
+        end
+
+        function obj = TracesQC(obj)
+            obj.sj.traces = obj.sj.traces.setManually;
+
+            % expand with quality metrics (make use of TraceViewer)
         end
 
     end
