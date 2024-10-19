@@ -467,10 +467,10 @@ classdef ActivityTraces
             end
         end
 
-        function series = convertToSeries(obj, subject)
+        function series = convert2Series(obj, subject)
             arguments
                 obj 
-                subject Subject 
+                subject = [];
             end
 
             if isempty(subject)
