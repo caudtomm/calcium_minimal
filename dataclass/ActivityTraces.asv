@@ -162,31 +162,31 @@ classdef ActivityTraces
         % major interruptions will then have the same F0 for each cell
         % across the whole trial length.
         function F0 = defineF0(obj)
-            % threshold_duration = 5; %sec, for good periods only. the reason
-            % % for this threshold is to avoid computing the F0 on periods
-            % % too short, when the cell might be active.
-            % 
-            % % initialize output
-            % F0 = nan(obj.L, obj.Nrois, obj.ntrials);
-            % 
-            % for i_trial = 1:obj.ntrials
-            %     % find good periods
-            %     thisbadperiods = obj.badperiods(obj.badperiods(:,1)==i_trial,:);
-            %     thisgoodperiods = ~convertPeriods(thisbadperiods(:,[2,3]),1);
-            %     paddingsize = obj.L - length(thisgoodperiods);
-            %     thisgoodperiods = [thisgoodperiods; ones(paddingsize,1)];
-            %     thisgoodperiods = convertPeriods(thisgoodperiods);
-            %     trialcol = repelem(i_trial,size(thisgoodperiods,1),1);
-            %     thisgoodperiods = [trialcol, thisgoodperiods];
-            % 
-            %     % use large enough periods only
-            %     longgoodperiods = mergePeriods(thisgoodperiods, threshold_duration*obj.framerate);
-            % 
-            % 
-            % 
-            % 
-            % 
-            % end
+            threshold_duration = 5; %sec, for good periods only. the reason
+            % for this threshold is to avoid computing the F0 on periods
+            % too short, when the cell might be active.
+
+            % initialize output
+            F0 = nan(obj.L, obj.Nrois, obj.ntrials);
+
+            for i_trial = 1:obj.ntrials
+                % find good periods
+                thisbadperiods = obj.badperiods(obj.badperiods(:,1)==i_trial,:);
+                thisgoodperiods = ~convertPeriods(thisbadperiods(:,[2,3]),1);
+                paddingsize = obj.L - length(thisgoodperiods);
+                thisgoodperiods = [thisgoodperiods; ones(paddingsize,1)];
+                thisgoodperiods = convertPeriods(thisgoodperiods);
+                trialcol = repelem(i_trial,size(thisgoodperiods,1),1);
+                thisgoodperiods = [trialcol, thisgoodperiods];
+
+                % use large enough periods only
+                longgoodperiods = mergePeriods(thisgoodperiods, threshold_duration*obj.framerate);
+
+
+
+
+
+            end
 
 
             % compute (lowest 10th percentile of each ROI's per trial)
@@ -299,16 +299,16 @@ classdef ActivityTraces
 
             % compute
             % dFoverF = (obj.F - obj.background_avgF - F0rep) ./ F0rep;
-            dFoverF = (obj.F - obj.intercell.minF - F0rep) ./ F0rep;
-            % dFoverF = (obj.F - F0rep) ./ F0rep;
+            % dFoverF = (obj.F - obj.intercell.minF - F0rep) ./ F0rep;
+            dFoverF = (obj.F - F0rep) ./ F0rep;
 
-            % % get average dFoverF for background ROIs
-            % background_dFoverF = mean(dFoverF(:,obj.background_IDs,:),2,'omitmissing'); % [t,1,trials]
-            % background_dFoverF_rep = repmat(background_dFoverF,[1,obj.Nrois,1]);
-            % 
-            % % subtract background average from all dFoverF (this is
-            % % intended to remove global artefacts and fluctuations)
-            % dFoverF = dFoverF - background_dFoverF_rep./2;
+            % get average dFoverF for background ROIs
+            background_dFoverF = mean(dFoverF(:,obj.background_IDs,:),2,'omitmissing'); % [t,1,trials]
+            background_dFoverF_rep = repmat(background_dFoverF,[1,obj.Nrois,1]);
+
+            % subtract background average from all dFoverF (this is
+            % intended to remove global artefacts and fluctuations)
+            dFoverF = dFoverF - background_dFoverF_rep./2;
 
             % denoise
             dFoverF = obj.filter(dFoverF,obj.framerate);
@@ -357,6 +357,17 @@ classdef ActivityTraces
             obj = assignROIs(obj,subject);
         end
 
+        function obj = setBadtrials(obj,value)
+            arguments
+                obj 
+                value double
+            end
+
+            obj.badtrials = value;
+
+            obj = obj.elimBadTrials;
+        end
+
         % check behavior with partial arguments ################
         function obj = loadMovieData(obj,subject,fname_PMToffmeta,fname_noLightmeta)
             arguments
@@ -400,7 +411,8 @@ classdef ActivityTraces
             [obj.goodNeuron_IDs, obj.N, obj.dFoverF] = obj.defineGoodNeurons(true);
         end
 
-        function [goodNeuron_IDs, newN, newdFoverF] = defineGoodNeurons(obj, do_capBadValues) % only temporarily public
+        function [goodNeuron_IDs, newN, newdFoverF] = ...
+                defineGoodNeurons(obj, do_capBadValues) % only temporarily public
             arguments
                 obj 
                 do_capBadValues logical = false;
@@ -478,16 +490,23 @@ classdef ActivityTraces
                 disp('Subject input missing. Loading:'); disp(FileIn)
                 fprintf('...')
 
-                subject = load(FileIn);
+                subject = load(FileIn).fish1;
                 fprintf(' loaded.')
                 disp(''); disp('')
             end
 
             % construct data structure
             data.L = obj.L;
-            data.N = obj.Nrois;
+            data.N = obj.N;
             data.common_units = obj.goodNeuron_IDs;
-            data.trials = subject.filelist;
+
+            files = subject.filelist;
+            trials = {};
+            for i = 1:numel(files)
+                trials{i} = files(i).name;
+            end
+            data.trials = trials;            
+            
             data.trial_num = 1:obj.ntrials;
             data.stim_type = obj.stim_series.stimulus;
 
@@ -498,8 +517,9 @@ classdef ActivityTraces
             map = obj.ROImap;
             map(~ismember(map,obj.goodNeuron_IDs)) = 0;
             data.ROI_map_common = map;
+
             data.idx_by_stim_type = sortbyStimType(data);
-            data.traces = obj.dFoverF;
+            data.traces = traceFormat(obj.dFoverF(:,obj.goodNeuron_IDs,:));
             data.stim_on_sec = obj.stim_series.frame_onset(1)/obj.framerate;
             data.stim_off_sec = obj.stim_series.frame_offset(1)/obj.framerate;
             data.response_window = [data.stim_on_sec , data.stim_off_sec];
@@ -511,47 +531,67 @@ classdef ActivityTraces
             series.data = data;
         end
         
-        function obj = setManually(obj)            
+        function obj = setManually(obj, ignore_previous)
+            arguments
+                obj 
+                ignore_previous logical = false 
+            end            
+
             % manual identification of bad units
-            badunits = checkTracesMan(obj);
-            obj.goodNeuron_IDs(ismember(obj.goodNeuron_IDs,badunits)) = [];
+            badunits = checkTracesMan(obj,ignore_previous);
+            if ignore_previous %                                ### 'goodunits' this can be output directly by checkTracesMan
+                obj.goodNeuron_IDs = obj.neuron_IDs;
+                obj.goodNeuron_IDs(badunits) = [];
+            else
+                obj.goodNeuron_IDs(ismember(obj.goodNeuron_IDs,badunits)) = [];
+            end
         end
 
-        function bad_unit_labs = checkTracesMan(obj)
+        function bad_unit_labs = checkTracesMan(obj,ignore_previous)
+            arguments
+                obj 
+                ignore_previous logical = false 
+            end
             % prompts to check traces manually
             % data = checkTracesMan(data)
             
             traces = obj.dFoverF;
-            idx_toshow = obj.goodNeuron_IDs;
-            
+            if ignore_previous  
+                idx_toshow = obj.neuron_IDs;
+            else
+                idx_toshow = obj.goodNeuron_IDs;
+            end
+
             to_del = [];
             prompt = 'Next bad unit: [''k'' to stop]';
-
-            remaining_idx = idx_toshow;    % init         
-            for i_trial = 1:obj.ntrials
-                thistraces = traces(:,remaining_idx,i_trial);
-                figure; imagesc(thistraces); title(num2str(i_trial)); xlabel('units')
-                
-                
-                while true
-                    x = input(prompt,'s');
-                    y = str2num(x);
-                    if isempty(y)
-                        if strcmp(x,'k'); break
-                        else disp('Input invalid.'); continue;
-                        end
+            
+            thistraces = traces(:,idx_toshow,1);
+            for i_trial = 2:obj.ntrials
+                thistraces = [thistraces; traces(:,idx_toshow,i_trial)];
+            end
+            figure; imagesc(thistraces); colorbar; xlabel('units')
+            
+            while true
+                x = input(prompt,'s');
+                y = str2num(x);
+                if isempty(y)
+                    if strcmp(x,'k'); break
+                    else disp('Input invalid.'); continue;
                     end
-                    
-                    to_del = [to_del; y];
-                    remaining_idx(y) = [];
-                    thistraces = traces(:,remaining_idx,i_trial);
-                    imagesc(thistraces)
                 end
                 
-                close(gcf)
+                to_del = [to_del; y];
+                thistraces(:,y) = nan;
+                imagesc(thistraces); colorbar;shg
             end
             
+            close(gcf)
+
             bad_unit_labs = idx_toshow(unique(to_del));
+        end
+
+        function obj = elimBadTrials(obj)
+            obj.dFoverF(:,:,obj.badtrials) = nan;
         end
 
         % Setter for read-only property 'PMToff' (type Movie)

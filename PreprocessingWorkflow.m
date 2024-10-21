@@ -35,7 +35,6 @@ p = p.updateSubject(src);
 
 p = p.selectROIs; % manual input required
 
-p.sj = p.sj.setImagingInfo; % temporary
 p.sj = p.sj.setManually; % manual input required
 p.sj.save2mat(p.autosave);
 
@@ -48,8 +47,11 @@ p.sj.traces.save('','light',p.autosave);
 
 %% construct Experiment
 
-thisdrive = 'W:';
+thisdrive = '\\tungsten-nas.fmi.ch\tungsten';
 a = Experiment(fullfiletol(thisdrive,'\scratch\gfriedri\caudtomm\data_record2.xlsx'),'odorexp004_analysis');
+a.locations = a.locations.setDrive(thisdrive);
+a.locations = a.locations.setDataFolder('scratch\gfriedri\caudtomm\testground'); % or whatever
+
 
 % load 'light' traces (without single px values)
 a = a.loadSubjectTraces;

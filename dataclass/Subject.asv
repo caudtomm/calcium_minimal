@@ -23,22 +23,27 @@ classdef Subject
 
         % fspecs
         imaging_date
-        owner char = getFileNameSpecs(obj.filelist(1).name).owner
-        tg_line char = getFileNameSpecs(obj.filelist(1).name).subject_line
-        withinday_id char = getFileNameSpecs(obj.filelist(1).name).subject
-        region char = getFileNameSpecs(obj.filelist(1).name).region
-        protocol char = getFileNameSpecs(obj.filelist(1).name).stim_type
-        method char = getFileNameSpecs(obj.filelist(1).name).method
+        owner char
+        tg_line char
+        withinday_id char
+        region char
+        protocol char
+        method char
+        extra_info char
 
         ROImap double = []
         backgroundROImap double = []
         framerate
         scanimage_metadata
-        badtrials double = []
         badperiods
+        anat_regions
         
         process_log cell = {}
         currentstate
+    end
+
+    properties (SetAccess = protected)
+        badtrials double = []
     end
 
     methods (Access = protected)
@@ -123,13 +128,8 @@ classdef Subject
             end
         end
 
-        % Method to set the imaging info
-        function obj = setImagingDate(obj)
-            str = obj.singletrial_meta{1}.path.date;
-            mydate = datestr(datenum(str ,'yyyymmdd'),'dd/mm/yyyy');
-            obj.imaging_date = mydate;
-        end
-
+        
+        
         % Method to load a pre-existing annotation for ROI selection
         function p_ann = load_partial_annotation(obj)
             obj.reload;
@@ -178,7 +178,10 @@ classdef Subject
             obj.singletrial_meta = obj.loadSingletrialMeta();
             obj.anatomy_imgs = obj.retrieve_trial_anatomies();
             obj.localcorr_imgs = obj.retrieve_localcorr_maps();
-            obj = obj.setImagingDate;
+            obj = obj.setImagingInfo;
+
+            
+
             obj = update_currentstate(obj, 'newly constructed');
             % obj.ROIcheckfiles = struct('to_keep',[],'to_discard',[],'is_complete',[]);
 
@@ -226,6 +229,40 @@ classdef Subject
                 fname = 'metadata.json';
                 img_meta = readJson(fullfiletol(PathIn,fname));
             end
+        end
+
+        function obj = set.badtrials(obj,value)
+            arguments
+                obj 
+                value double
+            end
+
+            obj.badtrials = value;
+
+            if isempty(obj.traces); return; end
+
+            obj.traces.badtrials = value;
+        end
+
+        % Method to set the imaging info
+        function obj = setImagingInfo(obj)
+            str = obj.singletrial_meta{1}.path.date;
+            mydate = datestr(datenum(str ,'yyyymmdd'),'dd/mm/yyyy');
+            obj.imaging_date = mydate;
+
+            fspecs = getFileNameSpecs(obj.filelist(1).name);
+            obj.owner = fspecs.owner;
+            obj.tg_line = fspecs.subject_line;
+            obj.withinday_id = fspecs.subject;
+            obj.region = fspecs.region;
+            obj.protocol = fspecs.stim_type;
+            obj.method = fspecs.method;
+            obj.extra_info = fspecs.extra;
+        end
+        
+        % setter for secundary properties requiring user input
+        function obj = setManually(obj)
+            obj.anat_regions = selectAnatRegions(obj,false);
         end
 
         % Method to load all raw trials and return a cell

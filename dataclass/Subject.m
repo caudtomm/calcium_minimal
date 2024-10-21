@@ -35,12 +35,15 @@ classdef Subject
         backgroundROImap double = []
         framerate
         scanimage_metadata
-        badtrials double = []
         badperiods
         anat_regions
         
         process_log cell = {}
         currentstate
+    end
+
+    properties (SetAccess = protected)
+        badtrials double = []
     end
 
     methods (Access = protected)
@@ -226,6 +229,19 @@ classdef Subject
                 fname = 'metadata.json';
                 img_meta = readJson(fullfiletol(PathIn,fname));
             end
+        end
+
+        function obj = setBadtrials(obj,value)
+            arguments
+                obj 
+                value double
+            end
+
+            obj.badtrials = value;
+
+            if isempty(obj.traces); return; end
+
+            obj.traces = obj.traces.setBadtrials(value);
         end
 
         % Method to set the imaging info

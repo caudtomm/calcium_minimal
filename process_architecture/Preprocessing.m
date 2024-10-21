@@ -443,8 +443,13 @@ classdef Preprocessing
 
         end
 
-        function obj = TracesQC(obj)
-            obj.sj.traces = obj.sj.traces.setManually;
+        function obj = TracesQC(obj, ignore_previous)
+            arguments
+                obj 
+                ignore_previous logical = false 
+            end            
+
+            obj.sj.traces = obj.sj.traces.setManually(ignore_previous);
 
             % expand with quality metrics (make use of TraceViewer)
         end
