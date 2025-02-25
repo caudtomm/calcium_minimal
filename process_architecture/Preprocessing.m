@@ -432,13 +432,9 @@ classdef Preprocessing
 
         function obj = allRegistration(obj)
             % every registration protocol, done sequentially
-            obj = obj.rigidregRaw;
+            obj = obj.allRigidReg;
             % then
-            obj = obj.rigidregHisteq2Raw;
-            % then
-            obj = obj.opticflowregRaw;
-            % then
-            obj = obj.opticflowHisteq2Raw;
+            obj = obj.allWarpReg;
         end
 
         function obj = allRigidReg(obj)
@@ -446,6 +442,13 @@ classdef Preprocessing
             obj = obj.rigidregRaw;
             % then
             obj = obj.rigidregHisteq2Raw;
+        end
+
+        function obj = allWarpReg(obj)
+            % every warp registration protocol, done sequentially
+            obj = obj.opticflowregRaw;
+            % then
+            obj = obj.opticflowHisteq2Raw;
         end
 
         % _________________________________________________

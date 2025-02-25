@@ -35,7 +35,11 @@ p = p.correctBidiScanningHisteq2Raw;
 
 %% registration
 
-p = p.allRegistration;
+% can run anywhere
+p = p.allRigidReg;
+
+% needs to run on windows (best use FAIM Workstations)
+p = p.allWarpReg;
 
 %% select best source of registration, after visual inspection of the results
 src = p.sj.locations.rawtrials_opticflowwarp_fromhisteq
