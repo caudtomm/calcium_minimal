@@ -1,7 +1,0 @@
-# ignore temporary files
-*.swp
-*.asv
-
-# ignore folders
-/temporary/
-/.vscode/
