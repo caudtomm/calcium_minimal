@@ -16,6 +16,12 @@ function periods = convertPeriods(X,reverse)
         elseif numel(pstart) < numel(pend)
             pstart = [1; pstart];
         end
+
+        % make sure periods are not staggered
+        if ~isempty(pend) && ~isempty(pstart) && pend(1)<pstart(1)
+            pend = [pend; length(X)];
+            pstart = [1; pstart];
+        end
         
         periods = [pstart, pend];
     else % X is a period matrix [:,[pstart, pend]]

@@ -23,7 +23,7 @@ classdef (Abstract) Registration < MovieProcessing
             
         end
 
-        %% Funtional methods
+        %% Functional methods
         function obj = run(obj)
             % Signal registration start
             obj.disp_runheader()

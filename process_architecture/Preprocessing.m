@@ -45,19 +45,45 @@ classdef Preprocessing
             
         end
 
-        function obj = createSubject(obj,subjectID,group,datafolder,odordelay)
+        function obj = updateSubject(obj, loc)
+            arguments
+                obj 
+                loc char = obj.sj.locations.rawtrials_rigidreg
+            end
+
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+            
+            obj.sj.anatomy_imgs = obj.sj.retrieve_trial_anatomies(loc);
+            obj.sj.reference_img = obj.sj.retrieve_ref_img(loc);
+            obj.sj.localcorr_imgs = obj.sj.retrieve_localcorr_maps(loc);
+
+            % store as Subject traces source location
+            obj.sj.locations.traces_src = loc;
+            obj.sj = obj.sj.update_currentstate( ...
+                'Trial anatomies and reference frame updated in Subject file');
+            obj.sj.save2mat(obj.autosave)
+            
+            if obj.pl % plot anatomy
+                SubjectViewer(obj.sj).visualize_anatomy_physFOV;
+            end
+
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+        end
+    
+        function obj = createSubject(obj,subjectID,group,drive,datafolder,odordelay)
             arguments
                 obj 
                 subjectID char
                 group char
+                drive char = 'W:'
                 datafolder char = 'scratch\gfriedri\caudtomm\testground'
                 odordelay double = 0 % odor delay to nostril [sec]
             end
 
-            % subjectID = 'TC_230910_TC0028_230906beh1b3_sxpDp_odorexp005_RPB3144501500AG';
             locations = Locations;
             locations = locations.setSubjectID(subjectID);
             locations = locations.setDataFolder(datafolder);
+            locations = locations.setDrive(drive);
             
             % startup
             cd(locations.subject_datapath)
@@ -74,13 +100,35 @@ classdef Preprocessing
 
         end
     
-        function obj = claheRawTrials(obj)
+        function [obj, b] = replaceBadPeriodsWithNans(obj)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+            datapath = obj.sj.locations.orig_trials;
+            
+            % initialize Batch Process
+            b = BatchProcess(BasicMovieProcessor('replace_badperiods_with_nans'));
+            b.init.description = "Replace bad periods with nans in raw trials";
+            b = b.setDataPath(datapath);            
+            
+            % run
+            b = b.run;
+            
+            % move to layer 1 dir
+            sourceFolder = fullfiletol(datapath, b.OutFolder);
+            destinationFolder = obj.sj.locations.rawtrials;
+            movedirTC(sourceFolder,destinationFolder)
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
+        end
+
+        function [obj, b] = claheRawTrials(obj)
             cd(fullfiletol(obj.sj.locations.subject_datapath))
             datapath = obj.sj.locations.rawtrials;
             
             % initialize Batch Process
             b = BatchProcess(BasicMovieProcessor('clahe'));
             b.init.description = "CLAHE raw trials";
+            b.includeFilter = [num2str(obj.sj.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
             b = b.setDataPath(datapath);            
             
             % run
@@ -97,8 +145,10 @@ classdef Preprocessing
                 obj.sj.locations.references.raw,'metadata.json'));
             ref.metadata.Name = "Raw Reference Image (CLAHE)";
             foutname = getFileNameSpecs(obj.sj.filelist(ref.metadata.Trial_relativenum).name).fname; % w/o extension
-            fout = fullfiletol(obj.sj.locations.subject_datapath, ...
-                obj.sj.locations.references.histeq,[foutname,'.mat']);
+            foutpath = fullfiletol(obj.sj.locations.subject_datapath, ...
+                obj.sj.locations.references.histeq);
+            if ~exist(foutpath, 'dir'); mkdir(foutpath); end
+            fout = fullfiletol(foutpath,[foutname,'.mat']);
             movie = ref; clear ref
             save(fout,'movie','-mat'); clear movie
             cd(fullfiletol(obj.sj.locations.subject_datapath))
@@ -106,6 +156,103 @@ classdef Preprocessing
             % save anatomy and visualization results to disk
             obj = obj.tail_sequence(destinationFolder);
         end
+    
+        function [obj, b] = removeMovieBaseline(obj)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+            datapath = obj.sj.locations.rawtrials_rigidreg;
+
+            % initialize Batch Process
+            b = BatchProcess(BasicMovieProcessor('subtract_baseline'));
+            b.init.description = "Removing baseline from registered raw trials";
+            b.includeFilter = [num2str(obj.sj.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
+            b = b.setDataPath(datapath);
+
+            % run
+            b = b.run;
+            charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
+            obj.sj.log{end+1} = charv;
+
+            % move to layer 1 dir
+            sourceFolder = fullfiletol(datapath, b.OutFolder);
+            destinationFolder = [obj.sj.locations.rawtrials_rigidreg,'_rmbase'];
+            movedirTC(sourceFolder,destinationFolder)
+            obj.sj.locations.rawtrials_rigidreg = destinationFolder;
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
+
+
+            obj.sj = obj.sj.update_currentstate('Movie baseline removed');
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+        end
+    
+        function [obj, b] = correctBidiScanningHisteq(obj)
+            % prep histeq trial movies
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+            datapath = obj.sj.locations.histeqtrials;
+            obj.sj.Tiff2Movie(datapath)
+            
+            % initialize Batch Process
+            b = BatchProcess(CorrectBidiScanning);
+            b.init.description = "Correction of the bidirectional alignment artefact";
+            b.init.detailed_description = "Based on the consensus transform across lines of the histeq reference image";
+            b.includeFilter = [num2str(obj.sj.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
+            b = b.setDataPath(datapath);
+            imgref = obj.sj.loadReferenceImg(obj.sj.locations.references.histeq);
+            b.Processor = b.Processor.setReference(imgref);
+
+            % precompute shifts and apply to everything
+            comp = CorrectBidiScanning(Movie(imgref)).run(true);
+            b.init.operation_precomputed = true;
+            b.results = repmat({comp}, size(b.DataList));
+            
+            % run
+            b = b.run;
+            charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
+            obj.sj.log{end+1} = charv;
+            
+            % move to layer 1 dir
+            sourceFolder = fullfiletol(datapath, b.OutFolder);
+            destinationFolder = obj.sj.locations.histeqtrials;
+            movedirTC(sourceFolder,destinationFolder)
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
+
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+        end
+
+        function [obj, b] = correctBidiScanningHisteq2Raw(obj)
+            [obj, b] = correctBidiScanningHisteq(obj);
+
+            % prep original trial movies
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+            
+            % apply computed shifts to the raw data
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+            datapath = obj.sj.locations.rawtrials;
+            b = b.applyresults(datapath);
+            
+            % run
+            b = b.run;
+            charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
+            obj.sj.log{end+1} = charv;
+            
+            % move to layer 1 dir
+            sourceFolder = fullfiletol(datapath, b.OutFolder);
+            destinationFolder = obj.sj.locations.rawtrials;
+            movedirTC(sourceFolder,destinationFolder)
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
+            
+            obj.sj = obj.sj.update_currentstate('Bidi correction complete');
+            obj.sj.save2mat(obj.autosave)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+        end
+
+        % _________________________________________________
+        % FRAME-BY-FRAME REGISTRATION
 
         function [obj, b] = rigidregHisteq(obj)
             % prep CLAHEd trials
@@ -189,61 +336,7 @@ classdef Preprocessing
             obj.sj.save2mat(obj.autosave)
             cd(fullfiletol(obj.sj.locations.subject_datapath))
         end
-    
-        function [obj, b] = removeMovieBaseline(obj)
-            cd(fullfiletol(obj.sj.locations.subject_datapath))
-            datapath = obj.sj.locations.rawtrials_rigidreg;
 
-            % initialize Batch Process
-            b = BatchProcess(BasicMovieProcessor('subtract_baseline'));
-            b.init.description = "Removing baseline from registered raw trials";
-            b.includeFilter = [num2str(obj.sj.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
-            b = b.setDataPath(datapath);
-
-            % run
-            b = b.run;
-            charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
-            obj.sj.log{end+1} = charv;
-
-            % move to layer 1 dir
-            sourceFolder = fullfiletol(datapath, b.OutFolder);
-            destinationFolder = [obj.sj.locations.rawtrials_rigidreg,'_rmbase'];
-            movedirTC(sourceFolder,destinationFolder)
-            obj.sj.locations.rawtrials_rigidreg = destinationFolder;
-
-            % save anatomy and visualization results to disk
-            obj = obj.tail_sequence(destinationFolder);
-
-
-            obj.sj = obj.sj.update_currentstate('Movie baseline removed');
-            cd(fullfiletol(obj.sj.locations.subject_datapath))
-        end
-    
-        function obj = updateSubject(obj, loc)
-            arguments
-                obj 
-                loc char = obj.sj.locations.rawtrials_rigidreg
-            end
-
-            cd(fullfiletol(obj.sj.locations.subject_datapath))
-            
-            obj.sj.anatomy_imgs = obj.sj.retrieve_trial_anatomies(loc);
-            obj.sj.reference_img = obj.sj.retrieve_ref_img(loc);
-            obj.sj.localcorr_imgs = obj.sj.retrieve_localcorr_maps(loc);
-
-            % store as Subject traces source location
-            obj.sj.locations.traces_src = loc;
-            obj.sj = obj.sj.update_currentstate( ...
-                'Trial anatomies and reference frame updated in Subject file');
-            obj.sj.save2mat(obj.autosave)
-            
-            if obj.pl % plot anatomy
-                SubjectViewer(obj.sj).visualize_anatomy_physFOV;
-            end
-
-            cd(fullfiletol(obj.sj.locations.subject_datapath))
-        end
-    
         function [obj, b] = opticflowregRaw(obj)
             % prep raw trials
             cd(fullfiletol(obj.sj.locations.subject_datapath))
@@ -315,27 +408,6 @@ classdef Preprocessing
         end
 
         function [obj, b] = opticflowHisteq2Raw(obj)
-            % % prep CLAHEd trials
-            % datapath = obj.sj.locations.histeqtrials;
-            % obj.sj.Tiff2Movie(datapath)
-            % 
-            % % initialize Batch Process
-            % b = BatchProcess(OpticFlowRegistration);
-            % b.init.description = "Opticflow alignment of CLAHEd raw trials to the CLAHEd reference image";
-            % b.includeFilter = [num2str(obj.sj.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
-            % b = b.setDataPath(datapath);
-            % imgref = obj.sj.loadReferenceImg(obj.sj.locations.references.histeq);
-            % b.Processor.reference_img=imgref;
-            % 
-            % % run
-            % b = b.run;
-            % charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
-            % obj.sj.log{end+1} = charv;
-            % 
-            % % move to layer 1 dir
-            % sourceFolder = fullfiletol(datapath, b.OutFolder);
-            % destinationFolder = obj.sj.locations.histeqtrials_opticflowwarp;
-            % movedirTC(sourceFolder,destinationFolder)
             [obj,b] = obj.opticflowregHisteq();
             
             % apply computed shifts to the raw data
@@ -376,6 +448,9 @@ classdef Preprocessing
             obj = obj.rigidregHisteq2Raw;
         end
 
+        % _________________________________________________
+        
+        
         function obj = selectROIs(obj)
             % select background ROIs
             obj.sj.backgroundROImap = imageSequenceGUI(...
@@ -400,7 +475,11 @@ classdef Preprocessing
             obj.sj.save2mat(obj.autosave)
         end
 
-        function obj = extractCalciumTraces(obj)            
+        function obj = extractCalciumTraces(obj, do_save)    
+            arguments
+                obj 
+                do_save logical = true
+            end
             loc = obj.sj.locations;
 
             % temporary
@@ -427,8 +506,10 @@ classdef Preprocessing
             
             cd(fullfiletol(obj.sj.locations.subject_datapath))
 
-            obj.sj.traces.save('','full',obj.autosave);
-            obj.sj.traces.save('','light',obj.autosave);
+            if do_save
+                obj.sj.traces.save('','full',obj.autosave);
+                obj.sj.traces.save('','light',obj.autosave);
+            end
 
             obj.sj.traces.Fpx = {};          
             
@@ -437,13 +518,15 @@ classdef Preprocessing
 
         end
 
-        function obj = TracesQC(obj)
-            % trace quality check (manual 'bad cell' calling)
-            obj = checkTracesMan(obj);
+        function obj = TracesQC(obj, ignore_previous)
+            arguments
+                obj 
+                ignore_previous logical = false 
+            end            
 
-            % anatomical segmentation
-            
+            obj.sj.traces = obj.sj.traces.setManually(ignore_previous);
 
+            % expand with quality metrics (make use of TraceViewer)
         end
 
     end

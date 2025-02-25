@@ -4,7 +4,6 @@ classdef Subject
         id
         name
         log cell = {}
-        imaging_date
         group
         traces ActivityTraces
         odor_delay double {mustBeNonnegative}
@@ -22,22 +21,36 @@ classdef Subject
         stim_series
         ch2stimtype_map
 
+        % fspecs
+        imaging_date
+        owner char
+        tg_line char
+        withinday_id char
+        region char
+        protocol char
+        method char
+        extra_info char
+
         ROImap double = []
         backgroundROImap double = []
         framerate
         scanimage_metadata
-        badtrials double = []
         badperiods
+        anat_regions
         
         process_log cell = {}
         currentstate
+    end
+
+    properties (SetAccess = protected)
+        badtrials double = []
     end
 
     methods (Access = protected)
         % Method to set list of files
         function [files,trialnum,min_trialnum] = setFileList(obj)
             loc = obj.locations;
-            relative_pathin = fullfiletol(loc.subject_ID, loc.rawtrials);
+            relative_pathin = fullfiletol(loc.subject_ID, loc.orig_trials);
 
             fprintf(strcat('\nSource folder: ', strrep(relative_pathin, '\','\\'),'.\n\n'))
 
@@ -61,7 +74,7 @@ classdef Subject
         function [stim_series, ch2stimtype_map] = setStimSeries(obj)
             loc = obj.locations;
             fname = strcat(loc.subject_ID,'_',num2str(obj.min_trialnum, '%05.f'));
-            FileIn = fullfiletol(loc.subject_datapath,loc.rawtrials,fname);
+            FileIn = fullfiletol(loc.subject_datapath,loc.orig_trials,fname);
             [stim_series, ch2stimtype, ch2stimtype_map] = read_stim_series(FileIn);
             stim_series = horzcat(array2table(stim_series, ...
                 'VariableNames',{'trialnum' 'odor_channel' 'frame_onset','frame_offset'}), ...
@@ -115,13 +128,8 @@ classdef Subject
             end
         end
 
-        % Method to set the imaging date
-        function obj = setImagingDate(obj)
-            str = obj.singletrial_meta{1}.path.date;
-            mydate = datestr(datenum(str ,'yyyymmdd'),'dd/mm/yyyy');
-            obj.imaging_date = mydate;
-        end
-
+        
+        
         % Method to load a pre-existing annotation for ROI selection
         function p_ann = load_partial_annotation(obj)
             obj.reload;
@@ -166,11 +174,14 @@ classdef Subject
                 warning('Bad periods not found')
             end
 
-            obj.Tiff2Movie(obj.locations.rawtrials);
+            obj.Tiff2Movie(obj.locations.orig_trials);
             obj.singletrial_meta = obj.loadSingletrialMeta();
             obj.anatomy_imgs = obj.retrieve_trial_anatomies();
             obj.localcorr_imgs = obj.retrieve_localcorr_maps();
-            obj = obj.setImagingDate;
+            obj = obj.setImagingInfo;
+
+            
+
             obj = update_currentstate(obj, 'newly constructed');
             % obj.ROIcheckfiles = struct('to_keep',[],'to_discard',[],'is_complete',[]);
 
@@ -220,12 +231,46 @@ classdef Subject
             end
         end
 
+        function obj = setBadtrials(obj,value)
+            arguments
+                obj 
+                value double
+            end
+
+            obj.badtrials = value;
+
+            if isempty(obj.traces); return; end
+
+            obj.traces = obj.traces.setBadtrials(value);
+        end
+
+        % Method to set the imaging info
+        function obj = setImagingInfo(obj)
+            str = obj.singletrial_meta{1}.path.date;
+            mydate = datestr(datenum(str ,'yyyymmdd'),'dd/mm/yyyy');
+            obj.imaging_date = mydate;
+
+            fspecs = getFileNameSpecs(obj.filelist(1).name);
+            obj.owner = fspecs.owner;
+            obj.tg_line = fspecs.subject_line;
+            obj.withinday_id = fspecs.subject;
+            obj.region = fspecs.region;
+            obj.protocol = fspecs.stim_type;
+            obj.method = fspecs.method;
+            obj.extra_info = fspecs.extra;
+        end
+        
+        % setter for secundary properties requiring user input
+        function obj = setManually(obj)
+            obj.anat_regions = selectAnatRegions(obj,false);
+        end
+
         % Method to load all raw trials and return a cell
         % array with all their metadata
         function result = loadSingletrialMeta(obj,sourcedir)
             loc = obj.locations;
             if ~exist('sourcedir','var') || isempty(sourcedir)
-                sourcedir = fullfiletol(loc.subject_datapath,loc.rawtrials);
+                sourcedir = fullfiletol(loc.subject_datapath,loc.orig_trials);
             end
             files = obj.filelist;
 
@@ -248,7 +293,7 @@ classdef Subject
         % Method to load BADPERIOD coordinates
         function badperiods = loadBadperiods(obj)
             loc = obj.locations;
-            FileIn = fullfiletol(loc.subject_datapath,loc.rawtrials,[loc.subject_ID,'_badperiods.csv']);
+            FileIn = fullfiletol(loc.subject_datapath,loc.orig_trials,[loc.subject_ID,'_badperiods.csv']);
             badperiods.data = [];
             if exist(FileIn,'file'); badperiods = importdata(FileIn); end
             if isstruct(badperiods)
@@ -261,7 +306,7 @@ classdef Subject
         function Tiff2Movie(obj, sourcedir)
             loc = obj.locations;
             if ~exist('sourcedir','var') || isempty(sourcedir)
-                sourcedir = fullfiletol(loc.subject_datapath,loc.rawtrials);
+                sourcedir = fullfiletol(loc.subject_datapath,loc.orig_trials);
             end
             files = obj.filelist;
 
@@ -291,7 +336,7 @@ classdef Subject
         function localCorr = retrieve_localcorr_maps(obj, input_folder, interval)
             % initialize vars
             if ~exist('input_folder','var') || isempty(input_folder)
-                input_folder = obj.locations.rawtrials;
+                input_folder = obj.locations.orig_trials;
             end
             if ~exist('interval','var') || isempty(interval)
                 interval = 1:obj.getNFrames;
@@ -393,8 +438,8 @@ classdef Subject
             filename = find_daughter_file(obj.filelist(reftrialnum).name,'mat');
 
             % extract average of selected frame range
-            frame_range = obj.reference_img_meta.Frameavg_range(1) : ...
-                obj.reference_img_meta.Frameavg_range(2);
+            frame_range = obj.reference_img_meta.Frame_range(1) : ...
+                obj.reference_img_meta.Frame_range(2);
             snip = Snippet(filename,frame_range);
             snip.path.fname = getFileNameSpecs(filename).fname; % to have a nice name when saving, if applicable
             reference_image = snip.timeavg;
@@ -409,6 +454,7 @@ classdef Subject
             if ~exist(output_folder,'dir'); mkdir(output_folder); end
             snip.save(output_folder,'mat')                                  % Saving the whole Snippet
             FileOut = fullfiletol(output_folder,[snip.path.fname, '.tif']);    % Saving the image as Tiff
+            if exist(FileOut,'file'); rm(FileOut); end
             saveastiff(reference_image,FileOut)
         end
 

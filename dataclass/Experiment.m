@@ -236,6 +236,20 @@ classdef Experiment
             end
         end
 
+        function experiment = convert2BackwardCompatibleStruct(obj, name)
+            arguments
+                obj 
+                name char = 'new_experiment'
+            end
+
+            experiment.name = name;
+            experiment.summaryTable = obj.subjectTab;
+
+            for i = 1:numel(obj.traces)
+                 experiment.series{i} = obj.traces{i}.convert2Series;
+            end
+        end
+
         function obj = saveAnatomicalReferencesToFiles(obj)
             % define complete list of subjects to process
             subjectlist = obj.subjectTab.name;

@@ -46,6 +46,8 @@ classdef Snippet < Movie
                 if ~isempty(src.scanimage_meta)
                     obj.scanimage_meta = src.scanimage_meta(obj.frameinterval);
                 end
+                
+                obj.fs = src.fs; % inherit framerate
             else
                 if ~isempty(obj.scanimage_meta)
                     % in case it was loaded from a mat file containing a Movie object
