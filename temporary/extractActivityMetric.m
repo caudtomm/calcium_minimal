@@ -24,11 +24,18 @@ todo_fish = select_fish(experiment, params.groups);
 fish_stats = [];
 outputMAT = []; outputMAT_baseline = [];
 
+
 % for each fish, extract a single vector per trial
 for i_fish = 1:numel(todo_fish)
     thisfish = todo_fish(i_fish);
-    fprintf('interval length check : %s\n', num2str(i_fish))
+    fprintf('fish num : %s\n', num2str(thisfish))
     data = experiment.series{thisfish}.data;
+
+    % hacky shit
+    if iscolumn(data.stim_type)
+        data.stim_type = data.stim_type';
+    end
+
     output_vector = []; output_vector_baseline = [];
     
     % extract fish-specific vars
@@ -54,7 +61,7 @@ for i_fish = 1:numel(todo_fish)
     relative_trial_num = relative_trial_num(desired_trials);
 
     % extract activity traces
-    tracestmp = traceFormat(data.tracesdesdn,data.L); % time x cells x trials
+    tracestmp = traceFormat(data.traces,data.L); % time x cells x trials
 
     % define desired cells
     cells = 1:data.N;
@@ -87,9 +94,9 @@ for i_fish = 1:numel(todo_fish)
             error('Requested metric invalid.')
     end
 
-%     % normalize by baseline average
-%     output_vector = output_vector ./ nanmean(output_vector_baseline,"all");
-%     output_vector_baseline = output_vector_baseline ./ nanmean(output_vector_baseline,"all");
+    % % normalize by baseline average
+    % output_vector = output_vector ./ nanmean(output_vector_baseline,"all");
+    % output_vector_baseline = output_vector_baseline ./ nanmean(output_vector_baseline,"all");
 
     % store loop outputs
     fish_stats{i_fish}.fish_id = thisfish;

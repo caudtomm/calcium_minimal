@@ -2,16 +2,18 @@
 %% plot trial distance averaged across fish
 
 % todo_fish = [6:7,11:12,14,17,18,21:23];
-todo_fish = find(strcmp(experiment.summaryTable.group,'naïve'));
+todo_fish = find(~strcmp(experiment.summaryTable.group,'naïve'));
 % todo_fish = 20;
+% todo_fish = 1:17
 
 sec_range = [1,20]; % [+stim_on, +stim on]
-crange = [0.3 1];
+crange = [0.6 1];
 % blockstructure = [5;5;5;7;5;5];
 blockstructure = [6;6;6;6;6;3];
 
 data = experiment.series{todo_fish(1)}.data;
-sortorder = 1:numel(data.stim_type);
+% sortorder = 1:numel(data.stim_type);
+sortorder = data.idx_by_stim_type;
 labs = data.stim_type(sortorder);
 
 C = nan(numel(sortorder),numel(sortorder),numel(todo_fish));
@@ -26,14 +28,12 @@ for i_fish = 1:numel(todo_fish)
 %     figure; imagesc(C(1:16,1:16,i_fish)), title(num2str(i_fish))
 end
 
-C = nanmean(C(sortorder,sortorder,:),3);
-
-%% plot full avg intertrial distance matrix
-c = C;
+% plot full avg intertrial distance matrix
+c = nanmean(C(sortorder,sortorder,:),3);
 figure; imagesc(c)
 axis square; hold on
-xticks(1:size(c,1)); xticklabels(labs(sortorder)); xtickangle(90)
-yticks(1:size(c,1)); yticklabels(labs(sortorder))
+xticks(1:size(c,1)); xticklabels(labs); xtickangle(90)
+yticks(1:size(c,1)); yticklabels(labs)
 xlabel('Stimulus type')
 ylabel('Stimulus type')
 title(['Similarity: cosine ', num2str(interval(1)/fs-data.stim_on_sec), '-', ...

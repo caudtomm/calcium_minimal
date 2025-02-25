@@ -50,7 +50,7 @@ classdef Subject
         % Method to set list of files
         function [files,trialnum,min_trialnum] = setFileList(obj)
             loc = obj.locations;
-            relative_pathin = fullfiletol(loc.subject_ID, loc.rawtrials);
+            relative_pathin = fullfiletol(loc.subject_ID, loc.orig_trials);
 
             fprintf(strcat('\nSource folder: ', strrep(relative_pathin, '\','\\'),'.\n\n'))
 
@@ -74,7 +74,7 @@ classdef Subject
         function [stim_series, ch2stimtype_map] = setStimSeries(obj)
             loc = obj.locations;
             fname = strcat(loc.subject_ID,'_',num2str(obj.min_trialnum, '%05.f'));
-            FileIn = fullfiletol(loc.subject_datapath,loc.rawtrials,fname);
+            FileIn = fullfiletol(loc.subject_datapath,loc.orig_trials,fname);
             [stim_series, ch2stimtype, ch2stimtype_map] = read_stim_series(FileIn);
             stim_series = horzcat(array2table(stim_series, ...
                 'VariableNames',{'trialnum' 'odor_channel' 'frame_onset','frame_offset'}), ...
@@ -174,7 +174,7 @@ classdef Subject
                 warning('Bad periods not found')
             end
 
-            obj.Tiff2Movie(obj.locations.rawtrials);
+            obj.Tiff2Movie(obj.locations.orig_trials);
             obj.singletrial_meta = obj.loadSingletrialMeta();
             obj.anatomy_imgs = obj.retrieve_trial_anatomies();
             obj.localcorr_imgs = obj.retrieve_localcorr_maps();
@@ -270,7 +270,7 @@ classdef Subject
         function result = loadSingletrialMeta(obj,sourcedir)
             loc = obj.locations;
             if ~exist('sourcedir','var') || isempty(sourcedir)
-                sourcedir = fullfiletol(loc.subject_datapath,loc.rawtrials);
+                sourcedir = fullfiletol(loc.subject_datapath,loc.orig_trials);
             end
             files = obj.filelist;
 
@@ -293,7 +293,7 @@ classdef Subject
         % Method to load BADPERIOD coordinates
         function badperiods = loadBadperiods(obj)
             loc = obj.locations;
-            FileIn = fullfiletol(loc.subject_datapath,loc.rawtrials,[loc.subject_ID,'_badperiods.csv']);
+            FileIn = fullfiletol(loc.subject_datapath,loc.orig_trials,[loc.subject_ID,'_badperiods.csv']);
             badperiods.data = [];
             if exist(FileIn,'file'); badperiods = importdata(FileIn); end
             if isstruct(badperiods)
@@ -306,7 +306,7 @@ classdef Subject
         function Tiff2Movie(obj, sourcedir)
             loc = obj.locations;
             if ~exist('sourcedir','var') || isempty(sourcedir)
-                sourcedir = fullfiletol(loc.subject_datapath,loc.rawtrials);
+                sourcedir = fullfiletol(loc.subject_datapath,loc.orig_trials);
             end
             files = obj.filelist;
 
@@ -336,7 +336,7 @@ classdef Subject
         function localCorr = retrieve_localcorr_maps(obj, input_folder, interval)
             % initialize vars
             if ~exist('input_folder','var') || isempty(input_folder)
-                input_folder = obj.locations.rawtrials;
+                input_folder = obj.locations.orig_trials;
             end
             if ~exist('interval','var') || isempty(interval)
                 interval = 1:obj.getNFrames;
@@ -438,8 +438,8 @@ classdef Subject
             filename = find_daughter_file(obj.filelist(reftrialnum).name,'mat');
 
             % extract average of selected frame range
-            frame_range = obj.reference_img_meta.Frameavg_range(1) : ...
-                obj.reference_img_meta.Frameavg_range(2);
+            frame_range = obj.reference_img_meta.Frame_range(1) : ...
+                obj.reference_img_meta.Frame_range(2);
             snip = Snippet(filename,frame_range);
             snip.path.fname = getFileNameSpecs(filename).fname; % to have a nice name when saving, if applicable
             reference_image = snip.timeavg;
@@ -454,6 +454,7 @@ classdef Subject
             if ~exist(output_folder,'dir'); mkdir(output_folder); end
             snip.save(output_folder,'mat')                                  % Saving the whole Snippet
             FileOut = fullfiletol(output_folder,[snip.path.fname, '.tif']);    % Saving the image as Tiff
+            if exist(FileOut,'file'); rm(FileOut); end
             saveastiff(reference_image,FileOut)
         end
 

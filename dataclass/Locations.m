@@ -16,6 +16,7 @@ classdef Locations
                                 % to another specified folder name
                                 % property of the same Location object
         
+        orig_trials char = 'orig_trials'
         rawtrials char = 'trials'
         references struct = struct()
         histeqtrials = 'trials_clahe';
@@ -66,7 +67,7 @@ classdef Locations
             
             % This will retain the existing drive, in case the id was
             % empty.
-            obj.drive = obj.tungstenDrive(id);
+            obj.drive = obj.tungstenDrive(fullfiletol(id));
 
             obj = obj.setGeneralDataPath(fullfiletol(obj.drive,obj.datafolder));
 
@@ -79,7 +80,7 @@ classdef Locations
             end
 
             if ~isempty(id)
-                obj.general_datapath = id;
+                obj.general_datapath = fullfiletol(id);
             end % else, keep existing
 
             obj = obj.setSubjectDataPath(fullfiletol(obj.general_datapath,obj.subject_ID));
@@ -92,7 +93,7 @@ classdef Locations
                 id char
             end
 
-            obj.subject_datapath = id;
+            obj.subject_datapath = fullfiletol(id);
 
         end
 
@@ -103,7 +104,7 @@ classdef Locations
             end
 
             if ~isempty(id)
-                obj.subject_ID = id;
+                obj.subject_ID = fullfiletol(id);
             end % else, keep existing
 
             obj = obj.setSubjectDataPath(fullfiletol(obj.general_datapath,obj.subject_ID));
@@ -117,7 +118,7 @@ classdef Locations
             end
 
             if ~isempty(id)
-                obj.datafolder = id;
+                obj.datafolder = fullfiletol(id);
             end % else, keep existing
 
             obj = obj.setGeneralDataPath(fullfiletol(obj.drive,obj.datafolder));

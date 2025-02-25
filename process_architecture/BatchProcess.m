@@ -4,8 +4,8 @@ classdef BatchProcess < Process
 
     properties
         Processor Process = BasicMovieProcessor('subtract_baseline')  % Instance of a subclass of Process to apply
-        includeFilter char = '.mat'
-        excludeFilter char = ''
+        includeFilter char = '.mat' % should have private SetAccess, and call setDataPath when updated              ## TODO ##
+        excludeFilter char = '' % should have private SetAccess, and call setDataPath when updated                  ## TODO ##
         results cell
         OutFolder char = 'batch'
     end
@@ -173,7 +173,7 @@ classdef BatchProcess < Process
             end
             
             obj.init.save(outpath,'json')
-            obj.Processor = getLight(obj.Processor);
+            try obj.Processor = getLight(obj.Processor); catch; end
             save(getLight(obj),outpath);
         end        
 
@@ -199,7 +199,7 @@ classdef BatchProcess < Process
         end
 
         function obj = setDataList(obj, dataList)
-            [obj.DataList, obj.DataPath] = obj.reformatDataList(dataList,obj.includeFilter,obj.excludeFilter);
+            obj = setDataPath(obj, dataList);
         end
     end
 end

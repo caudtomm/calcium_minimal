@@ -43,7 +43,7 @@ stim_on = data.stim_on_sec;
 stim_off = data.stim_off_sec;
 labs = stims;
 
-traces = data.tracesdesdn;
+traces = data.traces;
 % FindTopUnits
 % traces = selectCells(traces,data.L,alltopunits');
 traces = traceFormat(traces,data.L);
@@ -67,6 +67,11 @@ C = [1 1 1;
      0 1 0;
      1 0 1;
      .5 .8 .2];
+
+% hacky shit
+if iscolumn(data.stim_type)
+    data.stim_type = data.stim_type';
+end
 
 % save folder
 pathout = fullfile(mfilename,tag)

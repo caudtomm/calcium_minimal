@@ -159,23 +159,92 @@ classdef TraceViewer
             ylabel('neuron #')
         end
 
-        function h = plotPSTH(obj, tracename, trials, stim_frame, ps_lim)
+        function [h, events] = plotPSTH(obj, tracename, trials, event_frames, ps_lim)
             arguments
                 obj 
                 tracename char = 'dFoverF'
                 trials double = [1:obj.traces.ntrials]
-                stim_frame double = obj.traces.stim_series.frame_onset(1)
-                ps_lim double = [-4, 30] % from stim onset [s]
+                event_frames double = [obj.traces.stim_series.trialnum, obj.traces.stim_series.frame_onset]
+                ps_lim double = [-4, 30] % from event frame [s]
             end
 
             M = obj.initializeTraces(tracename); % [t, roi, trial]
-
+            nrois = size(M,2);
             fs = obj.traces.framerate;
+            t = ps_lim(1) : 1/fs : ps_lim(2)-1/fs;
 
-            interval = floor(ps_lim(1)*fs+stim_frame) : floor(ps_lim(2)*fs+stim_frame); 
-            t = interval /fs;
+            % define intervals
+            interval_len = floor(diff(ps_lim)*fs);
+            event_frames = event_frames(ismember(event_frames(:,1),trials),:); % only use events from specified trials
+            nevents = size(event_frames,1);
+            intervals = nan(nevents,interval_len);
+            for i = 1:nevents
+                intervals(i,:) = floor(ps_lim(1)*fs+event_frames(i,2)) + ...
+                    [0 : interval_len-1];
+            end
+            intervals(intervals>obj.traces.L | intervals<1) = nan;
 
-            h = obj.plotAvgCurve(t, M(interval,:,trials));
+            % isolate peri-event data
+            events = nan(interval_len,nrois,nevents); % [t, roi, event]
+            for i = 1:nevents
+                isnanframe = isnan(intervals(i,:));
+                thisevent = M(intervals(i,~isnanframe),:,event_frames(i,1));
+                
+                events(~isnanframe,:,i) = thisevent;
+            end
+
+            % plot
+            h = obj.plotAvgCurve(t, events);
+            xlabel('time from stimulus onset [s]')
+            ylabel(tracename)
+            axis tight
+            
+            set(gcf, 'Position', [50 50 400 280]);
+            set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w');
+            set(gcf, 'color', 'none'); 
+            
+            l = legend('PSTH'); legend('boxoff')
+            l.TextColor = 'w';
+        end
+
+        function [h, events] = plotbehaviorPSTH(obj, tracename, trials, event_frames, ps_lim)
+            arguments
+                obj 
+                tracename char = 'Tail'
+                trials double = [1:obj.traces.ntrials]
+                event_frames double = [obj.traces.stim_series.trialnum, obj.traces.stim_series.frame_onset]
+                ps_lim double = [-4, 30] % from event frame [s]
+            end
+
+            M = obj.traces.behavior2p.(tracename).raw;
+            
+
+            nrois = size(M,2);
+            fs = obj.traces.framerate;
+            t = ps_lim(1) : 1/fs : ps_lim(2)-1/fs;
+
+            % define intervals
+            interval_len = floor(diff(ps_lim)*fs);
+            event_frames = event_frames(ismember(event_frames(:,1),trials),:); % only use events from specified trials
+            nevents = size(event_frames,1);
+            intervals = nan(nevents,interval_len);
+            for i = 1:nevents
+                intervals(i,:) = floor(ps_lim(1)*fs+event_frames(i,2)) + ...
+                    [0 : interval_len-1];
+            end
+            intervals(intervals>obj.traces.L | intervals<1) = nan;
+
+            % isolate peri-event data
+            events = nan(interval_len,nrois,nevents); % [t, roi, event]
+            for i = 1:nevents
+                isnanframe = isnan(intervals(i,:));
+                thisevent = M(intervals(i,~isnanframe),:,event_frames(i,1));
+                
+                events(~isnanframe,:,i) = thisevent;
+            end
+
+            % plot
+            h = obj.plotAvgCurve(t, events);
             xlabel('time from stimulus onset [s]')
             ylabel(tracename)
             axis tight

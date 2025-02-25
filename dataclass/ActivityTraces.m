@@ -50,6 +50,8 @@ classdef ActivityTraces
         % only temporarily public
         goodNeuron_IDs double
         N double = 0
+        behavior2p Behavior2PTraces % should be inherited from Subject
+        behavior2p_scaling double
         
         % currently not implemented #### TODO in separate ActivityTraces = Process(ActivityTraces)
         baseline_periods cell % periods of inactivity for each ROI

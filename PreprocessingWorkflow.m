@@ -11,16 +11,26 @@ p = Preprocessing;
 p.autosave = true;
 
 %% create or load fish (autosaving never applies to subject creation)
-subjectID = 'TC_230910_TC0028_230906beh1b3_sxpDp_odorexp005_RPB3144501500AG';
-group = 'naive';
+subjectID = 'TC_240217_TC0028_240213beh1b4_sxpDp_odorexp004_RPB3144501500AG';
+group = 'uncoupled';
+drive = '/tungstenfs/';
 datafolder = 'scratch\gfriedri\caudtomm\testground';
 odordelay = 0;
-p = p.createSubject(subjectID,group,datafolder,odordelay);
+p = p.createSubject(subjectID,group,drive,datafolder,odordelay);
 % or
 p.sj = fish1; clear fish1
 
-%% histogram equalization
+%% early preprocessing
+
+% remove bad periods and replace them with nan frames
+p = p.replaceBadPeriodsWithNans;
+
+% histogram equalization
 p = p.claheRawTrials;
+
+%% correct bidirectional scan artefact
+p = p.correctBidiScanningHisteq2Raw;
+
 
 
 %% registration

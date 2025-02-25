@@ -54,6 +54,12 @@ classdef BasicMovieProcessor < MovieProcessing
                 case 'add_badperiods_as_nans'
                     [movie, obj.operation.periods_added] = ...
                         add_badperiods_as_nans(obj.data_raw);
+
+                case 'replace_badperiods_with_nans'
+                    [movie, obj.operation.periods_removed] = ...
+                        subtract_badperiods(obj.data_raw);
+                    [movie, obj.operation.periods_added] = ...
+                        add_badperiods_as_nans(movie.checkAgain);
                 
                 case 'clahe'
                     disp('Histogram equalization (CLAHE)')
@@ -182,6 +188,4 @@ end
 movie_result.stack = movie;
 
 end
-
-
 

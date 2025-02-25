@@ -18,7 +18,7 @@ function periods = convertPeriods(X,reverse)
         end
 
         % make sure periods are not staggered
-        if pend(1)<pstart(1)
+        if ~isempty(pend) && ~isempty(pstart) && pend(1)<pstart(1)
             pend = [pend; length(X)];
             pstart = [1; pstart];
         end
