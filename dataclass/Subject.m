@@ -276,7 +276,7 @@ classdef Subject
 
             result = {};
 
-            for i_f = 1:numel(files)
+            parfor i_f = 1:numel(files)
                 thisfilename = find_daughter_file(fullfiletol(sourcedir,files(i_f).name),'mat');
                 if ~isempty(thisfilename)
                     thismovie = load(thisfilename,'movie').movie;
@@ -310,7 +310,7 @@ classdef Subject
             end
             files = obj.filelist;
 
-            for i_f = 1:numel(files)
+            parfor i_f = 1:numel(files)
                 thisfilename = fullfiletol(sourcedir,files(i_f).name);
                 thismatfilename = fullfiletol(sourcedir,[extractBefore(files(i_f).name,'.'),'.mat']);
                 if exist(thismatfilename,'file')
@@ -355,11 +355,11 @@ classdef Subject
                 filenames{end+1} = find_daughter_file(obj.filelist(i_file).name,'mat');
             end
 
-            for i_file = 1:numel(filenames)
+            parfor i_file = 1:numel(filenames)
                 disp(filenames{i_file})
                 % assumes that filenames refer to physiological Movie's
-                load(filenames{i_file},'movie');
-                M = movie.stack(:,:,interval);
+                m = load(filenames{i_file},'movie');
+                M = m.movie.stack(:,:,interval);
                 localCorr(:,:,i_file) = computeLocalCorrelationMap(M);
             end
         end
@@ -408,12 +408,12 @@ classdef Subject
                 end
     
                 % open each file and extract anatomy image
-                for i_file = 1:ntrials
+                parfor i_file = 1:ntrials
                     disp(filenames{i_file})
                     
                     % assumes that filenames refer to physiological Movie's
-                    load(filenames{i_file},'movie');
-                    anatomy(:,:,i_file) = movie.timeavg;
+                    m = load(filenames{i_file},'movie');
+                    anatomy(:,:,i_file) = m.movie.timeavg;
                 end
 
             end
@@ -525,6 +525,20 @@ classdef Subject
             FileIn = fullfiletol(files(1).folder,files(end).name);
             load(FileIn)
             disp('... DATA LOADED.')
+        end
+
+        function [fileList, numFiles] = getFileListInSubfolder(obj, folder)
+            cd(fullfiletol(obj.locations.subject_datapath))
+            
+            % retrieve file list
+            fileList = {};
+            for i = 1:numel(obj.filelist)
+                fileList{end+1} = find_daughter_file(...
+                    fullfiletol(folder,obj.filelist(i).name),'mat');
+            end
+
+            % Determine the number of files
+            numFiles = length(fileList);
         end
 
         %% Functional methods
