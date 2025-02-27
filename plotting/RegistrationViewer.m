@@ -17,17 +17,9 @@ classdef RegistrationViewer
 
         function collage = subsampledMovieCollage(obj)
             orig_folder = fullfiletol(pwd);
-            cd(fullfiletol(obj.sj.locations.subject_datapath))
-            
-            % retrieve file list
-            fileList = {};
-            for i = 1:numel(obj.sj.filelist)
-                fileList{end+1} = find_daughter_file(...
-                    fullfiletol(obj.folder,obj.sj.filelist(i).name),'mat');
-            end
 
-            % Determine the number of files
-            numFiles = length(fileList);
+            % get file list and move to subject-datapath
+            [fileList, numFiles] = obj.sj.getFileListInSubfolder(obj.folder);
         
             % Calculate the dimensions of the collage
             cols = ceil(sqrt(numFiles));
@@ -70,5 +62,48 @@ classdef RegistrationViewer
             cd(orig_folder)
         end
 
+        function [fbf_corr, zsc_corr, putative_fails] = QC(obj)
+            % generate a frame-by-frame correlation curve
+
+            orig_folder = fullfiletol(pwd);
+
+            % get file list and move to subject-datapath
+            [fileList, numFiles] = obj.sj.getFileListInSubfolder(obj.folder);
+            if numFiles~=obj.sj.getNTrials; warning('Number of movies found is different from the number of trials.'); end
+
+            % initialize
+            fbf_corr = zeros(obj.sj.getNFrames-1, numFiles); % [numFrames-1, trials]
+
+            % loop
+            parfor i = 1:numFiles
+                % Load the movie data
+                disp(fileList{i})
+                m = load(fileList{i}, 'movie');
+
+                fbf_corr(:,i) = avg_frame_correlation(m.movie.stack);
+            end
+
+            % zscored frame-by-frame correlation
+            zsc_corr = nanzscore(fbf_corr);
+
+            % define putatively failed frames
+            putative_fails = [zeros(1,numFiles) ; zsc_corr < -5]; % add one line at the start for frame 1
+
+            % return to original location
+            cd(orig_folder)
+        end
+
+    end
+end
+
+
+function corr_curve = avg_frame_correlation(data)
+    [rows, cols, frames] = size(data);
+    corr_curve = zeros(frames - 1, 1);
+    
+    for i = 1:frames-1
+        frame1 = reshape(data(:,:,i), [], 1);
+        frame2 = reshape(data(:,:,i+1), [], 1);
+        corr_curve(i) = corr(frame1, frame2);
     end
 end
