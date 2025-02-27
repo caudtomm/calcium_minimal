@@ -482,9 +482,9 @@ classdef Subject
         end
 
         % Method to log a new state (update the log and currentstate properties)
-        function obj = update_currentstate(obj,charv)
+        function obj = update_currentstate(obj,charv)            
             % append a new voice to log
-            obj.log{end+1} = charv;
+            obj.log{end+1} = strjoin(charv);
             % make log vertical for easier visualization (only needs to happen once)
             if numel(obj.log)==2; obj.log = transpose(obj.log); end
         
