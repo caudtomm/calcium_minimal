@@ -118,14 +118,14 @@ classdef Snippet < Movie
             else
                 basename = '';
                 if ~isempty(obj.parentpath) && ~isempty(obj.parentpath.fname)
-                    basename = [obj.parentpath.fname,'_'];
+                    basename = obj.parentpath.fname;
                 end
                 basename = [basename, '_Snippet#'];
 
                 i = 1;
                 while true
                     obj.path.fname = [basename,num2str(i)];
-                    files = dir(fullfiletol(newpath,[obj.path.fname,'.*']));
+                    files = dir(fullfiletol(newpath,[obj.path.fname,'.',type]));
                     if isempty(files)
                         break
                     else
