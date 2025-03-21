@@ -175,12 +175,19 @@ classdef Subject
             end
 
             obj.Tiff2Movie(obj.locations.orig_trials);
-            obj.singletrial_meta = obj.loadSingletrialMeta();
+
+            % load and save singletrial metadata separately. retain info
+            % only for trial 1
+            singletrial_meta = obj.loadSingletrialMeta();
+            save(fullfiletol(obj.locations.subject_datapath,'singletrial_meta.mat'),'singletrial_meta','-v7.3');
+            obj.singletrial_meta = cell(size(singletrial_meta));
+            obj.singletrial_meta(1) = singletrial_meta(1);
+            clear singletrial_meta
+            
             obj.anatomy_imgs = obj.retrieve_trial_anatomies();
             obj.localcorr_imgs = obj.retrieve_localcorr_maps();
             obj = obj.setImagingInfo;
 
-            
 
             obj = update_currentstate(obj, 'newly constructed');
             % obj.ROIcheckfiles = struct('to_keep',[],'to_discard',[],'is_complete',[]);
@@ -390,32 +397,29 @@ classdef Subject
         % You can manually store the result into obj.anatomy_imgs for 
         % future reference
         function anatomy = retrieve_trial_anatomies(obj,input_folder)
+            arguments
+                obj 
+                input_folder = obj.locations.orig_trials
+            end
             ntrials = obj.getNTrials;
             anatomy = nan(height(obj.reference_img),width(obj.reference_img),ntrials);
+            
+            % move to input folder
+            cd(fullfiletol(obj.locations.subject_datapath,input_folder))
 
-            if ~exist('input_folder','var') || isempty(input_folder)
-                for i_file = 1:ntrials
-                    anatomy(:,:,i_file) = obj.singletrial_meta{i_file}.timeavg;
-                end
-            else
-                % move to input folder
-                cd(fullfiletol(obj.locations.subject_datapath,input_folder))
-    
-                % make a list of names for all the files to be loaded
-                filenames = {};
-                for i_file = 1:ntrials
-                    filenames{end+1} = find_daughter_file(obj.filelist(i_file).name,'mat');
-                end
-    
-                % open each file and extract anatomy image
-                parfor i_file = 1:ntrials
-                    disp(filenames{i_file})
-                    
-                    % assumes that filenames refer to physiological Movie's
-                    m = load(filenames{i_file},'movie');
-                    anatomy(:,:,i_file) = m.movie.timeavg;
-                end
+            % make a list of names for all the files to be loaded
+            filenames = {};
+            for i_file = 1:ntrials
+                filenames{end+1} = find_daughter_file(obj.filelist(i_file).name,'mat');
+            end
 
+            % open each file and extract anatomy image
+            for i_file = 1:ntrials
+                disp(filenames{i_file})
+                
+                % assumes that filenames refer to physiological Movie's
+                m = load(filenames{i_file},'movie');
+                anatomy(:,:,i_file) = m.movie.timeavg;
             end
 
         end
@@ -484,7 +488,11 @@ classdef Subject
         % Method to log a new state (update the log and currentstate properties)
         function obj = update_currentstate(obj,charv)            
             % append a new voice to log
-            obj.log{end+1} = strjoin(charv);
+            try
+                obj.log{end+1} = strjoin(charv); % in case of string arrays
+            catch
+                obj.log{end+1} = charv;
+            end
             % make log vertical for easier visualization (only needs to happen once)
             if numel(obj.log)==2; obj.log = transpose(obj.log); end
         
