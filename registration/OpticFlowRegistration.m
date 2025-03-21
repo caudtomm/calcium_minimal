@@ -35,8 +35,7 @@ classdef OpticFlowRegistration < Registration
                 if isa(data_raw,'Movie')
                     TiffFilename = data_raw.save(obj.init.original_path,'tif');
                 else
-                    error('data type not recognised') % ## ---------- this should be more robust.
-                    % saving should work the same way for all Movie subclasses
+                    error('data type not recognised')
                 end
     
                 % name the output tiff file

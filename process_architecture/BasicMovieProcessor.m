@@ -5,6 +5,7 @@ classdef BasicMovieProcessor < MovieProcessing
 %   - 'remove_badperiods'
 %   - 'add_badperiods_as_nans'
 %   - 'clahe'
+%   - 'movmean'
 %
     
     properties (SetAccess = private)
@@ -39,7 +40,7 @@ classdef BasicMovieProcessor < MovieProcessing
             obj.init.method = processor;
         end
 
-        function obj = run(obj)
+        function obj = run(obj,varargin)
             disp(['Running: ', obj.processor])
             switch obj.processor
 
@@ -64,6 +65,26 @@ classdef BasicMovieProcessor < MovieProcessing
                 case 'clahe'
                     disp('Histogram equalization (CLAHE)')
                     [movie, obj.operation] = clahe(obj.data_raw);
+
+                case 'movmean'
+                    % Default window size
+                    try
+                        win_size = obj.operation.win_size;
+                    catch
+                        win_size = 5; 
+                    end
+
+                    % Parse varargin for win_size
+                    if ~isempty(varargin)
+                        for i = 1:length(varargin)-1
+                            if ischar(varargin{i}) && strcmp(varargin{i}, 'win_size')
+                                win_size = varargin{i+1};
+                            end
+                        end
+                    end
+
+                    [movie, obj.operation.win_size] = ...
+                    movie_movmean(obj.data_raw, win_size);
 
                 otherwise
                     error('Basic movie processor function unknown.')
@@ -189,3 +210,21 @@ movie_result.stack = movie;
 
 end
 
+function [movie_result, win_size] = movie_movmean(data_raw, win_size)
+arguments
+    data_raw Movie
+    win_size double
+end
+
+fprintf('Averaging over window size: %s frames\n',num2str(win_size))
+    
+% initialize
+movie_result = data_raw;
+movie = data_raw.stack;
+
+movie = permute(movmean(permute(movie,[3,1,2]),win_size),[2,3,1]);
+
+% store to results
+movie_result.stack = movie;
+
+end

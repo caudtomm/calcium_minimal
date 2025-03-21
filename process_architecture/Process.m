@@ -47,7 +47,7 @@ classdef (Abstract) Process
                 filename = fullfiletol(filename, [obj.hash,'.mat']);
             end
             process = obj;
-            save(filename,'process','-mat')
+            save(filename,'process','-mat','-v7.3')
         end
 
         function process = getLight(obj)

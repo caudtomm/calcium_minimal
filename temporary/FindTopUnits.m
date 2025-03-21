@@ -7,7 +7,7 @@ interval_base = [floor((data.f0_window(1))*fs) : (data.f0_window(2))*fs];
 interval_response = [floor((data.stim_on_sec+1)*fs) : (data.stim_off_sec)*fs];
 thistraces = traceFormat(data.traces,data.L);
 cellstd_base = mean(squeeze(std(thistraces(interval_base,:,:),[],1,'omitnan')),2,'omitmissing');
-cellresponse = squeeze(mean(thistraces(interval_response,:,:),1,'omitmissing')) ./ cellstd_base;
+cellresponse = squeeze(mean(thistraces(interval_response,:,:),1,'omitmissing'));% ./ cellstd_base;
 
 
 % get variance for each cell and trial

@@ -62,7 +62,7 @@ classdef RegistrationViewer
             cd(orig_folder)
         end
 
-        function [fbf_corr, zsc_corr, putative_fails] = QC(obj)
+        function [fbf_corr, zsc_corr, putative_fails, hf] = QC(obj)
             % generate a frame-by-frame correlation curve
 
             orig_folder = fullfiletol(pwd);
@@ -75,7 +75,7 @@ classdef RegistrationViewer
             fbf_corr = zeros(obj.sj.getNFrames-1, numFiles); % [numFrames-1, trials]
 
             % loop
-            parfor i = 1:numFiles
+            for i = 1:numFiles
                 % Load the movie data
                 disp(fileList{i})
                 m = load(fileList{i}, 'movie');
@@ -83,16 +83,78 @@ classdef RegistrationViewer
                 fbf_corr(:,i) = avg_frame_correlation(m.movie.stack);
             end
 
+            % get image size
+            h = m.movie.h;
+            w = m.movie.w;
+
             % zscored frame-by-frame correlation
             zsc_corr = nanzscore(fbf_corr);
 
             % define putatively failed frames
-            putative_fails = [zeros(1,numFiles) ; zsc_corr < -5]; % add one line at the start for frame 1
+            th = -5;
+            putative_fails = [false(1,numFiles) ; zsc_corr < th]; % add one line at the start for frame 1
 
             % return to original location
             cd(orig_folder)
-        end
 
+
+            % PLOTTING
+
+            hf = figure;
+            hf.set('Position',[10 10 700 800]);
+
+
+            ncol = 2;
+            nrow = 3;
+            [failsrows,failscols] = find(putative_fails);
+            failscores = zsc_corr(putative_fails(2:end,:));
+            [~, leastbadidx] = min(failscores,[],'omitmissing');
+            [~, medianidx] = min(abs(failscores-median(failscores)),[],'omitmissing');
+            [~, worstidx] = max(failscores,[],'omitmissing');
+
+            subplot(nrow,ncol,1) 
+            src_trial = failscols(leastbadidx);
+            snip = Snippet(fileList{src_trial},failsrows(leastbadidx)-[1,0]);
+            im = zeros(h,w,3);
+            im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
+            imagesc(im); axis square
+            xticks([]); yticks([])
+            title(['least bad case: trial ',num2str(src_trial),', frame ',num2str(failsrows(leastbadidx))])
+
+            subplot(nrow,ncol,3) 
+            src_trial = failscols(medianidx);
+            snip = Snippet(fileList{src_trial},failsrows(medianidx)-[1,0]);
+            im = zeros(h,w,3);
+            im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
+            imagesc(im); axis square
+            xticks([]); yticks([])
+            title(['median case: trial ',num2str(src_trial),', frame ',num2str(failsrows(leastbadidx))])
+            
+            subplot(nrow,ncol,5) 
+            src_trial = failscols(worstidx);
+            snip = Snippet(fileList{src_trial},failsrows(worstidx)-[1,0]);
+            im = zeros(h,w,3);
+            im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
+            imagesc(im); axis square
+            xticks([]); yticks([])
+            title(['worst case: trial ',num2str(src_trial),', frame ',num2str(failsrows(leastbadidx))])
+
+            subplot(nrow,ncol,2)
+            imagesc(zsc_corr)
+            title('z-scored frame correlations')
+            xlabel('trial #')
+            ylabel('frames')
+
+            subplot(nrow,ncol,4)
+            plot(zsc_corr); axis tight
+            hold on
+            bh = line(xlim,[th th],'Color','r','LineStyle','--');
+            legend(bh,'thresh')
+            title('z-scored frame correlations')
+            xlabel('frames')
+
+
+        end
     end
 end
 

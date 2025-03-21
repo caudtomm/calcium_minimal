@@ -37,7 +37,7 @@ methods
         
         st = obj.sniptab;
         nsnips = height(st);
-        snips = cell(nsnips);
+        snips = cell(nsnips,1);
 
         parfor i = 1:nsnips
             % get subject folder name
@@ -68,6 +68,7 @@ methods
         nsnips = numel(sn);
 
         for i = 1:nsnips
+            fprintf('Saving: %s of %s\n',num2str(i),num2str(nsnips))
             fout = sn{i}.save(outfolder,'mat');
             sn{i}.save(outfolder,'avi');
 
