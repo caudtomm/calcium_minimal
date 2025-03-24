@@ -117,7 +117,8 @@ classdef RegistrationViewer
             snip = Snippet(fileList{src_trial},failsrows(leastbadidx)-[1,0]);
             im = zeros(h,w,3);
             im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
-            imagesc(im); axis square
+            maxval = quantile(im(:),.97);
+            imagesc(im./maxval); axis square
             xticks([]); yticks([])
             title(['least bad case: trial ',num2str(src_trial),', frame ',num2str(failsrows(leastbadidx))])
 
@@ -126,18 +127,20 @@ classdef RegistrationViewer
             snip = Snippet(fileList{src_trial},failsrows(medianidx)-[1,0]);
             im = zeros(h,w,3);
             im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
-            imagesc(im); axis square
+            maxval = quantile(im(:),.97);
+            imagesc(im./maxval); axis square
             xticks([]); yticks([])
-            title(['median case: trial ',num2str(src_trial),', frame ',num2str(failsrows(leastbadidx))])
+            title(['median case: trial ',num2str(src_trial),', frame ',num2str(failsrows(medianidx))])
             
             subplot(nrow,ncol,5) 
             src_trial = failscols(worstidx);
             snip = Snippet(fileList{src_trial},failsrows(worstidx)-[1,0]);
             im = zeros(h,w,3);
             im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
-            imagesc(im); axis square
+            maxval = quantile(im(:),.97);
+            imagesc(im./maxval); axis square
             xticks([]); yticks([])
-            title(['worst case: trial ',num2str(src_trial),', frame ',num2str(failsrows(leastbadidx))])
+            title(['worst case: trial ',num2str(src_trial),', frame ',num2str(failsrows(worstidx))])
 
             subplot(nrow,ncol,2)
             imagesc(zsc_corr)
