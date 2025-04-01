@@ -286,7 +286,8 @@ classdef Subject
             parfor i_f = 1:numel(files)
                 thisfilename = find_daughter_file(fullfiletol(sourcedir,files(i_f).name),'mat');
                 if ~isempty(thisfilename)
-                    thismovie = load(thisfilename,'movie').movie;
+                    % thismovie = load(thisfilename,'movie').movie;
+                    thismovie = robust_io('load',thisfilename,'movie').movie;
                 else
                     thisfilename = fullfiletol(sourcedir,files(i_f).name);
                     thismovie = Movie(thisfilename);
@@ -458,7 +459,7 @@ classdef Subject
             if ~exist(output_folder,'dir'); mkdir(output_folder); end
             snip.save(output_folder,'mat')                                  % Saving the whole Snippet
             FileOut = fullfiletol(output_folder,[snip.path.fname, '.tif']);    % Saving the image as Tiff
-            if exist(FileOut,'file'); rm(FileOut); end
+            if exist(FileOut,'file'); delete(FileOut); end
             saveastiff(reference_image,FileOut)
         end
 
@@ -757,8 +758,9 @@ classdef Subject
             FileOut = fullfiletol(fpath,fname);
             if auto; b = true; else; b = prompt_overwrite(FileOut); end
             if ~b; return; end
-            eval(strcat(obj.name,'=obj;'));
-            eval(strcat('save(FileOut,''',obj.name,''',''-v7.3'')'));
+            % eval(strcat(obj.name,'=obj;'));
+            s.(obj.name) = obj;
+            robust_io('save',FileOut,s,'-v7.3');
         end
 
         % Method to save a checkfiles file to the subject_datapath location
