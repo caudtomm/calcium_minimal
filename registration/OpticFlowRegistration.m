@@ -33,7 +33,7 @@ classdef OpticFlowRegistration < Registration
                 % create a temporary tiff file (typically useful to have no nans)
                 data_raw.path.fname = ['temp',data_raw.path.fname];
                 if isa(data_raw,'Movie')
-                    TiffFilename = data_raw.save(obj.init.original_path,'tif');
+                    TiffFilename = data_raw.save(data_raw.path.orig_path,'tif','',true);
                 else
                     error('data type not recognised')
                 end
@@ -41,7 +41,7 @@ classdef OpticFlowRegistration < Registration
                 % name the output tiff file
                 fpathout = obj.hash;
                 if obj.init.batch_run; fpathout = ['batch_',obj.init.superHash]; end
-                fpathout = fullfiletol(obj.init.original_path,fpathout,movie_result.path.fname);
+                fpathout = fullfiletol(data_raw.path.orig_path,fpathout,movie_result.path.fname);
     
                 % flow registration settings
                 options = OF_options(...

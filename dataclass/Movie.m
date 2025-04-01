@@ -146,12 +146,13 @@ classdef Movie
             end
         end
 
-        function FileOut = save(obj, newpath, type, newfname)
+        function FileOut = save(obj, newpath, type, newfname, auto_overwrite)
             arguments
                 obj Movie
                 newpath char = ''
                 type char = 'mat'
                 newfname char = ''
+                auto_overwrite logical = false
             end
             
             outpath = pwd;
@@ -174,7 +175,10 @@ classdef Movie
             switch type
                 case 'mat'
                     FileOut = fullfiletol(outpath,[outfname,'.mat']);
-                    b = prompt_overwrite(FileOut);
+                    b = true;
+                    if ~auto_overwrite
+                        b = prompt_overwrite(FileOut);
+                    end
         
                     obj.path = getFileNameSpecs(FileOut);
         
@@ -185,7 +189,10 @@ classdef Movie
                     
                 case 'tif'
                     FileOut = fullfiletol(outpath,[outfname,'.tif']);
-                    b = prompt_overwrite(FileOut);
+                    b = true;
+                    if ~auto_overwrite
+                        b = prompt_overwrite(FileOut);
+                    end
         
                     movie = obj.stack;
                     if b
@@ -194,7 +201,10 @@ classdef Movie
 
                 case 'avi'
                     FileOut = fullfiletol(outpath,[outfname,'.avi']);
-                    b = prompt_overwrite(FileOut);
+                    b = true;
+                    if ~auto_overwrite
+                        b = prompt_overwrite(FileOut);
+                    end
 
                     if b
                         v = VideoWriter(FileOut);
