@@ -6,6 +6,8 @@ classdef BasicMovieProcessor < MovieProcessing
 %   - 'add_badperiods_as_nans'
 %   - 'clahe'
 %   - 'movmean'
+%   - 'downsamplet'
+%   - 'gauss_blur2d'
 %
     
     properties (SetAccess = private)
@@ -84,7 +86,45 @@ classdef BasicMovieProcessor < MovieProcessing
                     end
 
                     [movie, obj.operation.win_size] = ...
-                    movie_movmean(obj.data_raw, win_size);
+                        movie_movmean(obj.data_raw, win_size);
+
+                case 'downsamplet'
+                    % Default downsampling factor
+                    try
+                        factor = obj.operation.factor;
+                    catch
+                        factor = 2; 
+                    end
+
+                    % Parse varargin for factor
+                    if ~isempty(varargin)
+                        for i = 1:length(varargin)-1
+                            if ischar(varargin{i}) && strcmp(varargin{i}, 'factor')
+                                factor = varargin{i+1};
+                            end
+                        end
+                    end
+                    [movie, obj.operation.factor] = ...
+                        movie_downsample_time(obj.data_raw, factor);
+
+                case 'gauss_blur2d'
+                    % Default kernel sigma
+                    try
+                        sigma = obj.operation.sigma;
+                    catch
+                        sigma = 5; 
+                    end
+
+                    % Parse varargin for sigma
+                    if ~isempty(varargin)
+                        for i = 1:length(varargin)-1
+                            if ischar(varargin{i}) && strcmp(varargin{i}, 'sigma')
+                                sigma = varargin{i+1};
+                            end
+                        end
+                    end
+                    [movie, obj.operation.sigma] = ...
+                        gauss_blur2d(obj.data_raw, sigma);
 
                 otherwise
                     error('Basic movie processor function unknown.')
@@ -223,6 +263,52 @@ movie_result = data_raw;
 movie = data_raw.stack;
 
 movie = permute(movmean(permute(movie,[3,1,2]),win_size),[2,3,1]);
+
+% store to results
+movie_result.stack = movie;
+
+end
+
+function [movie_result, factor] = movie_downsample_time(data_raw, factor)
+arguments
+    data_raw Movie
+    factor double
+end
+
+newfs = data_raw.fs/factor;
+
+fprintf('Downsampling in time by a factor of %s - FR %s -> %sHz\n',...
+    num2str(factor),num2str(data_raw.fs),num2str(newfs))
+    
+% initialize
+movie_result = data_raw;
+movie = data_raw.stack;
+
+% execute
+idx = mod([1:data_raw.nfr],factor) ~= 0;
+movie(:,:,idx) = [];
+
+% store to results
+movie_result.stack = movie;
+movie_result = movie_result.setFramerateHz(newfs);
+
+end
+
+function [movie_result, sigma] = gauss_blur2d(data_raw, sigma)
+arguments
+    data_raw Movie
+    sigma double
+end
+
+fprintf('Applying Gaussian blur - sigma: %s\n',num2str(sigma))
+    
+% initialize
+movie_result = data_raw;
+movie = data_raw.stack;
+
+for i = 1:data_raw.nfr
+    movie(:,:,i) = imgaussfilt(movie(:,:,i),sigma);
+end
 
 % store to results
 movie_result.stack = movie;
