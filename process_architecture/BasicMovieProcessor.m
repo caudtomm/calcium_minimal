@@ -104,7 +104,7 @@ classdef BasicMovieProcessor < MovieProcessing
                             end
                         end
                     end
-                    [movie, obj.operation.factor] = ...
+                    [movie, obj.operation.factor, obj.operation.idx_elim_frames] = ...
                         movie_downsample_time(obj.data_raw, factor);
 
                 case 'gauss_blur2d'
@@ -269,28 +269,43 @@ movie_result.stack = movie;
 
 end
 
-function [movie_result, factor] = movie_downsample_time(data_raw, factor)
+function [movie_result, factor, idx_elim_frames] = movie_downsample_time(data_raw, factor)
 arguments
     data_raw Movie
     factor double
 end
 
 newfs = data_raw.fs/factor;
-
-fprintf('Downsampling in time by a factor of %s - FR %s -> %sHz\n',...
-    num2str(factor),num2str(data_raw.fs),num2str(newfs))
     
 % initialize
 movie_result = data_raw;
 movie = data_raw.stack;
 
 % execute
-idx = mod([1:data_raw.nfr],factor) ~= 0;
-movie(:,:,idx) = [];
+idx_elim_frames = mod([1:data_raw.nfr],factor) ~= 0;
+movie(:,:,idx_elim_frames) = [];
 
 % store to results
 movie_result.stack = movie;
-movie_result = movie_result.setFramerateHz(newfs);
+if ~isempty(newfs)
+    movie_result = movie_result.setFramerateHz(newfs);
+end
+
+% adapt badperiods to new sampling
+bps = movie_result.badperiods;
+if ~isempty(bps)
+    b = convertPeriods(bps(:,2:3),true);
+    b_padded = zeros(data_raw.nfr,1); b_padded(1:numel(b)) = b;
+    b = logical(b_padded);
+    trialnum = bps(1);
+    b = convertPeriods(b(~idx_elim_frames));
+    bps = [trialnum*ones(height(b),1), b];
+    movie_result.badperiods = bps;
+end
+
+fprintf('Downsampling in time by a factor of %s - FR %s -> %sHz - frame# %s -> %s\n',...
+    num2str(factor),num2str(data_raw.fs,'%.2f'),num2str(newfs,'%.2f'),...
+    num2str(data_raw.nfr),num2str(movie_result.nfr))
 
 end
 

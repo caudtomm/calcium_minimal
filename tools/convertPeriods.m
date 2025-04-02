@@ -7,8 +7,8 @@ function periods = convertPeriods(X,reverse)
     if ~reverse % X is logical
         X = logical(X);
     
-        pstart = find(diff(X)==1);
-        pend = find(diff(X)==-1);
+        pstart = find(diff(X)==1)+1;
+        pend = find(diff(X)==-1)+1;
 
         % make sure array length is consistent
         if numel(pstart) > numel(pend)

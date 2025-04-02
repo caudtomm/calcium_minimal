@@ -5,7 +5,7 @@ classdef (Abstract) MovieProcessing < SingleProcess
     end
 
     properties (Abstract)
-        data_processed Movie % specifying accepted data type
+        data_processed Movie
     end
 
     methods (Access=protected)

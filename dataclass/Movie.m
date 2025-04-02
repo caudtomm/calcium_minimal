@@ -47,7 +47,24 @@ classdef Movie
                 [obj.h,obj.w,obj.nfr] = size(obj.stack);
             end
         end
-        
+
+        % getters
+        function value = get.timeavg(obj)
+            value = mean(obj.stack,3,'omitmissing');
+        end
+
+        function value = get.h(obj)
+            value = size(obj.stack,1);
+        end
+
+        function value = get.w(obj)
+            value = size(obj.stack,2);
+        end
+
+        function value = get.nfr(obj)
+            value = size(obj.stack,3);
+        end
+
         function obj = setFramerateHz(obj, value)
             obj.fs = value;
             obj.frameperiod = 1/value;
@@ -67,23 +84,19 @@ classdef Movie
             obj = obj.checkAgain;
         end
 
-        function value = get.timeavg(obj)
-            value = mean(obj.stack,3,'omitmissing');
-        end
-
-        function obj = checkAgain(obj)
-            %initialize
-            movie = obj.stack;
-            
-            % re-compute
-            [height,width,framecount] = size(movie);
-            zproj = mean(movie,3,'omitmissing');
-
-            % store
-            obj.h = height;
-            obj.w = width;
-            obj.nfr = framecount;
-            obj.timeavg = zproj;
+        function obj = checkAgain(obj) %% EMPTY: TESTING IF NO LONGER NECESSARY (REPLACED BY MORE EFFICIENT GETTERS)
+            % %initialize
+            % movie = obj.stack;
+            % 
+            % % re-compute
+            % [height,width,framecount] = size(movie);
+            % zproj = mean(movie,3,'omitmissing');
+            % 
+            % % store
+            % obj.h = height;
+            % obj.w = width;
+            % obj.nfr = framecount;
+            % obj.timeavg = zproj;
         end
 
         function v = getmaxval(obj)
