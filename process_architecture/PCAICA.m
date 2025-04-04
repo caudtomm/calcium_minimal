@@ -198,7 +198,9 @@ classdef PCAICA < MovieProcessing
             %% store to structures
             
             % results
-            PCAresults.inputdata = a;
+            PCAresults.rawinput = crop; % input data
+            PCAresults.linearizedinput = lin_crop;
+            PCAresults.zscoredinput = a;
             PCAresults.inputstd = stda;
             PCAresults.inputmu = mu;
             PCAresults.fullscore = fullscore;
@@ -350,13 +352,17 @@ classdef PCAICA < MovieProcessing
         end
 
 
-        function [ROImap, hf] = plotICimpact(ICAresults, PCAresults, idx) %% JUST COPYPASTED FROM SCRIPT, TO FIX
+        function [ROImap, hf] = plotICimpact(obj, ICAresults, PCAresults, idx) %% TENTATIVELY FIXED
             % init vars
             data_ica = ICAresults.data;
             Mdl = ICAresults.Mdl;
-            
+            mu = PCAresults.inputmu;
+            stda = PCAresults.inputstd;
             coef = PCAresults.coef;
             numcomponentsPCA = PCAresults.numcomponents;
+            crop = PCAresults.rawinput;
+            lin_crop = PCAresults.linearizedinput;
+            nfr = obj.data_raw.nfr;
             
             if ~exist('idx','var') || isempty(idx)
                 [~, idx] = max(var(data_ica)); % pick most variant IC
