@@ -144,7 +144,7 @@ classdef Subject
             [~, latest_complete_idx] = max(arrayfun(@(x) getFileNameSpecs(x{:}).trial_num, complete_files));
             fname = getFileNameSpecs(complete_files{latest_complete_idx}).fname;
             FileIn = fullfiletol(obj.locations.subject_datapath,obj.locations.defRois,[fname,'_defROIs.mat']);
-            load(FileIn);
+            robust_io('load',FileIn);
             p_ann = plane{1}.ROI_map;
         end
         
@@ -179,7 +179,8 @@ classdef Subject
             % load and save singletrial metadata separately. retain info
             % only for trial 1
             singletrial_meta = obj.loadSingletrialMeta();
-            save(fullfiletol(obj.locations.subject_datapath,'singletrial_meta.mat'),'singletrial_meta','-v7.3');
+            s.singletrial_meta = singletrial_meta;
+            robust_io('save',fullfiletol(obj.locations.subject_datapath,'singletrial_meta.mat'),s,'-v7.3');
             obj.singletrial_meta = cell(size(singletrial_meta));
             obj.singletrial_meta(1) = singletrial_meta(1);
             clear singletrial_meta
@@ -216,7 +217,7 @@ classdef Subject
                         warning('more than one reference image available. selected: %s', ...
                             files(1).name)
                 end
-                snip = load(fullfiletol(PathIn,files(1).name)).movie;
+                snip = robust_io('load',fullfiletol(PathIn,files(1).name)).movie;
                 img = snip.timeavg;
                 img_meta = snip.metadata;
             else
@@ -366,7 +367,7 @@ classdef Subject
             parfor i_file = 1:numel(filenames)
                 disp(filenames{i_file})
                 % assumes that filenames refer to physiological Movie's
-                m = load(filenames{i_file},'movie');
+                m = robust_io('load',filenames{i_file},'movie');
                 M = m.movie.stack(:,:,interval);
                 localCorr(:,:,i_file) = computeLocalCorrelationMap(M);
             end
@@ -419,7 +420,7 @@ classdef Subject
                 disp(filenames{i_file})
                 
                 % assumes that filenames refer to physiological Movie's
-                m = load(filenames{i_file},'movie');
+                m = robust_io('load',filenames{i_file},'movie');
                 anatomy(:,:,i_file) = m.movie.timeavg;
             end
 
@@ -532,7 +533,7 @@ classdef Subject
                     disp('Last file was loaded.')
             end
             FileIn = fullfiletol(files(1).folder,files(end).name);
-            load(FileIn)
+            robust_io('load',FileIn)
             disp('... DATA LOADED.')
         end
 
@@ -632,7 +633,7 @@ classdef Subject
             % load sample data for initialization
             disp('Loading sample data for initialization from:')
             FileIn = fullfiletol(loc.defRois,files(1).name);
-            disp(FileIn); load(FileIn)
+            disp(FileIn); robust_io('load',FileIn)
             
             % initialize vars
             % TODO: for each field, sanity-check if value is the same as in
@@ -668,7 +669,7 @@ classdef Subject
                 filename = fullfiletol(loc.defRois,files(i_f).name);
                 disp(strcat('Loading: ',strrep(filename,'\','\\'),' ...'))
                 if ~exist(filename,'file'); warning(strcat(strrep(filename,'\','\\'),' not found! - skipped.')); continue; end
-                load(filename)
+                robust_io('load',filename)
                 if ~exist('plane','var'); error('''plane'' variable not found!'); end
 
                 % original dF/F timetraces
@@ -693,7 +694,8 @@ classdef Subject
 
                 % save fspecs to plane{1}.meta
                 plane{1}.meta.fspecs = getFileNameSpecs(filename);
-                save(filename,'plane','-v7.3');
+                s.plane = plane;
+                robust_io('save',filename,s,'-v7.3');
             end
             
             
@@ -741,7 +743,8 @@ classdef Subject
             b = prompt_overwrite(FileOut);
             if ~b; return; end
             fprintf(strcat('Saving: ',strrep(FileOut,'\','\\'),' ...'))
-            save(FileOut,'data')
+            s.data = data;
+            robust_io('save',FileOut,s)
             fprintf(' DONE!\n')
         end
 
@@ -772,10 +775,10 @@ classdef Subject
             if auto; b = true; else; b = prompt_overwrite(FileOut); end
             if ~b; return; end
             disp(['Saving: ',fname,' ... '])
-            is_complete = obj.ROIcheckfiles.is_complete;
-            to_keep = obj.ROIcheckfiles.to_keep;
-            to_discard = obj.ROIcheckfiles.to_discard;
-            save(FileOut,'is_complete',"to_keep","to_discard",'-mat')
+            s.is_complete = obj.ROIcheckfiles.is_complete;
+            s.to_keep = obj.ROIcheckfiles.to_keep;
+            s.to_discard = obj.ROIcheckfiles.to_discard;
+            robust_io('save',FileOut,s,'-mat')
         end
     
         % Method to reload the Subject MAT file
@@ -785,7 +788,7 @@ classdef Subject
             FileIn = fullfiletol(loc.subject_datapath,fname);
             check_exist(FileIn);
             fprintf('Loading: %s',FileIn)
-            load(FileIn)
+            robust_io('load',FileIn)
         end
     end
 end

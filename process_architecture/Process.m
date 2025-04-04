@@ -47,7 +47,8 @@ classdef (Abstract) Process
                 filename = fullfiletol(filename, [obj.hash,'.mat']);
             end
             process = obj;
-            save(filename,'process','-mat','-v7.3')
+            s.process = process;
+            robust_io('save',filename,s,'-mat','-v7.3')
         end
 
         function process = getLight(obj)

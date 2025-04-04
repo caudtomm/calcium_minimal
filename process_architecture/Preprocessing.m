@@ -150,7 +150,8 @@ classdef Preprocessing
             if ~exist(foutpath, 'dir'); mkdir(foutpath); end
             fout = fullfiletol(foutpath,[foutname,'.mat']);
             movie = ref; clear ref
-            save(fout,'movie','-mat'); clear movie
+            s.movie = movie;
+            robust_io('save',fout,s,'-mat'); clear movie
             cd(fullfiletol(obj.sj.locations.subject_datapath))
 
             % save anatomy and visualization results to disk

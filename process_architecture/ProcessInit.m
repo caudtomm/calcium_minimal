@@ -52,7 +52,8 @@ classdef ProcessInit
                     FileOut = fullfiletol(outpath,[fname,'.mat']);
                     b = prompt_overwrite(FileOut);
                     if b
-                        save(FileOut,'init');
+                        s.init = init;
+                        robust_io('save',FileOut,s);
                     end
                 case 'json'
                     % save init as json file

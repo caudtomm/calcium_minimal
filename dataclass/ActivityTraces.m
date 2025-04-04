@@ -236,7 +236,7 @@ classdef ActivityTraces
             % load each movie and extract each ROI's pixel values
             for i_trial = 1:obj.ntrials
                 disp(movies{i_trial})
-                load(movies{i_trial},'movie')
+                robust_io('load',movies{i_trial},'movie')
                 for i_roi = 1:obj.Nrois
                     % isolate ROI in the current trial
                     mask = obj.ROImap == rois(i_roi);
@@ -492,7 +492,7 @@ classdef ActivityTraces
                 disp('Subject input missing. Loading:'); disp(FileIn)
                 fprintf('...')
 
-                subject = load(FileIn).fish1;
+                subject = robust_io('load',FileIn).fish1;
                 fprintf(' loaded.')
                 disp(''); disp('')
             end
@@ -640,7 +640,8 @@ classdef ActivityTraces
             end
 
             %save to file
-            save(FileOut,"traces",'-v7.3');
+            s.traces = traces;
+            robust_io('save',FileOut,s,'-v7.3');
         end
     end
 

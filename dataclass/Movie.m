@@ -197,7 +197,8 @@ classdef Movie
         
                     movie = obj;
                     if b
-                        save(FileOut,'movie');
+                        s.movie = movie;
+                        robust_io('save',FileOut,s);
                     end
                     
                 case 'tif'
@@ -254,7 +255,7 @@ function [stack,scanimage_meta,path] = readSource(src)
             src = char(src);
             disp(['Loading: ',src])
             if endsWith(src,'.mat')
-                load(src,'movie');
+                robust_io('load',src,'movie');
                 stack = movie.stack;
                 scanimage_meta = movie.scanimage_meta;
                 path = movie.path;

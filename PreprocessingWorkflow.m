@@ -76,7 +76,8 @@ exp_name = 'new_analysis';
 experiment = a.convert2BackwardCompatibleStruct(exp_name);
 
 % save to pwd
-save([expname,'.mat'],'experiment','-mat','-v7.3')
+s.experiment = experiment;
+robust_io('save',[expname,'.mat'],s,'-mat','-v7.3')
 
 %%
 

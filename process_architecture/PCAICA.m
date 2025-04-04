@@ -20,7 +20,7 @@ classdef PCAICA < MovieProcessing
                 for i = 1:numFiles
                     disp(['Iter: #',num2str(i)])
                     disp(['Loading ... ',fileList{i}])
-                    load(fileList{i}) % loads 'movie' of type Movie
+                    robust_io('load',fileList{i}) % loads 'movie' of type Movie
                     
                     % downsample in time
                     movie = BasicMovieProcessor('downsamplet',movie).run('factor',downsamplefactor).data_processed;

@@ -27,7 +27,7 @@ classdef RegistrationViewer
         
             % Load the first file to get the size of movie.stack
             disp('Initializing...')
-            load(fileList{1}, 'movie');
+            robust_io('load',fileList{1}, 'movie');
             [x, y, z] = size(movie.stack);
             
             % Subsample dimensions
@@ -41,7 +41,7 @@ classdef RegistrationViewer
             for i = 1:numFiles
                 % Load the movie data
                 disp(fileList{i})
-                load(fileList{i}, 'movie');
+                robust_io('load',fileList{i}, 'movie');
                 
                 % Subsample the movie stack
                 subsampledStack = movie.stack(1:5:end, 1:5:end, :);
@@ -78,7 +78,7 @@ classdef RegistrationViewer
             for i = 1:numFiles
                 % Load the movie data
                 disp(fileList{i})
-                m = load(fileList{i}, 'movie');
+                m = robust_io('load',fileList{i}, 'movie');
 
                 fbf_corr(:,i) = avg_frame_correlation(m.movie.stack);
             end

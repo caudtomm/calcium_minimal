@@ -2,7 +2,7 @@
 %% load baseline
 
 if ~exist('baseline', 'var')
-    load(fullfile(FileIn_path,'defROIs', strcat(baselinefname,'_defROIs.mat')))
+    robust_io('load',fullfile(FileIn_path,'defROIs', strcat(baselinefname,'_defROIs.mat')))
     [~, ~, ~, ~, baseline] = getTransients(plane{1}.timetraces);
 end
 

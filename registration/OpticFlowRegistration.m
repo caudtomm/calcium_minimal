@@ -70,7 +70,7 @@ classdef OpticFlowRegistration < Registration
                 movie_result.stack = Movie(fullfiletol(fpathout,'compensated.TIFF')).stack;
     
                 % load operation results
-                operation = load(fullfiletol(fpathout,'statistics.mat'));
+                operation = robust_io('load',fullfiletol(fpathout,'statistics.mat'));
                 operation.warp = warp;
                 operation.idx_valid = idx_valid;
     

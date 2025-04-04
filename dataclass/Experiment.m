@@ -67,7 +67,7 @@ classdef Experiment
                 FileIn = fullfiletol(thisloc.subject_datapath,fname);
                 if isfile(FileIn)
                     fprintf('found : %s ...',fname)
-                    thissubject = load(FileIn,'fish1').fish1;
+                    thissubject = robust_io('load',FileIn,'fish1').fish1;
                     fprintf(' loaded.')
                     disp('')
                 elseif create
@@ -141,7 +141,7 @@ classdef Experiment
                 FileIn = fullfiletol(thisloc.subject_datapath,fname);
                 if isfile(FileIn)
                     fprintf('found : %s ...',fname)
-                    thistraces = load(FileIn).traces;
+                    thistraces = robust_io('load',FileIn).traces;
                     fprintf(' loaded.')
                     disp(''); disp('')
                 else

@@ -89,7 +89,7 @@ classdef BatchProcess < Process
     methods (Access = protected, Static)
         function data = loadData(item)            
             % Load data from one item of the file list
-            data = load(item);  % Assuming MATLAB .mat files or compatible types
+            data = robust_io('load',item);  % Assuming MATLAB .mat files or compatible types
         end
     end
     
@@ -166,7 +166,7 @@ classdef BatchProcess < Process
                 result.data_processed.save(outpath,'mat') % always save results independently, 
                 % including inits, in a new subfolder of the data folder;
                 result.init.save(outpath_inits,'json')
-                save(getLight(result),outpath_inits);
+                save(getLight(result),outpath_inits); % internal save fun
                 
                 obj.init.subHash{end+1} = result.hash;
                 obj.init.subHash = obj.init.subHash(:); % make vertical
@@ -174,7 +174,7 @@ classdef BatchProcess < Process
             
             obj.init.save(outpath,'json')
             try obj.Processor = getLight(obj.Processor); catch; end
-            save(getLight(obj),outpath);
+            save(getLight(obj),outpath); % internal save fun
         end        
 
         function obj = applyresults(obj,newdatapath)
