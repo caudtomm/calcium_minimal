@@ -20,7 +20,7 @@ classdef PCAICA < MovieProcessing
                 for i = 1:numFiles
                     disp(['Iter: #',num2str(i)])
                     disp(['Loading ... ',fileList{i}])
-                    robust_io('load',fileList{i}) % loads 'movie' of type Movie
+                    movie = robust_io('load',fileList{i}).movie; % loads 'movie' of type Movie
                     
                     % downsample in time
                     movie = BasicMovieProcessor('downsamplet',movie).run('factor',downsamplefactor).data_processed;
@@ -129,7 +129,7 @@ classdef PCAICA < MovieProcessing
             end
             
             % add nan frames back in
-            if ~isempty(idx_nanfr)
+            if ~isempty(idx_nanfr) && ~strcmp(obj.init.method,'svds')
                 tmp = nan(height(lin_crop),width(lin_crop)+numel(idx_nanfr));
                 idx_numfr = true(width(lin_crop)+numel(idx_nanfr),1);
                 idx_numfr(idx_nanfr) = false;
@@ -168,7 +168,8 @@ classdef PCAICA < MovieProcessing
             
             lin_crop_rc = transpose(fullscore*coef');
             
-            lin_crop_fullyrc = lin_crop_rc.*stda' + repmat(mu',1,nfr);
+            % lin_crop_fullyrc = lin_crop_rc.*stda' + repmat(mu',1,nfr);
+            lin_crop_fullyrc = lin_crop_rc.*stda' + mu';
             
             % add pixels containing nans back in (this time as nans only)
             % add nan frames back in
@@ -207,6 +208,10 @@ classdef PCAICA < MovieProcessing
             PCAresults.score = score;
             PCAresults.coef = coef;
             PCAresults.numcomponents = numcomponentsPCA;
+            PCAresults.idx_nanpx = idx_nanpx;
+            PCAresults.idx_nanfr = idx_nanfr; % these are the idx of 
+            % nan-containing frames that were taken out AFTER removing 
+            % recorded 'badperiods'
             
             % reconstructed stacks
             reconstructions.raw = crop; % input data
@@ -287,9 +292,13 @@ classdef PCAICA < MovieProcessing
             obj.operation.tile_overlap = [.5 .5]; % fraction of tile overlap
             obj.operation.th_val = 10;
             obj.operation.th_occupancy = .5; % set =nan only if the px is <th_val at least 50% of the time
-            obj.operation.blursigma = 1;
-            obj.operation.rollavg_win = 3;
+            obj.operation.blursigma = 0; % use value of 1 to actually blur a little but not too much
+            obj.operation.rollavg_win = 0; % use value of 3 to actually blur a little but not too much
             obj.operation.downsamplefactor = 2;
+            obj.operation.resize_factor = 2;
+
+            % set default method
+            obj.init.method = 'svds';
         end
 
         function [obj, results, tile_coords] = run(obj)
@@ -301,6 +310,8 @@ classdef PCAICA < MovieProcessing
             
             % run PCAICA on tiles
             [results, tile_coords] = obj.apply_to_tiles(stack, @obj.run_singletile);
+            obj.operation.results = results;
+            obj.operation.tile_coords = tile_coords;
             
             % impact of individual ICs
             
@@ -315,13 +326,12 @@ classdef PCAICA < MovieProcessing
             movie = obj.data_raw;
 
             % extract free params
-            tile_size = obj.operation.tile_size;
-            tile_overlap = obj.operation.tile_overlap;
             th_val = obj.operation.th_val;
             th_occupancy = obj.operation.th_occupancy;
             blursigma = obj.operation.blursigma;
             rollavg_win = obj.operation.rollavg_win;
             downsamplefactor = obj.operation.downsamplefactor;
+            resize_factor = obj.operation.resize_factor;
 
             % prepare movie
             
@@ -329,9 +339,9 @@ classdef PCAICA < MovieProcessing
             movie_clean = BasicMovieProcessor('remove_badperiods',movie).run.data_processed;
             
             % rolling average in time
-            % movie_clean = BasicMovieProcessor('movmean',movie_clean).run('win_size',rollavg_win).data_processed;
-            % 
-            % % downsample in time
+            movie_clean = BasicMovieProcessor('movmean',movie_clean).run('win_size',rollavg_win).data_processed;
+
+            % downsample in time (commented out because done in getFull2PMovieSubsampled() already)
             % movie_clean = BasicMovieProcessor('downsamplet',movie_clean).run('factor',downsamplefactor).data_processed;
             
             
@@ -341,32 +351,90 @@ classdef PCAICA < MovieProcessing
             w = movie_clean.w;
             nfr = movie_clean.nfr;
             
-            % set all values under a threshold = nan
+            % set all values under a threshold = nan (to be done before any spatial operations!)
             [rows,cols] = find(sum(stack<th_val,3)./nfr >= th_occupancy);
             for i = 1:length(rows)
                 stack(rows(i), cols(i), :) = NaN;
             end
             
             % apply 2d gaussian blur
-            % stack = BasicMovieProcessor('gauss_blur2d',Movie(stack)).run('sigma',blursigma).data_processed.stack;
+            stack = BasicMovieProcessor('gauss_blur2d',Movie(stack)).run('sigma',blursigma).data_processed.stack;
+
+            % resize image (downsample based on nearest-neighbor interpolation)
+            % Method 'nearest' is chosen because it leads to the highest
+            % resconstruction accuracy when computing 
+            % imresize(scale) -> imresize(1/scale)
+            stack = imresize(stack,'nearest','scale',1/resize_factor);
         end
 
 
-        function [ROImap, hf] = plotICimpact(obj, ICAresults, PCAresults, idx) %% TENTATIVELY FIXED
+        function [ROImap, hf] = plotICimpact(obj, ICAresults, PCAresults, idx,ROImap) %% TENTATIVELY FIXED
+            arguments
+                obj
+                ICAresults struct
+                PCAresults struct
+                idx double = []
+                ROImap double = []
+            end
+
             % init vars
             data_ica = ICAresults.data;
             Mdl = ICAresults.Mdl;
+            numcomponentsICA = width(data_ica);
             mu = PCAresults.inputmu;
             stda = PCAresults.inputstd;
             coef = PCAresults.coef;
             numcomponentsPCA = PCAresults.numcomponents;
             crop = PCAresults.rawinput;
             lin_crop = PCAresults.linearizedinput;
-            nfr = obj.data_raw.nfr;
+            nfr = size(crop,3); % equivalent to Movie(crop).nfr but faster
+            idx_nanpx = PCAresults.idx_nanpx;
             
             if ~exist('idx','var') || isempty(idx)
                 [~, idx] = max(var(data_ica)); % pick most variant IC
             end
+
+            %%
+            [~, varidx] = sort(var(data_ica), 'descend');
+
+            wmaps = cell(numcomponentsICA,1);
+            
+            hf(1) = figure;
+            hf(2) = figure;
+            for i = 1:numcomponentsICA
+                weightmap = Mdl.TransformWeights(:,varidx(i))'*coef(:,1:numcomponentsPCA)';
+                weightmap = obj.addnanpxsbackin(weightmap', idx_nanpx);
+                weightmap = reshape(weightmap,height(crop),width(crop));
+
+                wmaps{i} = weightmap;
+                
+                figure(hf(1));
+                subplot(2,5,i)
+                y = weightmap;
+                imagesc(y)
+                title(['IC #',num2str(i),', var=',num2str(var(data_ica(:,varidx(i))),'%.1f')])
+                axis square
+                xticklabels([]),yticklabels([])
+
+                figure(hf(2));
+                subplot(2,5,i)
+                y = BasicMovieProcessor('clahe',Movie(weightmap)).run().data_processed.timeavg;
+                imagesc(y)
+                title(['IC #',num2str(i),', var=',num2str(var(data_ica(:,varidx(i))),'%.1f')])
+                axis square
+                xticklabels([]),yticklabels([])
+            end
+
+            [sorted_wmaps, idx_by_bias_scores, results, ~] = sortImgsPOW(wmaps, true);
+
+            figure;
+            scatter(var(data_ica), results.bias_scores, 'filled'); axis square
+            xticks(1:numcomponentsICA); xticklabels(idx);
+            xlabel('Decreasing bias score')
+            ylabel('KL Divergence')
+            hold on
+            rsquared = fitlm(var(data_ica), results.bias_scores).Rsquared.Ordinary;
+            text(1,mean(results.bias_scores),['R^2 = ',num2str(rsquared)],'FontSize',8,'Color','r');
             
             %% zero out ICs
             
@@ -386,35 +454,13 @@ classdef PCAICA < MovieProcessing
             
             % inverce PCA
             lin_crop_rc = transpose(data_pca*coef(:,1:numcomponentsPCA)');
-            lin_crop_fullyrc = lin_crop_rc.*stda' + repmat(mu',1,nfr);
+            lin_crop_fullyrc = lin_crop_rc.*stda' + mu';
             
             % add pixels containing nans back in (this time as nans only)
             % add nan frames back in
-            if ~isempty(idx_nanpx)
-                % lin_crop
-                tmp = nan(height(lin_crop)+numel(idx_nanpx),width(lin_crop));
-                idx_numpx = true(height(lin_crop)+numel(idx_nanpx),1);
-                idx_numpx(idx_nanpx) = false;
-                tmp(idx_numpx,:) = lin_crop;
-                lin_crop = tmp;
-                clear tmp
-                
-                % lin_crop_rc
-                tmp = nan(height(lin_crop_rc)+numel(idx_nanpx),width(lin_crop_rc));
-                idx_numpx = true(height(lin_crop_rc)+numel(idx_nanpx),1);
-                idx_numpx(idx_nanpx) = false;
-                tmp(idx_numpx,:) = lin_crop_rc;
-                lin_crop_rc = tmp;
-                clear tmp
-                
-                % lin_crop_fullyrc
-                tmp = nan(height(lin_crop_fullyrc)+numel(idx_nanpx),width(lin_crop_fullyrc));
-                idx_numpx = true(height(lin_crop_fullyrc)+numel(idx_nanpx),1);
-                idx_numpx(idx_nanpx) = false;
-                tmp(idx_numpx,:) = lin_crop_fullyrc;
-                lin_crop_fullyrc = tmp;
-                clear tmp
-            end
+            lin_crop = obj.addnanpxsbackin(lin_crop, idx_nanpx);
+            lin_crop_rc = obj.addnanpxsbackin(lin_crop_rc, idx_nanpx);
+            lin_crop_fullyrc = obj.addnanpxsbackin(lin_crop_fullyrc, idx_nanpx);
             
             % reconstruct 3d movie
             crop_rc = zeros(size(crop));
@@ -427,7 +473,7 @@ classdef PCAICA < MovieProcessing
                 crop_fullyrc(:,:,i) = reshape(lin_crop_fullyrc(:,i),[height(crop),width(crop)]);
             end
             
-            hf(1) = figure;
+            hf(3) = figure;
             subplot(231); imagesc(Movie(crop).timeavg); title('raw')
             subplot(232); imagesc(Movie(crop_rc).timeavg); title('reconstructed')
             subplot(233); imagesc(Movie(crop_fullyrc).timeavg); title('fully reconstr')
@@ -462,7 +508,7 @@ classdef PCAICA < MovieProcessing
                 end
             end
             
-            hf(2) = figure;
+            hf(4) = figure;
             subplot(141); plot(activity); xlabel('frames'); ylabel('ROI activity (raw)');
             labels = [{'background'}, arrayfun(@(i) sprintf('cell %d', i), 1:(numel(rois)-2), 'UniformOutput', false), {'cell-sized bg'}];
             legend(labels)
