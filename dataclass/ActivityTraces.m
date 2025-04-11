@@ -236,7 +236,7 @@ classdef ActivityTraces
             % load each movie and extract each ROI's pixel values
             for i_trial = 1:obj.ntrials
                 disp(movies{i_trial})
-                robust_io('load',movies{i_trial},'movie')
+                movie = robust_io('load',movies{i_trial},'movie').movie;
                 for i_roi = 1:obj.Nrois
                     % isolate ROI in the current trial
                     mask = obj.ROImap == rois(i_roi);

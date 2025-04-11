@@ -27,7 +27,7 @@ classdef RegistrationViewer
         
             % Load the first file to get the size of movie.stack
             disp('Initializing...')
-            robust_io('load',fileList{1}, 'movie');
+            movie = robust_io('load',fileList{1}, 'movie').movie;
             [x, y, z] = size(movie.stack);
             
             % Subsample dimensions
@@ -41,7 +41,7 @@ classdef RegistrationViewer
             for i = 1:numFiles
                 % Load the movie data
                 disp(fileList{i})
-                robust_io('load',fileList{i}, 'movie');
+                movie = robust_io('load',fileList{i}, 'movie').movie;
                 
                 % Subsample the movie stack
                 subsampledStack = movie.stack(1:5:end, 1:5:end, :);
@@ -62,6 +62,31 @@ classdef RegistrationViewer
             cd(orig_folder)
         end
 
+        function replaceFailsInterp(obj,fail_idx)
+            % fail_idx : putative_fails output of QC()
+
+            orig_folder = fullfiletol(pwd);
+
+            % get file list and move to subject-datapath
+            [fileList, numFiles] = obj.sj.getFileListInSubfolder(obj.folder);
+            if numFiles~=obj.sj.getNTrials; warning('Number of movies found is different from the number of trials.'); end
+
+            % initialize
+
+            % loop
+            for i = 1:numFiles
+                % Load the movie data
+                disp(fileList{i})
+                movie = robust_io('load',fileList{i}, 'movie').movie;
+
+                thisfails = convertPeriods(fail_idx(:,i)); % [start, end]
+
+                
+            end
+
+            cd(orig_folder)
+        end
+
         function [fbf_corr, zsc_corr, putative_fails, hf] = QC(obj)
             % generate a frame-by-frame correlation curve
 
@@ -78,14 +103,14 @@ classdef RegistrationViewer
             for i = 1:numFiles
                 % Load the movie data
                 disp(fileList{i})
-                m = robust_io('load',fileList{i}, 'movie');
+                movie = robust_io('load',fileList{i}, 'movie').movie;
 
-                fbf_corr(:,i) = avg_frame_correlation(m.movie.stack);
+                fbf_corr(:,i) = avg_frame_correlation(movie.stack);
             end
 
             % get image size
-            h = m.movie.h;
-            w = m.movie.w;
+            h = movie.h;
+            w = movie.w;
 
             % zscored frame-by-frame correlation
             zsc_corr = nanzscore(fbf_corr);

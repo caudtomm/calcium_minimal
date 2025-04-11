@@ -251,11 +251,11 @@ function [stack,scanimage_meta,path] = readSource(src)
         src = double(src);
     end
     switch class(src)
-        case {'string','char'}  % src : filename
+        case {'string','char'}  % src :
             src = char(src);
             disp(['Loading: ',src])
             if endsWith(src,'.mat')
-                robust_io('load',src,'movie');
+                movie = robust_io('load',src,'movie').movie;
                 stack = movie.stack;
                 scanimage_meta = movie.scanimage_meta;
                 path = movie.path;
