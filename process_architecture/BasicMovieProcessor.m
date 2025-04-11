@@ -255,12 +255,14 @@ arguments
     data_raw Movie
     win_size double
 end
-
-fprintf('Averaging over window size: %s frames\n',num2str(win_size))
     
 % initialize
 movie_result = data_raw;
 movie = data_raw.stack;
+
+if isempty(win_size) || win_size == 0; return; end
+
+fprintf('Averaging over window size: %s frames\n',num2str(win_size))
 
 movie = permute(movmean(permute(movie,[3,1,2]),win_size),[2,3,1]);
 
@@ -275,11 +277,14 @@ arguments
     factor double
 end
 
-newfs = data_raw.fs/factor;
-    
 % initialize
 movie_result = data_raw;
 movie = data_raw.stack;
+idx_elim_frames = false(data_raw.nfr,1);
+
+if isempty(factor) || factor == 0 || factor == 1; return; end
+
+newfs = data_raw.fs/factor;
 
 % execute
 idx_elim_frames = mod([1:data_raw.nfr],factor) ~= 0;
@@ -315,11 +320,13 @@ arguments
     sigma double
 end
 
-fprintf('Applying Gaussian blur - sigma: %s\n',num2str(sigma))
-    
 % initialize
 movie_result = data_raw;
 movie = data_raw.stack;
+
+if isempty(sigma) || sigma == 0; return; end
+
+fprintf('Applying Gaussian blur - sigma: %s\n',num2str(sigma))
 
 for i = 1:data_raw.nfr
     movie(:,:,i) = imgaussfilt(movie(:,:,i),sigma);
@@ -329,3 +336,4 @@ end
 movie_result.stack = movie;
 
 end
+
