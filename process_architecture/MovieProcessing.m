@@ -32,7 +32,7 @@ classdef (Abstract) MovieProcessing < SingleProcess
                     obj.data_raw = movie_in;
                 elseif ischar(movie_in) || isstring(movie_in)
                     % Assume movie_in is a path to a .mat file containing a 'Movie' object
-                    obj.data_raw = robust_io('load',movie_in, 'Movie'); % Ensure 'Movie' is the variable name in the .mat file
+                    obj.data_raw = robust_io('load',movie_in, 'Movie').movie; % Ensure 'Movie' is the variable name in the .mat file
                 else
                     error('Input must be of type Movie or a valid path to a .mat file containing a Movie object.');
                 end
