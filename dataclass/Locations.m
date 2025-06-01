@@ -26,8 +26,9 @@ classdef Locations
         rawtrials_opticflowwarp = 'OFreg_stacks_raw';
         histeqtrials_opticflowwarp = 'OFreg_stacks_clahe';
         rawtrials_opticflowwarp_fromhisteq = 'OFreg_stacks_clahe2raw';
-
-%         locations.warp.rawtrials_bunwarpj = 'trials_warp_bunwarpj';
+        
+        rawtrials_opticflowwarp_fromhisteq_corrected = 'OFreg_stacks_clahe2raw_corr';
+        rawtrials_opticflowwarp_fromhisteq_corrected_noIC = 'OFreg_stacks_clahe2raw_IC';
         
     end
 

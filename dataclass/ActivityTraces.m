@@ -1,5 +1,5 @@
 classdef ActivityTraces
-    properties (SetAccess = private)
+    properties% (SetAccess = private)
         PMToff Movie % typically a Snippet
         noLight Movie % typically a Snippet
 
@@ -21,10 +21,10 @@ classdef ActivityTraces
         stim_series table
         badtrials double = []
         badperiods    
-        anatomy double    
+        anatomy double  
         anat_regions
     end
-    properties
+    properties  
         % so called 'derivative properties', because they are derived from everything else
         techBase double = 0
         techNoise double = 0 % single-valued technical noise (variance of PMToff)
@@ -67,9 +67,9 @@ classdef ActivityTraces
             end
 
             % design filter (butterworth 4-poles)
-            fcutoff = 1.5; % cutoff freq in Hz
+            fcutoff = 3.8; % cutoff freq in Hz
             forder = 4; % filter order
-            [b,a] = butter(forder,fcutoff/fs);
+            [b,a] = butter(forder,fcutoff/(fs/2),'low');
 
             % temporarily eliminate nans and infs
             was_problematic_val = isnan(traces) | isinf(traces);
@@ -90,7 +90,7 @@ classdef ActivityTraces
         end
     end
 
-    methods (Access=private)
+    methods %(Access=private)
         % define t [seconds] : 1d array, numel = frames
         function t = extractt(obj,subject)
             fs = subject.framerate;
@@ -164,31 +164,31 @@ classdef ActivityTraces
         % major interruptions will then have the same F0 for each cell
         % across the whole trial length.
         function F0 = defineF0(obj)
-            threshold_duration = 5; %sec, for good periods only. the reason
-            % for this threshold is to avoid computing the F0 on periods
-            % too short, when the cell might be active.
-
-            % initialize output
-            F0 = nan(obj.L, obj.Nrois, obj.ntrials);
-
-            for i_trial = 1:obj.ntrials
-                % find good periods
-                thisbadperiods = obj.badperiods(obj.badperiods(:,1)==i_trial,:);
-                thisgoodperiods = ~convertPeriods(thisbadperiods(:,[2,3]),1);
-                paddingsize = obj.L - length(thisgoodperiods);
-                thisgoodperiods = [thisgoodperiods; ones(paddingsize,1)];
-                thisgoodperiods = convertPeriods(thisgoodperiods);
-                trialcol = repelem(i_trial,size(thisgoodperiods,1),1);
-                thisgoodperiods = [trialcol, thisgoodperiods];
-
-                % use large enough periods only
-                longgoodperiods = mergePeriods(thisgoodperiods, threshold_duration*obj.framerate);
-
-
-
-
-
-            end
+            % threshold_duration = 5; %sec, for good periods only. the reason
+            % % for this threshold is to avoid computing the F0 on periods
+            % % too short, when the cell might be active.
+            % 
+            % % initialize output
+            % F0 = nan(obj.L, obj.Nrois, obj.ntrials);
+            % 
+            % for i_trial = 1:obj.ntrials
+            %     % find good periods
+            %     thisbadperiods = obj.badperiods(obj.badperiods(:,1)==i_trial,:);
+            %     thisgoodperiods = ~convertPeriods(thisbadperiods(:,[2,3]),1);
+            %     paddingsize = obj.L - length(thisgoodperiods);
+            %     thisgoodperiods = [thisgoodperiods; ones(paddingsize,1)];
+            %     thisgoodperiods = convertPeriods(thisgoodperiods);
+            %     trialcol = repelem(i_trial,size(thisgoodperiods,1),1);
+            %     thisgoodperiods = [trialcol, thisgoodperiods];
+            % 
+            %     % use large enough periods only
+            %     longgoodperiods = mergePeriods(thisgoodperiods, threshold_duration*obj.framerate);
+            % 
+            % 
+            % 
+            % 
+            % 
+            % end
 
 
             % compute (lowest 10th percentile of each ROI's per trial)
@@ -216,7 +216,7 @@ classdef ActivityTraces
         end
         
         % Function to extract raw traces, separately for each pixel, within
-        % each ROI. Output Fpx is a cell array when each element is an ROI
+        % each ROI. Output Fpx is a cell array where each element is an ROI
         % and contains an [t, px, trials] matrix of raw intensity values
         function [Fpx,intercell] = extractFpx(obj, subject)
             % find movies in the current folder
@@ -285,6 +285,10 @@ classdef ActivityTraces
 
                 % remove technical baseline
                 traces = traces - obj.techBase;
+
+                % global scaling factor
+                scaling = obj.intercell.avgF; % [t]
+                traces = (traces./scaling).*mean(scaling,"all",'omitmissing');
                 
                 % store to output
                 F(:,i,:) = traces;
@@ -304,13 +308,13 @@ classdef ActivityTraces
             % dFoverF = (obj.F - obj.intercell.minF - F0rep) ./ F0rep;
             dFoverF = (obj.F - F0rep) ./ F0rep;
 
-            % get average dFoverF for background ROIs
-            background_dFoverF = mean(dFoverF(:,obj.background_IDs,:),2,'omitmissing'); % [t,1,trials]
-            background_dFoverF_rep = repmat(background_dFoverF,[1,obj.Nrois,1]);
-
-            % subtract background average from all dFoverF (this is
-            % intended to remove global artefacts and fluctuations)
-            dFoverF = dFoverF - background_dFoverF_rep./2;
+            % % get average dFoverF for background ROIs
+            % background_dFoverF = mean(dFoverF(:,obj.background_IDs,:),2,'omitmissing'); % [t,1,trials]
+            % background_dFoverF_rep = repmat(background_dFoverF,[1,obj.Nrois,1]);
+            % 
+            % % subtract background average from all dFoverF (this is
+            % % intended to remove global artefacts and fluctuations)
+            % dFoverF = dFoverF - background_dFoverF_rep./2;
 
             % denoise
             dFoverF = obj.filter(dFoverF,obj.framerate);
@@ -422,10 +426,8 @@ classdef ActivityTraces
             
             newdFoverF = obj.dFoverF;
 
-            % minval = -10;
-            % maxval = 20;
-            minval = quantile(obj.dFoverF(:),.001);
-            maxval = quantile(obj.dFoverF(:),.999);
+            minval = max([-10, quantile(obj.dFoverF(:),.001)]);
+            maxval = min([20, quantile(obj.dFoverF(:),.999)]);
 
             IDX = [];
             for i = 1:obj.ntrials % necessary because 'find' will only give the column number with 2D matrix inputs
@@ -564,6 +566,7 @@ classdef ActivityTraces
             for i_trial = 2:obj.ntrials
                 thistraces = [thistraces; traces(:,idx_toshow,i_trial)];
             end
+            h = TraceViewer(obj,idx_toshow).plotTracesInTime('F');
             figure; imagesc(thistraces); colorbar; xlabel('units')
             
             while true
@@ -581,6 +584,7 @@ classdef ActivityTraces
             end
             
             close(gcf)
+            close(h)
 
             bad_unit_labs = idx_toshow(unique(to_del));
         end

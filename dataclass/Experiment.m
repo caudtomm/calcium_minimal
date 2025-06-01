@@ -137,16 +137,21 @@ classdef Experiment
                 thisloc = thisloc.setSubjectID(thissubjectname);
 
                 % look for pre-existing traces file
-                fname = [thissubjectname,'_traceslight.mat'];
-                FileIn = fullfiletol(thisloc.subject_datapath,fname);
-                if isfile(FileIn)
+                % fname = [thissubjectname,'_traceslight.mat'];
+                % FileIn = fullfiletol(thisloc.subject_datapath,fname);
+                files = dir(fullfiletol(thisloc.subject_datapath,'*_traceslight*'));
+                idx = arrayfun(@(x) endsWith(x.name,'.mat'),files);
+                files = files(idx);
+                if ~isempty(files)
+                    thisfile = files(1);
+                    fname = thisfile.name;
+                    FileIn = fullfiletol(thisfile.folder,thisfile.name);
                     fprintf('found : %s ...',fname)
                     thistraces = robust_io('load',FileIn).traces;
                     fprintf(' loaded.')
                     disp(''); disp('')
                 else
-                    fprintf('not found : %s ...',fname)
-                    fprintf(' skipped.')
+                    disp('no traces found! skipped!')
                     disp(''); disp('')
                     continue
                 end
@@ -276,6 +281,7 @@ classdef Experiment
             
         end
 
+        
     end
 end
 

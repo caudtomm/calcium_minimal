@@ -277,11 +277,18 @@ function ROImap = imageSequenceGUI(images,localCorr,ROImap,GUItitle)
 
     function overlayROIs()
         % Overlay remaining ROIs
-        remainingLabels = unique(ROImap(ROImap > 0));
-        for i_r = 1:length(remainingLabels)
-            mask = (ROImap == remainingLabels(i_r));
-            visboundaries(axMain, mask, 'Color', 'g', 'LineWidth', 1);
-        end
+        % remainingLabels = unique(ROImap(ROImap > 0));
+        % for i_r = 1:length(remainingLabels)
+        %     mask = (ROImap == remainingLabels(i_r));
+        %     visboundaries(axMain, mask, 'Color', 'g', 'LineWidth', 1);
+        % end
+        
+        mask = ROImap > 0;
+        overlay = zeros([size(mask), 3]); % RGB overlay image
+        overlay(:,:,2) = 1; % green channel full brightness
+        h = imshow(overlay, 'Parent', axMain);
+        set(h, 'AlphaData', 0.4 * double(mask)); % 0.4 where mask==true, 0 where false
+        set(h, 'HitTest', 'off');
     end
 
     % Function to highlight the selected thumbnail

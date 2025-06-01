@@ -151,6 +151,7 @@ methods
         fprintf('Computing phase shifts..')
 
         % format data
+        obj = obj.setReference(obj.reference_img);
         refimg = obj.reference_img;
         N = height(refimg);
         S(:,:,1) = [refimg(mod(1:N,2) ~= 0,:)]'; % odd lines
@@ -199,7 +200,7 @@ methods
         stack_out = zeros(rows, cols, frames, 'like', movie.stack);
         
         % loop frame-by-frame
-        parfor i = 1:movie.nfr
+        for i = 1:movie.nfr
             thisframe = movie.stack(:,:,i);
             stack_out(:,:,i) = obj.applycorrection(thisframe,fwd_transform);
         end

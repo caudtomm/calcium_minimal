@@ -33,7 +33,9 @@ classdef OpticFlowRegistration < Registration
                 % create a temporary tiff file (typically useful to have no nans)
                 data_raw.path.fname = ['temp',data_raw.path.fname];
                 if isa(data_raw,'Movie')
-                    TiffFilename = data_raw.save(obj.init.original_path,'tif','',true);
+                    % TiffFilename = data_raw.save(obj.init.original_path,'tif','',true);
+                    movie_out = BasicMovieProcessor('movmean',data_raw).run('win_size',5).data_processed;
+                    TiffFilename = movie_out.save(obj.init.original_path,'tif','',true);
                 else
                     error('data type not recognised')
                 end

@@ -1,14 +1,16 @@
-function periods = convertPeriods(X,reverse)
+function [periods, len] = convertPeriods(X,reverse, len)
     arguments
         X % logical array or period matrix
         reverse logical = false;
+        len double = 0
     end
     
     if ~reverse % X is logical
         X = logical(X);
+        len = length(X);
     
         pstart = find(diff(X)==1)+1;
-        pend = find(diff(X)==-1)+1;
+        pend = find(diff(X)==-1);
 
         % make sure array length is consistent
         if numel(pstart) > numel(pend)
@@ -25,7 +27,8 @@ function periods = convertPeriods(X,reverse)
         
         periods = [pstart, pend];
     else % X is a period matrix [:,[pstart, pend]]
-        periods = false(max(X,[],"all"),1);
+        len = max([len, max(X,[],"all")]);
+        periods = false(len,1);
         nps = size(X,1);
         for i = 1:nps
             thisperiod = X(i,:);

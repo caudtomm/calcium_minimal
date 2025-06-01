@@ -34,9 +34,9 @@ classdef Preprocessing
             % method
             obj.sj.retrieve_ref_img(destinationFolder,true);
             % save a side-by-side subsampled avi movie of the results for
-            % all the trials, for easy supervicial visual inspection
+            % all the trials, for easy superficial visual inspection
             RegistrationViewer(obj.sj,destinationFolder). ...
-                subsampledMovieCollage.save(destinationFolder,'avi','sidebyside');
+                subsampledMovieCollage.save('','avi','sidebyside');
         end
     end
 
@@ -198,17 +198,16 @@ classdef Preprocessing
             b.init.description = "Correction of the bidirectional alignment artefact";
             b.init.detailed_description = "Based on the consensus transform across lines of the histeq reference image";
             b.includeFilter = [num2str(obj.sj.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
-            b = b.setDataPath(datapath);
+            b = b.setDataPath(datapath); % only needed to get b.DataList - b.applyresults will set the new path anyway
             imgref = obj.sj.loadReferenceImg(obj.sj.locations.references.histeq);
             b.Processor = b.Processor.setReference(imgref);
 
             % precompute shifts and apply to everything
             comp = CorrectBidiScanning(Movie(imgref)).run(true);
-            b.init.operation_precomputed = true;
             b.results = repmat({comp}, size(b.DataList));
             
             % run
-            b = b.run;
+            b = b.applyresults(datapath);
             charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
             obj.sj.log{end+1} = charv;
             
@@ -225,17 +224,13 @@ classdef Preprocessing
 
         function [obj, b] = correctBidiScanningHisteq2Raw(obj)
             [obj, b] = correctBidiScanningHisteq(obj);
-
-            % prep original trial movies
-            cd(fullfiletol(obj.sj.locations.subject_datapath))
             
             % apply computed shifts to the raw data
             cd(fullfiletol(obj.sj.locations.subject_datapath))
             datapath = obj.sj.locations.rawtrials;
-            b = b.applyresults(datapath);
             
             % run
-            b = b.run;
+            b = b.applyresults(datapath);
             charv = [char(datetime('today')), ' - hash:', b.hash, ' - ',b.init.description];
             obj.sj.log{end+1} = charv;
             
@@ -454,8 +449,174 @@ classdef Preprocessing
 
         % _________________________________________________
         
+        function [obj, b] = correctRegistrationResults(obj)
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+            datapath = obj.sj.locations.rawtrials_opticflowwarp_fromhisteq; % < path to pre-egistered movies
+            sourcepath = obj.sj.locations.rawtrials; % < path to raw movies
+
+            % check for consistent filenum across reference and source
+            % folders
+            [fileList, numFiles] = obj.sj.getFileListInSubfolder(datapath);
+            [~, numFiles2] = obj.sj.getFileListInSubfolder(sourcepath);
+            if numFiles~=obj.sj.getNTrials; warning( ...
+                    'Number of movies found  in the destination folder is different from the number of trials.'); end
+            if numFiles2~=obj.sj.getNTrials; warning( ...
+                    'Number of movies found  in the source folder is different from the number of trials.'); end
+
+            % quality control of registration results in datapath
+            th = -5;
+            v = RegistrationViewer(obj.sj,datapath);
+            [~,~,putative_fails,hf] = v.QC(th); % identifying putatively failed frames
+            savefig(hf, fullfile(datapath,'pre-correction_qc.fig'));
+
+            % load batchprocess json (to have a list of init subhashes for the transformation outputs of each file)
+            bias = 0; if contains(datapath,'2'); bias = numFiles; end
+            filename = dir(fullfile(datapath,'*_init.json'));
+            batchinit = readJson(fullfile(filename(1).folder,filename(1).name));
+            initlist = batchinit.subHash(bias+(1:numFiles));
+            
+            % build 'results' array for operation
+            results = cell(numFiles,1);
+            for i = 1:numFiles
+                op.fail_idx = putative_fails(:,i);
+                op.preregmovie = fileList{i};
+                op.transforminit = fullfile(datapath,'inits',[initlist{i},'.mat']);
+                op.zscorethresh = th;
+
+                results{i}.operation = op;
+
+                results{i}.init = readJson(fullfile(datapath,'inits',[initlist{i},'_init.json']));
+            end
+
+            % initialize Batch Process
+            b = BatchProcess(RegistrationCorrection);
+            b.init.description = "Corrected registration results";
+            b.init.detailed_description = "re-registered failed frames + added uncorrectable frames to badperiods";
+            b.includeFilter = [num2str(obj.sj.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT           
+            b.results = results;
+
+            % run
+            b = b.applyresults(sourcepath);
+            
+            % move to layer 1 dir
+            sourceFolder = fullfiletol(sourcepath, b.OutFolder);
+            destinationFolder = obj.sj.locations.rawtrials_opticflowwarp_fromhisteq_corrected;
+            movedirTC(sourceFolder,destinationFolder)
+            
+            % new QC on the output
+            v = RegistrationViewer(obj.sj,destinationFolder);
+            [~,~,~,hf] = v.QC(th);
+            savefig(hf, fullfile(destinationFolder,'post-correction_qc.fig'));
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
+        end
+
+        function obj = subtractIC(obj, idx)
+            arguments
+                obj 
+                idx double = []
+            end
+            cd(fullfiletol(obj.sj.locations.subject_datapath))
+            datapath = obj.sj.locations.rawtrials_opticflowwarp_fromhisteq_corrected;
+
+            %% check for pre-existing PCAICA output files
+            FileIn{1} = 'pcaica_w.mat';
+            FileIn{2} = 'pcaica.mat';
+            if exist(FileIn{1},"file") && exist(FileIn{2},"file")
+                pcaica_w = robust_io('load', FileIn{1}).pcaica_w;
+                decomposition = robust_io('load', FileIn{2}).pcaica;
+            else
+                movie = PCAICA.getFull2PMovieSubsampled(obj.sj,datapath);
+                decomposition = PCAICA(movie); 
+                [decomposition, ~,~, pcaica_w, ~,~] = decomposition.run();
+
+                % save figures (in a really stupid way, sorry)
+                mkdir('figures')
+                figs = findall(0, 'Type', 'figure');
+                for i = 1:numel(figs)
+                    fig = figs(i);
+                    fname = sprintf('fig_%d.fig', i); % or use i instead of fig.Number
+                    try; saveas(fig, fullfiletol('figures',fname), 'fig'); catch; end
+                end
+                close all
+            end
+
+
+            %%
+
+            if isempty(idx)
+                % select idx of ICs to reconstruct in isolation, so they can be
+                % removed from the original data
+                [~,idx] = sort(pcaica_w.spectral_bias.bias_scores,'descend');
+                idx = idx(1); % isolate only the top low-freq-biased IC
+            end
+
+            % resize weight maps to original size
+            resize_factor = decomposition.operation.resize_factor;
+            wmapsIC = pcaica_w.ICweightmaps.whole;
+            wmapsIC = cellfun(@(x) imresize(x,'nearest','scale',resize_factor), ...
+                wmapsIC,'UniformOutput',false);
+
+            % re-linearize wmaps and eliminate pre-identified NaNs
+            [wmapsIC, idx_nanfr, idx_nanpx] = cellfun(@(x) ...
+                PCAICA.linearizeFrames(x, true,[],[],decomposition.init.method), ...
+                wmapsIC, 'UniformOutput',false);
+            idx_nanfr = idx_nanfr{1};
+            idx_nanpx = idx_nanpx{1};
+
+            % concatenate linearized maps to one 2d array
+            wmapsIC = cell2mat(wmapsIC'); % [px x IC#]
+
+            % useful later
+            pxstd = pcaica_w.pxstdfullsize';
+            pxstd(idx_nanpx) = [];
+            pxmu = pcaica_w.pxmufullsize';
+            pxmu(idx_nanpx) = [];
+
+            % keep only idx
+            to_elim = true(width(wmapsIC),1); to_elim(idx) = false;
+            Wnew = wmapsIC; Wnew(:,to_elim) = zeros(height(wmapsIC),sum(to_elim));
+            W = wmapsIC * pinv(Wnew);
+
+            % -------
+
+            % package process parameters
+            op.pxmu = pxmu;
+            op.pxstd = pxstd;
+            op.transform = W;
+            op.idx_nanpx = idx_nanpx;
+            op.inputmethod = decomposition.init.method;
+            op.mode = 'nooffset';
+            op.subtract_from_inputdata = true;
+
+            % single file run (test)
+            %filename = 'OFreg_stacks_clahe2raw/TC_241213_TC0003_241209beh1B2_sxpDp_odorexp004_RPB3144501500AG_00002_00001.mat';
+            %reconstructedIC = ComponentReconstruction(op,filename).run().data_processed;
+
+            % initialize Batch Process
+            b = BatchProcess(ComponentReconstruction(op));
+            b.init.description = "Subtract top bias-scored IC from fully registered trials";
+            b.includeFilter = [num2str(obj.sj.min_trialnum, '%05.f'),'.mat']; % include only actual trials, not the last batch run result MAT
+            b = b.setDataPath(datapath);            
+            
+            % run
+            b = b.run;
+            
+            %% move to layer 1 dir
+            sourceFolder = fullfiletol(datapath, b.OutFolder);
+            destinationFolder = obj.sj.locations.rawtrials_opticflowwarp_fromhisteq_corrected_noIC;
+            movedirTC(sourceFolder,destinationFolder)
+
+            % save anatomy and visualization results to disk
+            obj = obj.tail_sequence(destinationFolder);
+        end
         
-        function obj = selectROIs(obj)
+        function obj = selectROIs(obj, ROImap)
+            arguments
+                obj 
+                ROImap double = [] 
+            end
             % select background ROIs
             obj.sj.backgroundROImap = imageSequenceGUI(...
                 obj.sj.anatomy_imgs,...
@@ -465,11 +626,11 @@ classdef Preprocessing
             obj.sj.backgroundROImap = obj.pruneROIs(obj.sj.backgroundROImap);
             
             % select cell ROIs
-            if exist("plane",'var'); obj.sj.ROImap = plane{1}.ROI_map; end
+            if isempty(ROImap); ROImap = obj.sj.ROImap; end
             obj.sj.ROImap = imageSequenceGUI(...
                 obj.sj.anatomy_imgs,...
                 obj.sj.localcorr_imgs,...
-                obj.sj.ROImap,...
+                ROImap,...
                 'Select neuronal somata');
             obj.sj.ROImap = obj.pruneROIs(obj.sj.ROImap);
             

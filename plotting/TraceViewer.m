@@ -37,7 +37,7 @@ classdef TraceViewer
         end
     end
 
-    methods (Static, Access=protected)
+    methods (Static)
         function h = plotStaggered(t,M)
             % plots the columns of M staggered in Y
 
@@ -52,7 +52,7 @@ classdef TraceViewer
 
             % space out data
             spacer_gain = 2; % (2 std)
-            spacer = repelem(spacer_gain,ncols);
+            spacer = repelem(spacer_gain,ncols) .* std(M,'omitmissing');
             spacermat = repmat(cumsum(spacer),[nrows,1]);
 
             y = M + spacermat;
@@ -122,7 +122,7 @@ classdef TraceViewer
 
         end
 
-        function h = plotTrialAvgs(obj, tracename)
+        function [h,v] = plotTrialAvgs(obj, tracename)
             % plots average trace over all cells, for each trial.
             % Staggers trials. Default traces are dFoverF. Assumes input
             % traces : [t, roi, trials]
@@ -139,7 +139,7 @@ classdef TraceViewer
             ylabel('trial #')
         end
 
-        function h = plotTracesInTime(obj, tracename, trials)
+        function [h,v] = plotTracesInTime(obj, tracename, trials)
             % plots single-cell traces side-by-side.
             % Staggers cells. Default traces are dFoverF. Assumes input
             % traces : [t, roi, trials]

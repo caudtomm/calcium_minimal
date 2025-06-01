@@ -6,13 +6,13 @@ function data = singleTrialCorrInTime(data, stim_on, stim_off, pl, s)
 %% corr matrix between istantaneous activity vectors across timeframes
 
 % input example: data, stim_on, stim_off
-% indata= data.traces;
-indata = data.tracesdns;
+indata= data.traces;
+% indata = data.tracesdns;
 ncells = data.N;
-indur = data.Ldns; % single trial duration in frames (after filtering)
+indur = data.L; % single trial duration in frames (after filtering)
 intrialnums = data.trial_num;
 intrialname = data.stim_type;
-fs = data.meta.framerate/data.meta.downsample;
+fs = data.meta.framerate;%/data.meta.downsample;
 trials = data.trials;
 
 ntrials = numel(trials)

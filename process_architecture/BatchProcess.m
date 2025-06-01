@@ -170,11 +170,14 @@ classdef BatchProcess < Process
                 
                 obj.init.subHash{end+1} = result.hash;
                 obj.init.subHash = obj.init.subHash(:); % make vertical
+                
+                % do this for each iteration to save memory!
+                obj = getLight(obj,true);
             end
             
             obj.init.save(outpath,'json')
-            try obj.Processor = getLight(obj.Processor); catch; end
-            save(getLight(obj),outpath); % internal save fun
+            try obj.Processor = getLight(obj.Processor); catch; end 
+            save(getLight(obj,true),outpath); % internal save fun
         end        
 
         function obj = applyresults(obj,newdatapath)

@@ -62,32 +62,147 @@ classdef RegistrationViewer
             cd(orig_folder)
         end
 
-        function replaceFailsInterp(obj,fail_idx)
+        function replaceFailsInterp(obj,fail_idx, sourceFolder, pl)
             % fail_idx : putative_fails output of QC()
 
             orig_folder = fullfiletol(pwd);
 
             % get file list and move to subject-datapath
             [fileList, numFiles] = obj.sj.getFileListInSubfolder(obj.folder);
-            if numFiles~=obj.sj.getNTrials; warning('Number of movies found is different from the number of trials.'); end
+            [fileList2, numFiles2] = obj.sj.getFileListInSubfolder(sourceFolder);
+            if numFiles~=obj.sj.getNTrials; warning( ...
+                    'Number of movies found  in the destination folder is different from the number of trials.'); end
+            if numFiles2~=obj.sj.getNTrials; warning( ...
+                    'Number of movies found  in the source folder is different from the number of trials.'); end
 
             % initialize
+            % load batchprocess json (to have a list of init subhashes for the transformation outputs of each file)
+            bias = 0; if contains(obj.folder,'2'); bias = numFiles; end
+            filename = dir(fullfile(obj.folder,'*_init.json'));
+            batchinit = readJson(fullfile(filename(1).folder,filename(1).name));
+            initlist = batchinit.subHash(bias+(1:numFiles));
 
             % loop
             for i = 1:numFiles
-                % Load the movie data
+                if sum(fail_idx(:,i))==0; continue; end % no fails for this trial: YAY!
                 disp(fileList{i})
-                movie = robust_io('load',fileList{i}, 'movie').movie;
 
-                thisfails = convertPeriods(fail_idx(:,i)); % [start, end]
+                % Load the movie data
+                movie = robust_io('load',fileList2{i}, 'movie').movie;
 
+                % load transformation maps
+                filein = fullfile(obj.folder,'inits',[initlist{i},'.mat']);
+                transform = robust_io('load',filein).process.operation;
+
+                % list failed periods
+                bps = convertPeriods(movie.badperiods(:,2:3),1);
+                thisfails = convertPeriods(fail_idx(~bps,i)); % [start, end] without the bad periods
+                numfails = height(thisfails);
                 
+                all_interp_tp = cell(numfails,1);
+                for i_fail = 1:numfails
+                    % extract transforms adjacent to the failed period
+                    idx1 = thisfails(i_fail,1)-1;
+                    idx2 = thisfails(i_fail,2)+1;
+                    if idx1<1; idx1 = idx2; end
+                    if idx2>size(transform.warp,4); idx2 = idx1; end
+                    adj_tf = transform.warp(:,:,:,[idx1,idx2]);
+                    nmissing = diff(thisfails(i_fail,:))+1;
+                    interp_tp = zeros(movie.h,movie.w,2,nmissing+2);
+                    
+                    for i_dim = 1:2
+                        cube = squeeze(adj_tf(:,:,i_dim,:));
+                        [ny,nx,nz]=size(cube);
+                        [x, y, z] = meshgrid(1:nx, 1:ny, 1:nz);
+                        [xq, yq, zq] = meshgrid(1:nx, 1:ny, 1:1/(nmissing+1):nz);
+                        interp_tp(:,:,i_dim,:) = interp3(x, y, z, cube, xq, yq, zq, 'spline');
+                    end
+
+                    transform.warp(:,:,:,thisfails(i_fail,1):thisfails(i_fail,2)) = interp_tp(:,:,:,2:end-1);
+
+                    all_interp_tp{i_fail} = interp_tp;
+                    
+                end
+
+                % build processor
+                p = OpticFlowRegistration(movie);
+                p.operation = transform;
+                p = p.run;
+                movie_corrected = BasicMovieProcessor('remove_badperiods',p.data_processed).run.data_processed;
+
+                % Load the previously registred movie data
+                movie_oldreg = robust_io('load',fileList{i}, 'movie').movie;
+                movie_oldreg = BasicMovieProcessor('remove_badperiods',movie_oldreg).run.data_processed;
+
+                if ~pl; continue; end
+
+                for i_fail = 1:numfails
+                    interp_tp = all_interp_tp{i_fail};
+
+                    buffer = 20;
+
+
+                    frcorrnew = avg_frame_correlation(movie_corrected.stack( ...
+                        buffer:end-buffer,buffer:end-buffer, :));
+                    frcorrold = avg_frame_correlation(movie_oldreg.stack( ...
+                        buffer:end-buffer,buffer:end-buffer, :));
+                    frcorrnew = nanzscore(frcorrnew);
+                    frcorrold = nanzscore(frcorrold);
+
+                    figure;
+                    nrows = 3;
+                    ncols = size(interp_tp,4)+1; % nmissing + adjacent frames + extra line plot
+                    
+                    for i_fr = 1:ncols-1
+                        % get the actual frame numbers (but without
+                        % counting the bad periods!) - so these are NOT
+                        % necessarily the correct frame numbers in context
+                        actualfrnum = thisfails(i_fail,1)+i_fr-2;
+
+                        % real part
+                        subplot(nrows,ncols,i_fr)
+                        imagesc(interp_tp(:,:,1,i_fr)); axis square; xticklabels([]); yticklabels([]);
+                        title(['fr #',num2str(actualfrnum)])
+                        if i_fr == 1; ylabel('real'); end
+    
+                        % imaginary part
+                        subplot(nrows,ncols,i_fr + ncols)
+                        imagesc(interp_tp(:,:,2,i_fr)); axis square; xticklabels([]); yticklabels([]);
+                        if i_fr == 1; ylabel('imaginary'); end
+    
+                        % corrected frame
+                        subplot(nrows,ncols,i_fr + ncols*2)
+                        imagesc(movie_corrected.stack(:,:,actualfrnum)); colormap('gray');
+                        axis square; xticklabels([]); yticklabels([]);
+                        if i_fr == 1; ylabel('adj. frames'); end
+                    end
+
+                    % restult correlation comparison
+                    subplot(1,ncols,ncols)
+                    overhang = 3; % including adjacent frames, one-sided
+                    idx1 = max([1,thisfails(i_fail,1)-overhang]);
+                    idx2 = min([movie.nfr,thisfails(i_fail,2)+overhang]);
+                    y = [frcorrold((idx1:idx2)-1), frcorrnew((idx1:idx2)-1)];
+                    b = plot(y,'LineWidth',2);
+                    hold on
+                    line([1 1]*overhang+.5 , ylim , ...
+                        'Color','r', 'LineStyle', '--', 'LineWidth',1)
+                    line([1 1]*height(y)-overhang+.5 , ylim , ...
+                        'Color','r', 'LineStyle', '--', 'LineWidth',1)
+                    legend(b, {'old warp','corrected'})
+                    xticks(1:height(y))
+                    xticklabels(idx1:idx2);
+                    % ylim([-1 1])
+                    ylabel('fr/fr z-scored correlation')
+                    xlabel('frames')
+                    axis tight
+                end
             end
 
             cd(orig_folder)
         end
 
-        function [fbf_corr, zsc_corr, putative_fails, hf] = QC(obj)
+        function [fbf_corr, zsc_corr, putative_fails, hf] = QC(obj, th)
             % generate a frame-by-frame correlation curve
 
             orig_folder = fullfiletol(pwd);
@@ -105,7 +220,11 @@ classdef RegistrationViewer
                 disp(fileList{i})
                 movie = robust_io('load',fileList{i}, 'movie').movie;
 
-                fbf_corr(:,i) = avg_frame_correlation(movie.stack);
+                buffer = 20; % registration algs can produce fast-variable 
+                % edges (effect of warping at the edge of the image).
+                % we take only the central portion of the image to estimate
+                % the frame-by-frame correlation.
+                fbf_corr(:,i) = avg_frame_correlation(movie.stack(buffer+1:end-buffer,buffer+1:end-buffer,:));
             end
 
             % get image size
@@ -116,8 +235,16 @@ classdef RegistrationViewer
             zsc_corr = nanzscore(fbf_corr);
 
             % define putatively failed frames
-            th = -5;
             putative_fails = [false(1,numFiles) ; zsc_corr < th]; % add one line at the start for frame 1
+            % eliminate the last index of each putatively failed periods:
+            % a good frame would still have low correlation with a bad
+            % frame
+            for i = 1:numFiles
+                [thisfails, len] = convertPeriods(putative_fails(:,i));
+                idx = diff(thisfails,[],2)>0; % everything should be positive in principle, but better have some robustness
+                thisfails(idx,2) = thisfails(idx,2)-1;
+                putative_fails(:,i) = convertPeriods(thisfails,true, len);
+            end
 
             % return to original location
             cd(orig_folder)
@@ -138,34 +265,40 @@ classdef RegistrationViewer
             [~, worstidx] = max(failscores,[],'omitmissing');
 
             subplot(nrow,ncol,1) 
-            src_trial = failscols(leastbadidx);
-            snip = Snippet(fileList{src_trial},failsrows(leastbadidx)-[1,0]);
-            im = zeros(h,w,3);
-            im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
-            maxval = quantile(im(:),.97);
-            imagesc(im./maxval); axis square
-            xticks([]); yticks([])
-            title(['least bad case: trial ',num2str(src_trial),', frame ',num2str(failsrows(leastbadidx))])
-
-            subplot(nrow,ncol,3) 
-            src_trial = failscols(medianidx);
-            snip = Snippet(fileList{src_trial},failsrows(medianidx)-[1,0]);
-            im = zeros(h,w,3);
-            im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
-            maxval = quantile(im(:),.97);
-            imagesc(im./maxval); axis square
-            xticks([]); yticks([])
-            title(['median case: trial ',num2str(src_trial),', frame ',num2str(failsrows(medianidx))])
+            if ~isempty(leastbadidx)
+                src_trial = failscols(leastbadidx);
+                snip = Snippet(fileList{src_trial},failsrows(leastbadidx)-[1,0]);
+                im = zeros(h,w,3);
+                im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
+                maxval = quantile(im(:),.97);
+                imagesc(im./maxval); axis square
+                xticks([]); yticks([])
+                title(['least bad case: trial ',num2str(src_trial),', frame ',num2str(failsrows(leastbadidx))])
+            end
             
+            subplot(nrow,ncol,3) 
+            if ~isempty(medianidx)
+                src_trial = failscols(medianidx);
+                snip = Snippet(fileList{src_trial},failsrows(medianidx)-[1,0]);
+                im = zeros(h,w,3);
+                im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
+                maxval = quantile(im(:),.97);
+                imagesc(im./maxval); axis square
+                xticks([]); yticks([])
+                title(['median case: trial ',num2str(src_trial),', frame ',num2str(failsrows(medianidx))])
+            end
+
             subplot(nrow,ncol,5) 
-            src_trial = failscols(worstidx);
-            snip = Snippet(fileList{src_trial},failsrows(worstidx)-[1,0]);
-            im = zeros(h,w,3);
-            im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
-            maxval = quantile(im(:),.97);
-            imagesc(im./maxval); axis square
-            xticks([]); yticks([])
-            title(['worst case: trial ',num2str(src_trial),', frame ',num2str(failsrows(worstidx))])
+            if ~isempty(worstidx)
+                src_trial = failscols(worstidx);
+                snip = Snippet(fileList{src_trial},failsrows(worstidx)-[1,0]);
+                im = zeros(h,w,3);
+                im(:,:,[1,3]) = snip.stack./max(snip.stack,[],'all','omitmissing');
+                maxval = quantile(im(:),.97);
+                imagesc(im./maxval); axis square
+                xticks([]); yticks([])
+                title(['worst case: trial ',num2str(src_trial),', frame ',num2str(failsrows(worstidx))])
+            end
 
             subplot(nrow,ncol,2)
             imagesc(zsc_corr)
@@ -183,17 +316,5 @@ classdef RegistrationViewer
 
 
         end
-    end
-end
-
-
-function corr_curve = avg_frame_correlation(data)
-    [rows, cols, frames] = size(data);
-    corr_curve = zeros(frames - 1, 1);
-    
-    for i = 1:frames-1
-        frame1 = reshape(data(:,:,i), [], 1);
-        frame2 = reshape(data(:,:,i+1), [], 1);
-        corr_curve(i) = corr(frame1, frame2);
     end
 end

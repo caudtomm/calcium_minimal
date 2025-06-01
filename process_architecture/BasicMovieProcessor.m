@@ -4,6 +4,7 @@ classdef BasicMovieProcessor < MovieProcessing
 %   - 'subtract_baseline'
 %   - 'remove_badperiods'
 %   - 'add_badperiods_as_nans'
+%   - 'replace_badperiods_with_nans'
 %   - 'clahe'
 %   - 'movmean'
 %   - 'downsamplet'
@@ -50,6 +51,10 @@ classdef BasicMovieProcessor < MovieProcessing
                     [movie, obj.operation.baseline] = ...
                         subtract_movie_baseline(obj.data_raw);
                 
+                case 'subtract_px_baseline'
+                    [movie, obj.operation.baseline] = ...
+                        subtract_px_baseline(obj.data_raw);
+
                 case 'remove_badperiods'
                     [movie, obj.operation.periods_removed] = ...
                         subtract_badperiods(obj.data_raw);
@@ -152,6 +157,19 @@ movie_subtracted.stack = movie - baselineMAT;
 baseline = squeeze(baseline);
 end
 
+function [movie_subtracted, baseline] = subtract_px_baseline(data_raw)
+arguments
+    data_raw Movie
+end
+movie = data_raw.stack;
+movie_subtracted = data_raw;
+
+% baseline defined as the 3% quantile of each pixel's values
+baseline = quantile(movie,0.03,3); 
+
+movie_subtracted.stack = movie - baseline;
+end
+
 function [movie_without_bp, adapted_badperiods] = subtract_badperiods(data_raw)
 % Subtract bad periods
 arguments
@@ -166,20 +184,23 @@ adapted_badperiods = [];
 if isempty(badperiods); return; end
 numberframes = data_raw.nfr;
 
+% convert bad periods to logical indices
+rm_idx = convertPeriods(badperiods(:,2:3),1);
+
 % adapt bad periods to a sub-trial movie
-for i_bp = 1:size(badperiods,1)
-    thisbp = badperiods(i_bp,:);
-    if thisbp(2)>numberframes; continue; end
-    if thisbp(3)>numberframes; thisbp(3)=numberframes; end
-    adapted_badperiods = [adapted_badperiods; thisbp];
+if length(rm_idx)>numberframes
+    rm_idx = rm_idx(1:numberframes);
+elseif length(rm_idx)<numberframes
+    tmp = false(numberframes,1);
+    tmp(1:length(rm_idx)) = rm_idx;
+    rm_idx = tmp; clear tmp
 end
 
-for i_bp = 1:size(badperiods,1)
-    thisbp = adapted_badperiods(size(adapted_badperiods,1)-i_bp+1,:);
-    movie(:,:,thisbp(2):thisbp(3)) = [];
-end
+% remove and store to output
+movie(:,:,rm_idx) = [];
 movie_without_bp.stack = movie;
 
+% logging
 fprintf('Removed following periods:\n');
 fprintf('%g\t%g\t%g\n', adapted_badperiods.');
 fprintf('\n');
@@ -215,6 +236,7 @@ for i_bp = 1:size(badperiods,1)+1
 end
 movie_result.stack = tmp;
 
+% logging
 fprintf('Added following periods:\n');
 fprintf('%g\t%g\t%g\n', badperiods.');
 fprintf('\n');
@@ -336,4 +358,3 @@ end
 movie_result.stack = movie;
 
 end
-

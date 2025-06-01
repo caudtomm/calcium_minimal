@@ -385,12 +385,14 @@ classdef Subject
             images = obj.retrieve_trial_anatomies(thispath);
         
             % save as a tif movie
-            Movie(images).save(fullfiletol(thispath,outpath),'tif');
+            Movie(images).save(outpath,'tif');
 
             % save individually
             for i_img = 1:size(images,3)
                 thisimg = Movie(images(:,:,i_img));
-                thisimg.path.fname = obj.filelist(i_img).name;
+                fname = obj.filelist(i_img).name;
+                if endsWith(fname,'.tif'); fname = extractBefore(fname,'.tif'); end
+                thisimg.path.fname = fname;
                 thisimg.save(fullfiletol(outpath),'tif');
             end
         end
@@ -458,9 +460,10 @@ classdef Subject
             % Saving as files
             disp(['Saving to ... ', output_folder])
             if ~exist(output_folder,'dir'); mkdir(output_folder); end
-            snip.save(output_folder,'mat')                                  % Saving the whole Snippet
-            FileOut = fullfiletol(output_folder,[snip.path.fname, '.tif']);    % Saving the image as Tiff
-            if exist(FileOut,'file'); delete(FileOut); end
+            snip.path.fname = ['trial_', num2str(getFileNameSpecs(snip.path.fname).trial_num)];
+            snip.save(output_folder,'mat',snip.path.fname)       % Saving the whole Snippet
+            FileOut = fullfile(output_folder,[snip.path.fname, '.tif']);    % Saving the image as Tiff
+            if exist(FileOut,'file'); delete(FileOut); end            
             saveastiff(reference_image,FileOut)
         end
 

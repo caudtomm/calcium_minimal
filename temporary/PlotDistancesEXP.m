@@ -1,13 +1,16 @@
 
+
+cmap = 'jet';
+
 %% plot trial distance averaged across fish
 
 % todo_fish = [6:7,11:12,14,17,18,21:23];
 todo_fish = find(~strcmp(experiment.summaryTable.group,'naïve'));
 % todo_fish = 20;
-% todo_fish = 1:17
+% todo_fish = 1:29
 
 sec_range = [1,20]; % [+stim_on, +stim on]
-crange = [0.6 1];
+crange = [0.7 1];
 % blockstructure = [5;5;5;7;5;5];
 blockstructure = [6;6;6;6;6;3];
 
@@ -40,7 +43,7 @@ title(['Similarity: cosine ', num2str(interval(1)/fs-data.stim_on_sec), '-', ...
     num2str(interval(end)/fs-data.stim_on_sec), ' s'], 'Color','w')
 caxis([quantile(c(:),.001), quantile(c(:),.999)]);
 caxis(crange)
-colormap(['hot'])
+colormap(cmap)
 colorbar('Color','w')
 set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w');
 set(gcf, 'color', 'none'); 
@@ -77,7 +80,7 @@ xlabel('Block #')
 ylabel('Block #')
 title('Same odor similarity', 'Color','w')
 caxis(crange);
-colormap(['hot'])
+colormap(cmap)
 colorbar('Color','w')
 set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w','FontSize',14);
 set(gcf, 'color', 'none'); 
@@ -116,7 +119,7 @@ xlabel('Block #')
 ylabel('Block #')
 title('Different odors similarity', 'Color','w')
 caxis(crange);
-colormap(['hot'])
+colormap(cmap)
 colorbar('Color','w')
 set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w','FontSize',14);
 set(gcf, 'color', 'none'); 
@@ -137,7 +140,7 @@ xlabel('Block #')
 ylabel('Block #')
 title('Same-different odors similarity', 'Color','w')
 caxis([0 1]);
-colormap(['hot'])
+colormap(cmap)
 colorbar('Color','w')
 set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w','FontSize',14);
 set(gcf, 'color', 'none'); 
@@ -150,7 +153,7 @@ c = same_odors - different_odors;
 
 figure; plot(diag(c,1),'LineWidth',2,'Color','r')
 
-ylim([0 1])
+ylim([0 .3])
 xticks(1:size(c,1)); xticklabels({'1-2','2-3','3-4','4-5','5-6'}); xtickangle(45)
 xlabel('Block #')
 ylabel('same-different similarity')

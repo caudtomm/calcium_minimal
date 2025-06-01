@@ -1,6 +1,6 @@
 %%
 baseline_tag = {'noodor', 'baseline', 'spont.'};
-this_group = {'previousnaive';'naive';'trained1';'trained2';'trained1alt';'uncoupled'};
+this_group = {'naive';'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'};
 cat.traces = [];
 todo_fish = [];
 for i_fish = 1:numel(experiment.series)
@@ -12,7 +12,7 @@ end
 for i_fish = 1:numel(todo_fish)
     %%
     data = experiment.series{i_fish}.data;
-    tmp = data.tracesdesdn;
+    tmp = data.traces;
     fs = data.meta.framerate;
 %     ds = data.meta.downsample;
     ds = 1;
@@ -24,24 +24,24 @@ for i_fish = 1:numel(todo_fish)
     tmp = traceFormat(tmp,data.L/ds);
     
 
-    % zscore each cell, based of its mean and variance throughout the
-    % experiment (all trials)
-    tmp2 = [];
-    for i=1:size(tmp,3)
-    tmp2 = [tmp2;tmp(:,:,i)];
-    end
-    for i = 1:size(tmp2,2)
-    tmp2(isnan(tmp2(:,i)),i) = nanmean(tmp2(:,i));
-    end
-    tmp2 = zscore(tmp2);
-    tmp3 = [];
-    for i=1:size(tmp,3)
-    tmp3(:,:,i) = tmp2(1300*(i-1)+[1:1300],:);
-    end
-    tmp = tmp3;
+    % % zscore each cell, based of its mean and variance throughout the
+    % % experiment (all trials)
+    % tmp2 = [];
+    % for i=1:size(tmp,3)
+    % tmp2 = [tmp2;tmp(:,:,i)];
+    % end
+    % for i = 1:size(tmp2,2)
+    % tmp2(isnan(tmp2(:,i)),i) = nanmean(tmp2(:,i));
+    % end
+    % tmp2 = zscore(tmp2);
+    % tmp3 = [];
+    % for i=1:size(tmp,3)
+    % tmp3(:,:,i) = tmp2(1300*(i-1)+[1:1300],:);
+    % end
+    % tmp = tmp3;
 
-    % component to isolate
-    tmp(tmp<0) = nan;
+    % % component to isolate
+    % tmp(tmp<0) = nan;
 
 
 
@@ -56,8 +56,8 @@ for i_fish = 1:numel(todo_fish)
     % select odor window [-5, +20] seconds
     interval = [floor(nanmax([1, (data.stim_on_sec - 4)*fs/ds])) : ...
         floor(nanmin([size(tmp,1), (data.stim_off_sec + 20)*fs/ds]))];
-%     interval = [floor(nanmax([1, (data.stim_off_sec + 94)*fs/ds])) : ...
-%         floor(nanmin([size(tmp,1), (data.stim_off_sec + 118)*fs/ds]))];
+    % interval = [floor(nanmax([1, (data.stim_off_sec + 74)*fs/ds])) : ...
+    %     floor(nanmin([size(tmp,1), (data.stim_off_sec + 118)*fs/ds]))];
 %     interval = [floor(nanmax([1, (data.stim_on_sec - 4)*fs/ds])) : ...
 %         floor(nanmin([size(tmp,1), (data.stim_off_sec + 104)*fs/ds]))];
     tmp = tmp(interval,:,:);
@@ -84,7 +84,7 @@ for i_fish = 1:numel(todo_fish)
 
     for i = 1:size(tmp,2)
         tmp(isnan(tmp(:,i)),i) = nanmean(tmp(:,i));
-%         tmp(:,i) = zscore(tmp(:,i));
+        % tmp(:,i) = zscore(tmp(:,i));
     end
     
     cat.traces = [cat.traces,nanmean(tmp,2)]; %
@@ -200,9 +200,9 @@ blocktrials_idx = {[1:5]+6*0; ... % block 1
                    [1:5]+6*2; ... % block 3
                    [1:5]+6*3; ... % block 4
                    [1:5]+6*4; ... % block 5
-                   [1:5]+6*5}; % block 6
+                   [1:3]+6*5}; % block 6
 
-i_block = 6;
+i_block = 1
 
 
 cat.traces = [];
@@ -210,11 +210,10 @@ cat.traces = [];
 for i_fish = 1:numel(experiment.series)
     %%
     data = experiment.series{i_fish}.data;
-    tmp = data.tracesdn;
+    tmp = data.traces;
     fs = data.meta.framerate;
 %     ds = data.meta.downsample;
     ds = 1;
-    tmp(tmp<.2) = .2;
     
 %     FindTopUnits
 %     tmp = selectCells(tmp,data.L/ds,alltopunits');
@@ -251,7 +250,7 @@ for i_fish = 1:numel(experiment.series)
 
     for i = 1:size(tmp,2)
         tmp(isnan(tmp(:,i)),i) = nanmean(tmp(:,i));
-        tmp(:,i) = zscore(tmp(:,i));
+        % tmp(:,i) = zscore(tmp(:,i));
     end
 
     cat.traces = [cat.traces, tmp];

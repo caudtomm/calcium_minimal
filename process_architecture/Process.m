@@ -21,8 +21,15 @@ classdef (Abstract) Process
 
     methods (Static)
         function hash = setHash()
+            rng('shuffle');  % Seed the random number generator based on current time
             hashlen = 20;
             hash = char(randi([97 122],1,hashlen));
+
+            % % alternative generation, more robust for unique hashes, but
+            % % can contain '-' and a couple other special characters
+            % hashlen = 20;
+            % uuid = char(java.util.UUID.randomUUID.toString());
+            % hash = uuid(1:hashlen);  % Trim to 20 characters if needed
         end
     end
 
@@ -51,14 +58,75 @@ classdef (Abstract) Process
             robust_io('save',filename,s,'-mat','-v7.3')
         end
 
-        function process = getLight(obj)
-            % empties out all properties considered memory-heavy
+        function process = getLight(obj, recursive)
+            % Recursively empties out all properties considered memory-heavy
             arguments
                 obj
+                recursive logical = false
             end
             process = obj;
-            process = process.clearProperties(process.heavyProperties);
+            if recursive
+                process = recursiveClear(process);
+            else
+                process = process.clearProperties(process.heavyProperties);
+            end
         end
+        
+        function obj = recursiveClear(obj)
+            % Clear current object's heavy properties
+            obj = obj.clearProperties(obj.heavyProperties);
+        
+            % Loop over all properties of the object
+            mc = metaclass(obj);
+            props = mc.PropertyList;
+            for i = 1:numel(props)
+                field = props(i).Name;
+                value = obj.(field);
+
+                if strcmp(props(i).SetAccess,'private'); continue; end
+        
+                % If the property is the same class and not empty, apply recursively
+                if isa(value, class(obj)) && ~isempty(value)
+                    obj.(field) = recursiveClear(value);
+                elseif iscell(value)
+                    for j = 1:numel(value)
+                        if isa(value{j}, class(obj)) && ~isempty(value{j})
+                            value{j} = recursiveClear(value{j});
+                        end
+                    end
+                    obj.(field) = value;
+                elseif isstruct(value)
+                    for j = 1:numel(value)
+                        value(j) = structRecursiveClear(value(j), class(obj));
+                    end
+                    obj.(field) = value;
+                end
+            end
+        end
+        
+        function s = structRecursiveClear(s, className)
+            fns = fieldnames(s);
+            for k = 1:numel(fns)
+                fn = fns{k};
+                val = s.(fn);
+                if isa(val, className) && ~isempty(val)
+                    s.(fn) = recursiveClear(val);
+                elseif iscell(val)
+                    for j = 1:numel(val)
+                        if isa(val{j}, className) && ~isempty(val{j})
+                            val{j} = recursiveClear(val{j});
+                        end
+                    end
+                    s.(fn) = val;
+                elseif isstruct(val)
+                    for j = 1:numel(val)
+                        val(j) = structRecursiveClear(val(j), className);
+                    end
+                    s.(fn) = val;
+                end
+            end
+        end
+
 
         function obj = clearProperties(obj, propNames)
             % clearProperties Clears the contents of specified properties of an object

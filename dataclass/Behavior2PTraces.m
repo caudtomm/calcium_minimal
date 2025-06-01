@@ -22,7 +22,6 @@ classdef Behavior2PTraces
             colb.Label.String = 'Power';
         end
 
-
         function plotInstRate(trace)
             x = trace.freq;
             t = trace.t;
@@ -74,7 +73,7 @@ classdef Behavior2PTraces
             ITI = median(diff(onperiods(:,1))); % [frames]
             onperiods2p = onperiods; % to keep live until storing
 
-            %% extract LED on periods (...)
+            %% extract LED-on periods (...)
 
             % get light-on intervals
             th = quantile(x,.999)*2/3; % threshold intensity val (assumes centered data)
@@ -148,10 +147,9 @@ classdef Behavior2PTraces
     end
 
     methods
-        function obj = Behavior2PTraces(fpath, framerate)
+        function obj = Behavior2PTraces(fpath)
             arguments
                 fpath char = fullfiletol(pwd,'tail_movies')
-                framerate double = 50; % Hz
             end
 
             if isunix
@@ -160,8 +158,11 @@ classdef Behavior2PTraces
                 obj.subject_ID = fliplr(extractBefore(fliplr(pwd),'\'));
             end
 
-            obj.framerate = framerate;
+            % extract stated framerate from video files
+            videos = dir(fullfiletol(fpath,'*.avi'));
+            obj.framerate = VideoReader(fullfiletol(fpath,videos(1).name)).FrameRate;
 
+            % read traces from FiJI output CSVs
             obj.LED = obj.extractTraces(fullfiletol(fpath,'LED_vals'));
             obj.Breathing = obj.extractTraces(fullfiletol(fpath,'Lip_vals'));
             obj.Tail = obj.extractTraces(fullfiletol(fpath,'Tail_vals'));
@@ -170,7 +171,7 @@ classdef Behavior2PTraces
             obj.Breathing.raw = highpass(obj.Breathing.raw,.5,obj.framerate);
 
             % clean from scanning background
-            MaiTai_freq = 7.66;
+            MaiTai_freq = 7.66;                                                 % ### TODO: should be argument (specify from Subject)
             obj.Breathing = obj.removeBackground(obj.Breathing,MaiTai_freq);
             obj.Tail = obj.removeBackground(obj.Tail,MaiTai_freq);
 
@@ -219,8 +220,7 @@ classdef Behavior2PTraces
             % return to original directory
             cd(currentDir)
         end
-
-       
+     
     end
 
 end

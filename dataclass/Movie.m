@@ -203,6 +203,27 @@ classdef Movie
                     
                 case 'tif'
                     FileOut = fullfiletol(outpath,[outfname,'.tif']);
+                    totpathlen = length(fullfiletol(pwd,FileOut));
+                    if totpathlen>259
+                        if ~isempty(getFileNameSpecs(outfname).trial_num)
+                            outfname = ['tr_',num2str(getFileNameSpecs(outfname).trial_num)];
+                        else
+                            outfname = 'filepath_too_long';
+                            % TODO: This should call a little function to 
+                            % pick a unique filename.
+                            % Also, this whole if-block should be extruded
+                            % from the switch block and applied in common
+                            % between classes Movie and Snippet (adapt use
+                            % suitably for each). Or maybe it should be its
+                            % own function and called for each 'type'case :
+                            % more flexibility for extensions of different
+                            % length?
+                        end
+                        FileOut = fullfiletol(outpath,[outfname,'.tif']);
+                        totpathlen2 = length(fullfiletol(pwd,FileOut));
+                        fprintf('\nOutput file path is too long! Lenght: %s > 259\nNew filename: %s\nNew length: %s\n\n', ...
+                            num2str(totpathlen), outfname, num2str(totpathlen2));
+                    end
                     b = true;
                     if ~auto_overwrite
                         b = prompt_overwrite(FileOut);
@@ -210,6 +231,7 @@ classdef Movie
         
                     movie = obj.stack;
                     if b
+                        delete(FileOut)
                         saveastiff(uint16(movie), FileOut)
                     end
 
