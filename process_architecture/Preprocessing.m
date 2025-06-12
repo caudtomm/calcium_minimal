@@ -551,6 +551,7 @@ classdef Preprocessing
                 [~,idx] = sort(pcaica_w.spectral_bias.bias_scores,'descend');
                 idx = idx(1); % isolate only the top low-freq-biased IC
             end
+            disp(['Removing following ICs: ',mat2str(idx)]) % print IC #
 
             % resize weight maps to original size
             resize_factor = decomposition.operation.resize_factor;
@@ -651,21 +652,39 @@ classdef Preprocessing
             obj.sj.backgroundROImap = obj.pruneROIs(obj.sj.backgroundROImap);
             obj.sj.ROImap = obj.pruneROIs(obj.sj.ROImap);
             
-            PMToffmeta = fullfiletol(loc.subject_datapath, loc.rawtrials, 'PMToff_metadata.json');
-            noLightmeta = fullfiletol(loc.subject_datapath, loc.rawtrials, 'noLight_metadata.json');
-            obj.sj = obj.sj.defineTraces(PMToffmeta,noLightmeta);
+            obj.sj = obj.sj.defineTraces; 
             cd(fullfiletol(obj.sj.locations.subject_datapath))
             
-            refmovieforbackground = 'TC_240218_TC0028_240213beh1b2_sxpDp_odorexp004_RPB3144501500AG_00035_00001.tif';
-            refmovieforbackground = fullfiletol(obj.sj.locations.general_datapath,refmovieforbackground);
-            
+            defaultrefmovieforbackground = 'TC_240218_TC0028_240213beh1b2_sxpDp_odorexp004_RPB3144501500AG_00035_00001.tif';
+            defaultrefmovieforbackground = fullfiletol(obj.sj.locations.general_datapath,defaultrefmovieforbackground);
             
             cd(fullfiletol(obj.sj.locations.traces_src))
-            
-            interval = 960:1100;
-            obj.sj.traces = obj.sj.traces.setPMToff(Snippet(refmovieforbackground,interval));
-            interval = 1160:1300;
-            obj.sj.traces = obj.sj.traces.setNoLight(Snippet(refmovieforbackground,interval));
+
+            % set PMToff
+            PMToffmeta = fullfiletol(loc.subject_datapath, loc.orig_trials, 'PMToff_metadata.json');
+            PMToffmeta = readJson(PMToffmeta);
+            interval = PMToffmeta.Frame_range(1):PMToffmeta.Frame_range(2);
+            if PMToffmeta.Internal_reference
+                refmovie = obj.sj.filelist(PMToffmeta.Trial_relativenum+obj.sj.min_trialnum-1).name;
+                refmovie = fullfiletol(loc.subject_datapath,loc.orig_trials,refmovie);
+                obj.sj.traces = obj.sj.traces.setPMToff(Snippet(refmovie,interval));
+            else
+                obj.sj.traces = obj.sj.traces.setPMToff(Snippet(defaultrefmovieforbackground,interval));
+            end
+
+            % set noLight
+            noLightmeta = fullfiletol(loc.subject_datapath, loc.orig_trials, 'noLight_metadata.json');
+            noLightmeta = readJson(noLightmeta);
+            interval = noLightmeta.Frame_range(1):noLightmeta.Frame_range(2);
+            if noLightmeta.Internal_reference
+                refmovie = obj.sj.filelist(noLightmeta.Trial_relativenum+obj.sj.min_trialnum-1).name;
+                refmovie = fullfiletol(loc.subject_datapath,loc.orig_trials,refmovie);
+                obj.sj.traces = obj.sj.traces.setNoLight(Snippet(refmovie,interval));
+            else
+                obj.sj.traces = obj.sj.traces.setNoLight(Snippet(defaultrefmovieforbackground,interval));
+            end
+
+            % get the actual traces
             obj.sj.traces = obj.sj.traces.defineFundamentalProperties(obj.sj);
             obj.sj.traces = obj.sj.traces.setDerivativeProperties;
             
@@ -674,9 +693,8 @@ classdef Preprocessing
             if do_save
                 obj.sj.traces.save('','full',obj.autosave);
                 obj.sj.traces.save('','light',obj.autosave);
-            end
-
-            obj.sj.traces.Fpx = {};          
+                obj.sj.traces.Fpx = {}; 
+            end                                 
             
             obj.sj = obj.sj.update_currentstate('Calcium traces extracted');
             obj.sj.save2mat(obj.autosave)

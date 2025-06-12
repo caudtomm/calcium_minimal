@@ -59,7 +59,7 @@ classdef Experiment
                 disp(thissubjectname)
                 idx = strcmp(obj.subjectTab.name,thissubjectname);
 
-                % create Locations object for the Subject
+                % create temporary Locations object for the Subject
                 thisloc = loc; % copy all the information of the experiment's Locations
                 thisloc = thisloc.setSubjectID(thissubjectname);
 
@@ -84,9 +84,11 @@ classdef Experiment
                     continue
                 end
 
-                % take local tungsten drive name into account
+                % take local tungsten drive name and data folder into account
                 thissubject.locations = ...
                     thissubject.locations.setDrive(obj.locations.drive);
+                thissubject.locations = ...
+                    thissubject.locations.setDataFolder(obj.locations.datafolder);
 
                 % save to properties                
                 subject_not_yet_in_this_experiment = ...
@@ -208,7 +210,12 @@ classdef Experiment
                 validMethods = methods(p);
                 
                 if ismember(process_name, validMethods)
-                    p = p.(process_name);
+                    func = str2func(['@p.', process_name]);
+
+                    idx_tosubtract = str2double(obj.subjectTab.manPickedICs_conservative_{i_sub});
+                    if idx_tosubtract==0; continue; end
+
+                    p = feval(func, idx_tosubtract); % add any input arguments on the right
                 else
                     error('process unknown.')
                 end

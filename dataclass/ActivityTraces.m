@@ -55,11 +55,9 @@ classdef ActivityTraces
         
         % currently not implemented #### TODO in separate ActivityTraces = Process(ActivityTraces)
         baseline_periods cell % periods of inactivity for each ROI
-        centersurround
-        bubble_removal
     end
 
-    methods (Static)       
+    methods (Static)
         function traces = filter(traces,fs)
             arguments
                 traces double % filter works along dim 1
@@ -287,8 +285,8 @@ classdef ActivityTraces
                 traces = traces - obj.techBase;
 
                 % global scaling factor
-                scaling = obj.intercell.avgF; % [t]
-                traces = (traces./scaling).*mean(scaling,"all",'omitmissing');
+                % scaling = obj.intercell.avgF; % [t]
+                % traces = (traces./scaling).*mean(scaling,"all",'omitmissing');
                 
                 % store to output
                 F(:,i,:) = traces;
@@ -318,23 +316,11 @@ classdef ActivityTraces
 
             % denoise
             dFoverF = obj.filter(dFoverF,obj.framerate);
+
+            % avoid Inf
+            dFoverF(isinf(dFoverF)) = nan;
         end
 
-        % SKETCH
-        function [centeravg, surroundavg, centermovie, surroundmovie] = ...
-                defineCenterSurround(obj)
-
-        end
-
-        % SKETCH
-        function traces = desurround(obj)
-
-        end
-
-        % SKETCH
-        function traces = removeBubbles(obj)
-
-        end
     end
 
     methods
@@ -452,11 +438,18 @@ classdef ActivityTraces
                 end
 
             end
+            
+            % include also cells that are always NaN
+            avg_dF_percell = mean(obj.dFoverF,[1,3],'omitmissing');
+            [~,idx] = find(isnan(avg_dF_percell));
+            IDX = [IDX;idx'];
+
+            % avoid repetitions
             IDX = unique(IDX);
 
             idx = ones(obj.N,1);
             idx(IDX) = 0;
-            goodNeuron_IDs = find(idx);
+            goodNeuron_IDs = find(idx); % #### TODO : on multiple uses, does this not shift the ids? maybe better goodNeuron_IDs(idx) or something.. but careful with replace/not replace
 
             % update to N
             newN = numel(goodNeuron_IDs);
@@ -521,7 +514,13 @@ classdef ActivityTraces
             data.stim_off_sec = obj.stim_series.frame_offset(1)/obj.framerate;
             data.response_window = [data.stim_on_sec , data.stim_off_sec];
             data.f0_window = data.response_window - diff(data.response_window) - 3; % same duration, until 3 sec before response_window
-            data.anat_regions = obj.anat_regions;
+            
+            anat_regions = obj.anat_regions;
+            for i = 1:numel(anat_regions.cells)
+                idx = ismember(anat_regions.cells{i}, obj.goodNeuron_IDs);
+                anat_regions.cells{i}(~idx)=[];
+            end
+            data.anat_regions = anat_regions;
 
             % store to output
             series.group = obj.subject_group;

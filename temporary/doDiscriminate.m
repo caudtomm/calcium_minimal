@@ -2,7 +2,7 @@ function [totFractionCorrectLab,totFractionCorrectLabSH, m] = doDiscriminate(exp
 
 global tframe
 % todo_fish = [6:7,11:12,14,17,18,21:23];
-todo_fish = find(~ismember(experiment.summaryTable.group,{'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'}));% options : {'previousnaive';'naïve';'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'};
+todo_fish = find(ismember(experiment.summaryTable.group,{'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'}));% options : {'previousnaive';'naïve';'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'};
 % todo_fish = [21:23];
 % todo_fish = [6:7,10:23]
 nfish = numel(todo_fish);
@@ -10,7 +10,7 @@ if isempty(stims2use); stims2use = {'Trp','Ser','Ala','Food'}; end
 nstims = numel(stims2use);
 trialn2usein = 1:5;
 if isempty(s); s = 0; end
-method = 'euclidean';
+method = 'cosine';
 
 ntrials=30;
 

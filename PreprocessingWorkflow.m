@@ -93,7 +93,7 @@ a = a.loadSubjectTraces;
 
 %% output backward compatible experiment structure and save to file
 
-exp_name = 'expdata290525';
+exp_name = 'expdata060625';
 experiment = a.convert2BackwardCompatibleStruct(exp_name);
 
 % save to pwd

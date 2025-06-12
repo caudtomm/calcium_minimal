@@ -4,13 +4,15 @@ cmap = 'jet';
 
 %% plot trial distance averaged across fish
 
-% todo_fish = [6:7,11:12,14,17,18,21:23];
-todo_fish = find(~strcmp(experiment.summaryTable.group,'naïve'));
+todo_fish = find(strcmp(experiment.summaryTable.group,'naïve'));
 % todo_fish = 20;
-% todo_fish = 1:29
+
+% (optional) randomly select n fish from the overall pool
+n = 8;
+% todo_fish = todo_fish(randperm(numel(todo_fish),n));
 
 sec_range = [1,20]; % [+stim_on, +stim on]
-crange = [0.7 1];
+crange = [0.2 1];
 % blockstructure = [5;5;5;7;5;5];
 blockstructure = [6;6;6;6;6;3];
 
@@ -26,9 +28,14 @@ for i_fish = 1:numel(todo_fish)
     this_sortorder = [1:numel(data.trials)]';
     interval = [floor((data.stim_on_sec+sec_range(1))*fs) : ...
               1+floor((data.stim_on_sec+sec_range(2))*fs)];
-    c = distTraceData(data,this_sortorder,data.L,[],'cosine',[1:data.N]',interval,0,0);
+    c = distTraceData(data,this_sortorder,data.L,[],'correlation',[1:data.N]',interval,0,0);
+
+    % % (optional) plot single fish
+    % figure; imagesc(c(sortorder,sortorder))
+    % clim(crange)
+    % axis square
+    
     C(1:size(c,1),1:size(c,2),i_fish) = c;
-%     figure; imagesc(C(1:16,1:16,i_fish)), title(num2str(i_fish))
 end
 
 % plot full avg intertrial distance matrix
@@ -39,7 +46,7 @@ xticks(1:size(c,1)); xticklabels(labs); xtickangle(90)
 yticks(1:size(c,1)); yticklabels(labs)
 xlabel('Stimulus type')
 ylabel('Stimulus type')
-title(['Similarity: cosine ', num2str(interval(1)/fs-data.stim_on_sec), '-', ...
+title(['Similarity: correlation ', num2str(interval(1)/fs-data.stim_on_sec), '-', ...
     num2str(interval(end)/fs-data.stim_on_sec), ' s'], 'Color','w')
 caxis([quantile(c(:),.001), quantile(c(:),.999)]);
 caxis(crange)
@@ -49,6 +56,46 @@ set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w');
 set(gcf, 'color', 'none'); 
 % set(gcf, 'Position', [50 50 200 400]);
 hold off
+
+%% plot average drift
+stims = {'Trp','Ser','Leu'};
+stimtypes = data.stim_type(sortorder);
+
+C = nan(5,5,numel(todo_fish)*numel(stims));
+for i_fish = 1:numel(todo_fish)
+    % first, get the full dist matrix for this fish
+    data = experiment.series{todo_fish(i_fish)}.data;
+    fs = data.meta.framerate;
+    this_sortorder = [1:numel(data.trials)]';
+    interval = [floor((data.stim_on_sec+sec_range(1))*fs) : ...
+              1+floor((data.stim_on_sec+sec_range(2))*fs)];
+    c = distTraceData(data,this_sortorder,data.L,[],'correlation',[1:data.N]',interval,0,0);
+    c = c(sortorder,sortorder);
+
+    % now, isolate odors
+    for i_stim = 1:numel(stims)
+        idx = find(ismember(stimtypes,stims{i_stim})); % only this odor's trials
+        C(:,:,(i_fish-1)*numel(stims)+i_stim) = c(idx,idx);
+    end
+end
+
+c = mean(C,3,'omitmissing');
+figure; imagesc(c)
+axis square; hold on
+xticks(1:size(c,1)); xtickangle(90)
+yticks(1:size(c,1)); 
+xlabel('Repetition')
+ylabel('Repetition')
+clim([quantile(c(:),.001), quantile(c(:),.999)]);
+clim(crange)
+clim([0 .2])
+colormap(cmap)
+colorbar('Color','w')
+set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w');
+set(gcf, 'color', 'none'); 
+% set(gcf, 'Position', [50 50 200 400]);
+hold off
+
 
 %% plot average distance between trials of the same odor for each block
 

@@ -593,21 +593,9 @@ classdef Subject
         %     cd(original_dir)
         % end
 
-        function obj = defineTraces(obj, fname_PMToffmeta, fname_noLightmeta)
-            arguments
-                obj
-                fname_PMToffmeta char = 'PMToff_metadata.json'
-                fname_noLightmeta char = 'noLight_metadata.json'
-            end
+        function obj = defineTraces(obj)
 
             tracestmp = ActivityTraces(obj); % construct traces
-            
-            cd(obj.locations.traces_src)
-
-            % tracestmp = tracestmp.loadMovieData(obj,fname_PMToffmeta,fname_noLightmeta);
-            % 
-            % % calc more things
-            % tracestmp = tracestmp.setDerivativeProperties();
 
             % return
             cd(obj.locations.subject_datapath)

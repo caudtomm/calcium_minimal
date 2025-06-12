@@ -61,7 +61,7 @@ xlabel('PC #')
 switch method
     case 'time'
         score2 = permute(traceFormat(score,L),[1 3 2]);
-        fig3dplot(score2(:,1:3,:),{'PCA123','PC#1','PC#2','PC#3'},[],0);
+        fig3dplot(score2(:,1:3,:),{'PCA123','PC#1','PC#2','PC#3'},numel(trialn2use)./(reltrialn*2),0);
         % fig3dplot(score2(:,2:4,:),{'PCA234','PC#2','PC#3','PC#4'},[],0);
         
         figscatter(score2(:,1:2,:),{'PCA12','PC1','PC2',''},1)

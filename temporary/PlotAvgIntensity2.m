@@ -12,7 +12,7 @@ params.dimension = 'over_time'; ...% options: {'over_cells', 'over_time'}
 params.n_equals = 'all'; ... % n = ?
 params.order_by = 'trial_num'; ... % order by : options {'trial_num','relative_trial_num','stim_type'};
 params.todo_reltrialnum = [1:5]; % todo_reltrialnum
-params.isolate_quantile = 'all';
+params.isolate_quantile = 'bottom';
 params.quantile = .9;
 
 %% 'all_options' structure

@@ -1,0 +1,9 @@
+name: calcium_postp
+channels:
+  - conda-forge
+  - pkgs/main
+dependencies:
+  - ipykernel
+  - python=3.13
+
+prefix: "C:\\Users\\caudtomm\\AppData\\Local\\miniconda3\\envs\\calcium_postp"

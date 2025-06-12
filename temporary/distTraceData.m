@@ -70,7 +70,7 @@ if dozscore
     traces = zscore(traces);
 %     win_all = zscore(win_all);
 end
-traces = selectCells(traces,L,cells');
+%traces = selectCells(traces,L,cells');
 win_all = selectTimeFrame(traces(:,sortorder), interval, L);
 
 avg_actvect = regionnanmean(win_all, length(interval));
