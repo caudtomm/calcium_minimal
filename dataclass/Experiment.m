@@ -1,6 +1,7 @@
 classdef Experiment
     properties
         name string = ""
+        tracesfolder char
         record
         subjectTab table
         subject cell = {}
@@ -26,15 +27,17 @@ classdef Experiment
     end
 
     methods 
-        function obj = Experiment(tabpath,sheet)
+        function obj = Experiment(tabpath,tracesfolder,sheet)
             arguments
                 tabpath char {isfile}
+                tracesfolder char = 'traces\top1biasedIC'
                 sheet char = ''
             end
             obj.record.tabpath = tabpath;
             obj.record.sheet = sheet;
             obj.subjectTab = loadContentTab(tabpath,sheet);
             obj.name = string(sheet);
+            obj.tracesfolder = tracesfolder;
         end
 
         function obj = loadSubjects(obj,subjectnames,create,do_overwrite)
@@ -141,7 +144,7 @@ classdef Experiment
                 % look for pre-existing traces file
                 % fname = [thissubjectname,'_traceslight.mat'];
                 % FileIn = fullfiletol(thisloc.subject_datapath,fname);
-                files = dir(fullfiletol(thisloc.subject_datapath,'*_traceslight*'));
+                files = dir(fullfiletol(thisloc.subject_datapath,obj.tracesfolder,'*traceslight*'));
                 idx = arrayfun(@(x) endsWith(x.name,'.mat'),files);
                 files = files(idx);
                 if ~isempty(files)
@@ -210,12 +213,10 @@ classdef Experiment
                 validMethods = methods(p);
                 
                 if ismember(process_name, validMethods)
-                    func = str2func(['@p.', process_name]);
-
                     idx_tosubtract = str2double(obj.subjectTab.manPickedICs_conservative_{i_sub});
                     if idx_tosubtract==0; continue; end
 
-                    p = feval(func, idx_tosubtract); % add any input arguments on the right
+                    p = p.(process_name)(idx_tosubtract); % add any input arguments on the right
                 else
                     error('process unknown.')
                 end
