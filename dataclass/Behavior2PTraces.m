@@ -2,6 +2,11 @@ classdef Behavior2PTraces
     properties
         subject_ID char
         framerate double
+        fpath char
+        regions = {'LED', 'Lip', 'Tail'}
+        ledROI
+        lipROI
+        tailROI
         LED
         Breathing
         Tail
@@ -147,9 +152,12 @@ classdef Behavior2PTraces
     end
 
     methods
-        function obj = Behavior2PTraces(fpath)
+        function obj = Behavior2PTraces(fpath, ledROI,lipROI,tailROI)
             arguments
-                fpath char = fullfiletol(pwd,'tail_movies')
+                fpath char = fullfiletol(pwd,'tail_movies') 
+                ledROI = [823, 470, 119, 106]
+                lipROI = [299, 497, 19, 16]
+                tailROI = [102, 96, 339, 262]
             end
 
             if isunix
@@ -158,9 +166,18 @@ classdef Behavior2PTraces
                 obj.subject_ID = fliplr(extractBefore(fliplr(pwd),'\'));
             end
 
+            % save region coordinates
+            obj.ledROI = ledROI;
+            obj.lipROI = lipROI;
+            obj.tailROI = tailROI;
+
             % extract stated framerate from video files
+            obj.fpath = fpath;
             videos = dir(fullfiletol(fpath,'*.avi'));
             obj.framerate = VideoReader(fullfiletol(fpath,videos(1).name)).FrameRate;
+
+            % generate region crops and save to folders
+            obj.cropMovies
 
             % read traces from FiJI output CSVs
             obj.LED = obj.extractTraces(fullfiletol(fpath,'LED_vals'));
@@ -216,6 +233,33 @@ classdef Behavior2PTraces
             struct_out.t = t; % time axis
             struct_out.raw = A; % raw intensity trace (median-centered)
             struct_out.fs = fs; % framerate copy
+
+            % return to original directory
+            cd(currentDir)
+        end
+
+        function cropMovies(obj)
+            disp(obj.fpath);
+            currentDir = pwd;
+            cd(obj.fpath)
+            
+            cropnames = obj.regions;
+            cropcoords = {obj.ledROI,obj.lipROI,obj.tailROI};
+
+            % get traces
+            files = dir('*.avi');
+            for ff = 1:numel(files)
+                file = files(ff);
+                fprintf(['Cropping: ', file.name, '...'])
+
+                for i_crop = 1:numel(cropnames)
+                    fout = fullfile(cropnames{i_crop},file.name);
+                    save_avi_crop(file.name, fout, cropcoords{i_crop})
+                end
+                
+                fprintf(' DONE!\n')
+            
+            end
 
             % return to original directory
             cd(currentDir)
