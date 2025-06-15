@@ -54,7 +54,7 @@ classdef ActivityTraces
         behavior2p_scaling double
         
         % currently not implemented #### TODO in separate ActivityTraces = Process(ActivityTraces)
-        baseline_periods cell % periods of inactivity for each ROI
+        baseline_periods cell % periods of inactivity for each ROI (base this on estimated FR?)
     end
 
     methods (Static)
@@ -211,6 +211,19 @@ classdef ActivityTraces
                 noisevals = var(thisroi,[],2,'omitnan'); % [t, 1, trials]
                 Fnoise(:,i_roi,:) = noisevals;
             end
+        end
+        
+        % # TODO : include in object generation pipeline
+        % defines dFoverF trace noise level using Peter Rupprecht's method [obj.N,1]
+        function dFnoise = definedFnoise(obj)
+            % # TODO : better formatting function
+            traces = zeros(obj.L*obj.ntrials,obj.N);
+            for j = 1:size(tmp,3)
+                traces((j-1)*obj.L+[1:obj.L],:) = tmp(:,:,j);
+            end
+
+            dFnoise = median(abs(diff(traces)),'omitmissing')/sqrt(obj.framerate);
+            dFnoise = dFnoise(:);
         end
         
         % Function to extract raw traces, separately for each pixel, within
