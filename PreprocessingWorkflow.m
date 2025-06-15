@@ -83,7 +83,9 @@ clear all
 thisdrive = '\\tachyon.fmi.ch\tachyon\';
 datafolder = 'groups\scratch\gfriedri\processed-data\250129_TC_invivoCaIMG_odorexp004_005';
 
-a = Experiment(fullfiletol(thisdrive,'\groups\scratch\gfriedri\caudtomm\data_record2.xlsx'),'odorexp004_analysis');
+tracesfolder = 'traces\top1biasedIC';
+
+a = Experiment(fullfiletol(thisdrive,'\groups\scratch\gfriedri\caudtomm\data_record2.xlsx'),tracesfolder,'odorexp004_analysis');
 a.locations = a.locations.setDrive(thisdrive);
 a.locations = a.locations.setDataFolder(datafolder);
 
@@ -91,9 +93,12 @@ a.locations = a.locations.setDataFolder(datafolder);
 % load 'light' traces (without single px values)
 a = a.loadSubjectTraces;
 
+a.name = "odorexp004_IC1_130625";
+save(a.name,'a','-v7.3')
+
 %% output backward compatible experiment structure and save to file
 
-exp_name = 'expdata060625';
+exp_name = char(strcat('exp_',a.name));
 experiment = a.convert2BackwardCompatibleStruct(exp_name);
 
 % save to pwd
