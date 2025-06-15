@@ -43,6 +43,7 @@ classdef ActivityTraces
         %           medianF : median F [t,1,trial]
 
         dFoverF double
+        pSpike double
 
         % inherited, not derivative
         subject_locations Locations
@@ -58,6 +59,38 @@ classdef ActivityTraces
     end
 
     methods (Static)
+        function traces_out = format(traces, ntrials)
+            % assumes [time, cells] or [time,cells,trials]
+            % arg 'ntrials' is only relevant if the input is 2D
+            arguments
+                traces double
+                ntrials (1,1) double = 35
+            end
+
+            switch ndims(traces)
+                case 2 % [time, cells], assume trials are concatenated along time
+                    [T,N] = size(traces);
+                    if mod(T, ntrials) ~= 0
+                        error('Time dimension must be divisible by ntrials.');
+                    end
+                    T_per_trial = T / ntrials;
+                    traces_out = reshape(traces, T_per_trial, ntrials, N);
+                    traces_out = permute(traces_out, [1, 3, 2]); % [time, cells, trials]
+
+                case 3 % [time, cells, trials], flatten to [time*trials, cells]
+                    [T,N,ntrials] = size(traces);
+                    traces_out = zeros(T*ntrials,N);
+                    for i=1:ntrials
+                        idx = (i-1)*T + [1:T];
+                        traces_out(idx,:) = traces(:,:,i);
+                    end
+
+                otherwise
+                    error('Too many input dimensions.')
+            end
+        end
+
+
         function traces = filter(traces,fs)
             arguments
                 traces double % filter works along dim 1
