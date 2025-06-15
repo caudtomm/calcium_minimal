@@ -209,7 +209,7 @@ classdef Movie
                             outfname = ['tr_',num2str(getFileNameSpecs(outfname).trial_num)];
                         else
                             outfname = 'filepath_too_long';
-                            % TODO: This should call a little function to 
+                            % # TODO: This should call a little function to 
                             % pick a unique filename.
                             % Also, this whole if-block should be extruded
                             % from the switch block and applied in common

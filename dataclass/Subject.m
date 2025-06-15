@@ -627,7 +627,7 @@ classdef Subject
             disp(FileIn); data = robust_io('load',FileIn).data;
             
             % initialize vars
-            % TODO: for each field, sanity-check if value is the same as in
+            % # TODO: for each field, sanity-check if value is the same as in
             % the corresponding Subject attribute
             disp(' ');
             data.L = size(plane{1}.timetraces,1); 
