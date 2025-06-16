@@ -4,14 +4,18 @@ classdef PlotConfig
         subjectIDs cell = {}         % explicit subject ID list (optional)
         subjectGroup char = ''       % e.g., a tag or label to select by group
 
-        traceType cell = {}          % trace type to select (e.g., 'dFoverF' or 'pSpike')
-                                    % - match name of ActivityTraces property
+        traceType char = 'dFoverF'   % trace type to select (e.g., 'dFoverF' or 'pSpike')
+                                     % - match name of ActivityTraces property
 
         % Visual appearance
-        theme char = 'light'         % plotting theme ('light', 'dark', etc.)
-        colormapName char = 'parula' % MATLAB colormap name
+        theme char = 'dark'          % plotting theme ('light', 'dark', etc.)
+        colormapName char = 'jet'    % MATLAB colormap name
         showGrid logical = true      % display grid in internal plots
         lineWidth double = 1.5       % default line width
+        c double = lines(10)         % default plot colors
+        axcol double = [0 0 0]       % default axis color
+        bgcol double = [1 1 1]       % default figure background color
+        textcol double = [0 0 0]     % default text color
 
         % Optional: arbitrary metadata for caller use
         custom struct = struct()
@@ -59,16 +63,7 @@ classdef PlotConfig
             end
         end
 
-        function types = getTraceTypes(obj, traces)
-            % Return trace types based on filter or available fields
-            if ~isempty(obj.traceTypes)
-                types = obj.traceTypes;
-            else
-                types = fieldnames(traces);
-            end
-        end
-
-        function c = getAxisColor(obj)
+        function c = get.axcol(obj)
             switch obj.theme
                 case 'dark'
                     c = [1 1 1];  % white
@@ -79,7 +74,7 @@ classdef PlotConfig
             end
         end
         
-        function c = getBackgroundColor(obj)
+        function c = get.bgcol(obj)
             switch obj.theme
                 case 'dark'
                     c = [0.1 0.1 0.1];  % dark gray
@@ -90,7 +85,7 @@ classdef PlotConfig
             end
         end
         
-        function c = getTextColor(obj)
+        function c = get.textcol(obj)
             switch obj.theme
                 case 'dark'
                     c = [1 1 1];  % white
@@ -101,7 +96,7 @@ classdef PlotConfig
             end
         end
         
-        function colors = getColorCycle(obj)
+        function colors = get.c(obj)
             % Returns 10 well-visible line/scatter colors adapted to theme
         
             switch obj.theme

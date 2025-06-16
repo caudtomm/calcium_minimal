@@ -11,7 +11,7 @@ classdef ExperimentViewer
     methods
         function obj = ExperimentViewer(experiment)
             arguments
-                experiment struct
+                experiment Experiment
             end
             obj.name = experiment.name;
             obj.subjectTab = experiment.subjectTab;
@@ -87,7 +87,7 @@ classdef ExperimentViewer
                         'axis', obj.plotConfig.getAxisColor(), ...
                         'text', obj.plotConfig.getTextColor(), ...
                         'background', obj.plotConfig.getBackgroundColor(), ...
-                        'line', obj.plotConfig.getColorCycle()(1,:) ...
+                        'line', obj.plotConfig.getColorCycle(1) ...
                     );
     
                 otherwise
