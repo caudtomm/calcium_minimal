@@ -99,7 +99,7 @@ classdef TraceViewer
             obj.idx = ismember(allrois,rois_touse);
         end
 
-        function h = plotAvgCurve(obj, t, M)
+        function [h, M, curves] = plotAvgCurve(obj, t, M)
             arguments
                 obj 
                 t double
@@ -113,6 +113,9 @@ classdef TraceViewer
             shade = std(M,[],2,'omitmissing');
             curve1 = avgCurve + shade;
             curve2 = avgCurve - shade;
+
+            % return
+            curves = [avgCurve,curve1,curve2];
 
             % plotting
             h = figure; hold on
@@ -159,13 +162,13 @@ classdef TraceViewer
             ylabel('neuron #')
         end
 
-        function [h, events] = plotPSTH(obj, tracename, trials, event_frames, ps_lim)
+        function [h, events] = plotPSTH(obj, tracename, trials, ps_lim, event_frames)
             arguments
                 obj 
                 tracename char = 'dFoverF'
                 trials double = [1:obj.traces.ntrials]
-                event_frames double = [obj.traces.stim_series.trialnum, obj.traces.stim_series.frame_onset]
                 ps_lim double = [-4, 30] % from event frame [s]
+                event_frames double = [obj.traces.stim_series.trialnum, obj.traces.stim_series.frame_onset]
             end
 
             M = obj.initializeTraces(tracename); % [t, roi, trial]
@@ -194,7 +197,7 @@ classdef TraceViewer
             end
 
             % plot
-            h = obj.plotAvgCurve(t, events);
+            [h, data] = obj.plotAvgCurve(t, events);
             xlabel('time from stimulus onset [s]')
             ylabel(tracename)
             axis tight
@@ -258,7 +261,7 @@ classdef TraceViewer
         end
 
         function h = plotAvgResponse(obj)
-            % to do
+            % # TODO: implement refactor of Plot
         end
 
     end
