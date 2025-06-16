@@ -30,6 +30,8 @@ classdef ActivityTraces
         techNoise double = 0 % single-valued technical noise (variance of PMToff)
         techBaseMap double = [] % temporal avg of technical baseline (expected uniform)
         techNoiseMap double = [] % temporal avg of technical noise (expected uniform)
+
+        dFnoise double % calculated on demand, using Peter Rupprecht's method [obj.N,1]
         
         Fnoise double % fluorescence noise for each ROI [t, roi, trial]
         F0 double % F0 for each ROI, per trial [roi, trial]
@@ -246,17 +248,14 @@ classdef ActivityTraces
             end
         end
         
-        % # TODO : include in object generation pipeline
         % defines dFoverF trace noise level using Peter Rupprecht's method [obj.N,1]
-        function dFnoise = definedFnoise(obj)
-            % # TODO : better formatting function
-            traces = zeros(obj.L*obj.ntrials,obj.N);
-            for j = 1:size(tmp,3)
-                traces((j-1)*obj.L+[1:obj.L],:) = tmp(:,:,j);
-            end
+        function dFnoise = get.dFnoise(obj)
+            traces_in = obj.dFoverF; % [t, roi, trials]
+
+            traces = obj.format(traces_in, obj.ntrials);
 
             dFnoise = median(abs(diff(traces)),'omitmissing')/sqrt(obj.framerate);
-            dFnoise = dFnoise(:);
+            dFnoise = dFnoise(:) * 100;
         end
         
         % Function to extract raw traces, separately for each pixel, within
