@@ -70,12 +70,17 @@ p = p.selectROIs; % manual input required
 p.sj = p.sj.setManually; % manual input required
 p.sj.save2mat(p.autosave);
 
-p = p.extractCalciumTraces(true);
+tracesfolder = 'manIC_conservative';
+p = p.extractCalciumTraces(true, tracesfolder);
 
 p = p.TracesQC; % manual input required
 p.sj.save2mat(p.autosave);
 
-p.sj.traces.save('','light',p.autosave);
+% save traces after QC
+mode = 'light';
+fname = [p.sj.locations.subject_ID,'_traces',mode,'.mat'];
+FileOut = fullfiletol(tracesfolder,fname);
+p.sj.traces.save(FileOut,mode,p.autosave);
 
 %% construct Experiment
 clear all

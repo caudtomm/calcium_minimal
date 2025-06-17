@@ -45,6 +45,7 @@ classdef ActivityTraces
         %           medianF : median F [t,1,trial]
 
         dFoverF double
+        dFoverF_good double
         pSpike double
 
         % inherited, not derivative
@@ -256,6 +257,10 @@ classdef ActivityTraces
 
             dFnoise = median(abs(diff(traces)),'omitmissing')/sqrt(obj.framerate);
             dFnoise = dFnoise(:) * 100;
+        end
+
+        function dFoverF_good = get.dFoverF_good(obj)
+            dFoverF_good = obj.dFoverF(:,obj.goodNeuron_IDs,:);
         end
         
         % Function to extract raw traces, separately for each pixel, within

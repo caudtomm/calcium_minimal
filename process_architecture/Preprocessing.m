@@ -641,9 +641,10 @@ classdef Preprocessing
             obj.sj.save2mat(obj.autosave)
         end
 
-        function obj = extractCalciumTraces(obj, do_save)    
+        function obj = extractCalciumTraces(obj, outfolder, do_save)    
             arguments
                 obj 
+                outfolder char = pwd
                 do_save logical = true
             end
             loc = obj.sj.locations;
@@ -691,8 +692,16 @@ classdef Preprocessing
             cd(fullfiletol(obj.sj.locations.subject_datapath))
 
             if do_save
-                obj.sj.traces.save('','full',obj.autosave);
-                obj.sj.traces.save('','light',obj.autosave);
+                mode = 'full';
+                fname = [obj.sj.locations.subject_ID,'_traces',mode,'.mat'];
+                FileOut = fullfiletol(outfolder,fname);
+                obj.sj.traces.save(FileOut,mode,obj.autosave);
+
+                mode = 'light';
+                fname = [obj.sj.locations.subject_ID,'_traces',mode,'.mat'];
+                FileOut = fullfiletol(outfolder,fname);
+                obj.sj.traces.save(FileOut,mode,obj.autosave);
+
                 obj.sj.traces.Fpx = {}; 
             end                                 
             
