@@ -71,7 +71,7 @@ p.sj = p.sj.setManually; % manual input required
 p.sj.save2mat(p.autosave);
 
 tracesfolder = 'manIC_conservative';
-p = p.extractCalciumTraces(true, tracesfolder);
+p = p.extractCalciumTraces(tracesfolder,true);
 
 p = p.TracesQC; % manual input required
 p.sj.save2mat(p.autosave);
