@@ -24,39 +24,31 @@ classdef ExperimentViewer
             % Extract and standardize data for selected subjects and traces
 
             ids = obj.plotConfig.getSubjectIDs(obj.subjectTab);
-            traceTypes = obj.plotConfig.getTraceTypes(obj.traces);
+            traceType = obj.plotConfig.traceType;
 
             out = struct( ...
                 'subjectIDs', {ids}, ...
-                'traceTypes', {traceTypes}, ...
+                'traceType', traceType, ...
                 'traces', [], ...
                 'locations', [], ...
                 'meta', struct() ...
             );
 
             numSubjects = numel(ids);
-            numTraces = numel(traceTypes);
-            out.traces = cell(numTraces, numSubjects);
-            out.locations = zeros(numSubjects, size(obj.locations, 2));
+            out.traces = cell(numSubjects,1);
+            out.locations = cell(numSubjects,1);
 
             for i = 1:numSubjects
                 sid = ids{i};
-                idx = find(strcmp({obj.subjectTab.id}, sid), 1);
+                idx = find(ismember(obj.subjectTab.name, sid), 1);
 
                 if isempty(idx)
                     warning('Subject ID "%s" not found in subjectTab.', sid);
                     continue
                 end
 
-                out.locations(i, :) = obj.locations(idx, :);
-                for j = 1:numTraces
-                    tName = traceTypes{j};
-                    if isfield(obj.traces, tName)
-                        out.traces{j, i} = obj.traces.(tName)(:, idx);
-                    else
-                        warning('Trace type "%s" not found in traces.', tName);
-                    end
-                end
+                out.locations{i} = obj.traces{idx}.subject_locations;
+                out.traces{i} = obj.traces{idx}.(traceType);
             end
 
             out.meta.theme = obj.plotConfig.theme;
@@ -89,6 +81,22 @@ classdef ExperimentViewer
                         'background', obj.plotConfig.getBackgroundColor(), ...
                         'line', obj.plotConfig.getColorCycle(1) ...
                     );
+
+                case 'plotDistances'
+                    % expected input:
+                    % .traces - cell array [nsubjects 1] of double [t, cells, trials] (sorted!)
+                    % .fs - framerate in seconds (assumes the same for all)
+                    % .sec_range - double [absolute absolute] (assumes the same for all)
+                    % .labs - cell array [nsubjects 1] of double indices [ntrials 1] with
+                    %       stimulus names (sorted!)
+
+                    % # TODO : sorting
+
+                    formatted.traces = raw.traces;
+                    formatted.fs = obj.traces{1}.framerate;
+                    formatted.sec_range = [30 50];
+                    formatted.labs = obj.traces{1}.stim_series.stimulus;
+                    
     
                 otherwise
                     formatted = raw;

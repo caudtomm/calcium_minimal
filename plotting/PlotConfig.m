@@ -3,9 +3,10 @@ classdef PlotConfig
         % Selection filters
         subjectIDs cell = {}         % explicit subject ID list (optional)
         subjectGroup char = ''       % e.g., a tag or label to select by group
+        cells_idx double = []        % idx of cells to use
 
-        traceType char = 'dFoverF'   % trace type to select (e.g., 'dFoverF' or 'pSpike')
-                                     % - match name of ActivityTraces property
+        traceType char = 'dFoverF_good'     % trace type to select (e.g., 'dFoverF_good' or 'pSpike')
+                                            % - match name of ActivityTraces property
 
         % Visual appearance
         theme char = 'dark'          % plotting theme ('light', 'dark', etc.)
@@ -14,7 +15,7 @@ classdef PlotConfig
         lineWidth double = 1.5       % default line width
         c double = lines(10)         % default plot colors
         axcol double = [0 0 0]       % default axis color
-        bgcol double = [1 1 1]       % default figure background color
+        bgcol = [1 1 1]              % default figure background color
         textcol double = [0 0 0]     % default text color
 
         % Optional: arbitrary metadata for caller use
@@ -59,7 +60,7 @@ classdef PlotConfig
                 match = strcmp({subjectTab.group}, obj.subjectGroup);
                 ids = allIDs(match);
             else
-                ids = {subjectTab.id};
+                ids = subjectTab.name;
             end
         end
 
@@ -77,7 +78,7 @@ classdef PlotConfig
         function c = get.bgcol(obj)
             switch obj.theme
                 case 'dark'
-                    c = [0.1 0.1 0.1];  % dark gray
+                    c = 'none';  % dark gray
                 case 'light'
                     c = [1 1 1];        % white
                 otherwise
