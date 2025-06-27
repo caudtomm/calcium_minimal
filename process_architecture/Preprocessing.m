@@ -693,12 +693,12 @@ classdef Preprocessing
 
             if do_save
                 mode = 'full';
-                fname = [obj.sj.locations.subject_ID,'_traces',mode,'.mat'];
+                fname = ['traces',mode,'.mat'];
                 FileOut = fullfiletol(outfolder,fname);
                 obj.sj.traces.save(FileOut,mode,obj.autosave);
 
                 mode = 'light';
-                fname = [obj.sj.locations.subject_ID,'_traces',mode,'.mat'];
+                fname = ['traces',mode,'.mat'];
                 FileOut = fullfiletol(outfolder,fname);
                 obj.sj.traces.save(FileOut,mode,obj.autosave);
 

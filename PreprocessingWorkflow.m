@@ -70,7 +70,7 @@ p = p.selectROIs; % manual input required
 p.sj = p.sj.setManually; % manual input required
 p.sj.save2mat(p.autosave);
 
-tracesfolder = 'manIC_conservative';
+tracesfolder = 'traces\manIC_conservative';
 p = p.extractCalciumTraces(tracesfolder,true);
 
 p = p.TracesQC; % manual input required
@@ -78,7 +78,7 @@ p.sj.save2mat(p.autosave);
 
 % save traces after QC
 mode = 'light';
-fname = [p.sj.locations.subject_ID,'_traces',mode,'.mat'];
+fname = ['traces',mode,'.mat'];
 FileOut = fullfiletol(tracesfolder,fname);
 p.sj.traces.save(FileOut,mode,p.autosave);
 
@@ -103,7 +103,7 @@ save(a.name,'a','-v7.3')
 
 %% output backward compatible experiment structure and save to file
 
-exp_name = char(strcat('exp_',a.name));
+exp_name = char(strcat('exp_',a.name,'_iSR'));
 experiment = a.convert2BackwardCompatibleStruct(exp_name);
 
 % save to pwd

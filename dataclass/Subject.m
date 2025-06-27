@@ -418,7 +418,7 @@ classdef Subject
             end
 
             % open each file and extract anatomy image
-            for i_file = 1:ntrials
+            parfor i_file = 1:ntrials
                 disp(filenames{i_file})
                 
                 % assumes that filenames refer to physiological Movie's

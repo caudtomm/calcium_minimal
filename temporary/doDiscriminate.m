@@ -298,6 +298,11 @@ totFractionCorrectLabNovelStims = squeeze(nanmean(correctTest.*mask_novel,2));
 totFractionCorrectLabFamiliarStims = squeeze(nanmean(correctTest.*mask_familiar,2));
 
 totFractionCorrectLab = totFractionCorrectLabAllStims;
+offset = totFractionCorrectLab(:,1);
+totFractionCorrectLab = totFractionCorrectLab-offset;
+maxval = mean(totFractionCorrectLab(:,3:5),2);
+totFractionCorrectLab = totFractionCorrectLab./maxval;
+
 
 %%
 lip = .4;
@@ -319,11 +324,11 @@ for i_set = 1:nsets
         'Color',csh,'LineWidth',5,'DisplayName','shuffle')
 end
 
-
-% jit = .1*randn(size(totFractionCorrectLab));
-% x = repmat(1:nsets,[size(totFractionCorrectLab,1),1]) + jit;
-% scatter(x, totFractionCorrectLab,30,'w','filled')
-% plot(x',totFractionCorrectLab','w','DisplayName','data')
+y = totFractionCorrectLab;
+jit = .1*randn(size(y));
+x = repmat(1:nsets,[size(y,1),1]) + jit;
+scatter(x, y,30,'w','filled')
+plot(x',y','w','DisplayName','data')
 
 
 
