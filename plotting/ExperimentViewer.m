@@ -5,6 +5,9 @@ classdef ExperimentViewer
         locations
         traces
 
+        subjects_to_use logical
+
+        dataFilter DataFilter
         plotConfig PlotConfig
     end
 
@@ -16,42 +19,33 @@ classdef ExperimentViewer
             obj.name = experiment.name;
             obj.subjectTab = experiment.subjectTab;
             obj.locations = experiment.locations;
-            obj.traces = experiment.traces;
+            obj.traces = experiment.traces(:);
+            obj.dataFilter = DataFilter();
             obj.plotConfig = PlotConfig();
         end
+
+        %% getters
+
+        function idx = get.subjects_to_use(obj)
+            subjectIDs = obj.dataFilter.getSubjectIDs(obj.subjectTab);
+            idx = ismember(obj.subjectTab.name,subjectIDs);
+        end
+
+        %% functional methods
 
         function out = prepareForPlot(obj)
             % Extract and standardize data for selected subjects and traces
 
-            ids = obj.plotConfig.getSubjectIDs(obj.subjectTab);
-            traceType = obj.plotConfig.traceType;
+            ids = obj.subjectTab.name(obj.subjects_to_use);
+            traceType = obj.dataFilter.traceType;
+
+            idx = obj.subjects_to_use;
 
             out = struct( ...
-                'subjectIDs', {ids}, ...
+                'subjectIDs', ids, ...
                 'traceType', traceType, ...
-                'traces', [], ...
-                'locations', [], ...
-                'meta', struct() ...
+                'traces', cellfun(@(x) x.(traceType),obj.traces(idx),'UniformOutput',false) ...
             );
-
-            numSubjects = numel(ids);
-            out.traces = cell(numSubjects,1);
-            out.locations = cell(numSubjects,1);
-
-            for i = 1:numSubjects
-                sid = ids{i};
-                idx = find(ismember(obj.subjectTab.name, sid), 1);
-
-                if isempty(idx)
-                    warning('Subject ID "%s" not found in subjectTab.', sid);
-                    continue
-                end
-
-                out.locations{i} = obj.traces{idx}.subject_locations;
-                out.traces{i} = obj.traces{idx}.(traceType);
-            end
-
-            out.meta.theme = obj.plotConfig.theme;
         end
 
         function plotSummary(obj, plotFunc)
@@ -93,6 +87,8 @@ classdef ExperimentViewer
                     % # TODO : sorting
 
                     formatted.traces = raw.traces;
+
+                    % # TODO : individual assignment
                     formatted.fs = obj.traces{1}.framerate;
                     formatted.sec_range = [30 50];
                     formatted.labs = obj.traces{1}.stim_series.stimulus;

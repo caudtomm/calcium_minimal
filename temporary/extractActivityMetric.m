@@ -128,6 +128,7 @@ function todo_fish = select_fish(experiment, desired_groups)
     end
 end
 
+% # TODO : remove from here. this should only be in PlotConfig
 % Function to extract group-specific identities of stimuli based on
 % training status
 function desired_stimuli = select_trained_stimuli(group,tag)

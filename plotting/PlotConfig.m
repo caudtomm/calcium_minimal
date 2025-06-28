@@ -1,14 +1,6 @@
 classdef PlotConfig
+% Sets parameters for the visual appearance of plots
     properties
-        % Selection filters
-        subjectIDs cell = {}         % explicit subject ID list (optional)
-        subjectGroup char = ''       % e.g., a tag or label to select by group
-        cells_idx double = []        % idx of cells to use
-
-        traceType char = 'dFoverF_good'     % trace type to select (e.g., 'dFoverF_good' or 'pSpike')
-                                            % - match name of ActivityTraces property
-
-        % Visual appearance
         theme char = 'dark'          % plotting theme ('light', 'dark', etc.)
         colormapName char = 'jet'    % MATLAB colormap name
         showGrid logical = true      % display grid in internal plots
@@ -23,9 +15,7 @@ classdef PlotConfig
     end
 
     methods
-        function obj = PlotConfig(varargin)
-            % Optional constructor with name-value pairs or a struct input
-        
+        function obj = PlotConfig(varargin)        
             if nargin == 1 && isstruct(varargin{1})
                 % Initialize from struct
                 s = varargin{1};
@@ -51,19 +41,7 @@ classdef PlotConfig
             end
         end
 
-        function ids = getSubjectIDs(obj, subjectTab)
-            % Return list of subject IDs based on filter criteria
-            if ~isempty(obj.subjectIDs)
-                ids = obj.subjectIDs;
-            elseif ~isempty(obj.subjectGroup) && isfield(subjectTab, 'group')
-                allIDs = {subjectTab.id};
-                match = strcmp({subjectTab.group}, obj.subjectGroup);
-                ids = allIDs(match);
-            else
-                ids = subjectTab.name;
-            end
-        end
-
+        %% getters
         function c = get.axcol(obj)
             switch obj.theme
                 case 'dark'
@@ -131,18 +109,5 @@ classdef PlotConfig
             end
         end
 
-        function s = export(obj)
-            % Optional: dump config as a struct
-            s = struct( ...
-                'subjectIDs', obj.subjectIDs, ...
-                'subjectGroup', obj.subjectGroup, ...
-                'traceTypes', obj.traceTypes, ...
-                'theme', obj.theme, ...
-                'colormapName', obj.colormapName, ...
-                'showGrid', obj.showGrid, ...
-                'lineWidth', obj.lineWidth, ...
-                'custom', obj.custom ...
-            );
-        end
     end
 end
