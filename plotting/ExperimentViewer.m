@@ -43,8 +43,17 @@ classdef ExperimentViewer
             % end
         end
 
-        %% plotting function headers (normally call external functions that don't rely on custom objects)
-        function [hf, out] = plotDistances(obj, varargin)
+        %% setters
+
+        function obj = setTheme(obj, themeName)
+            obj.plotConfig.theme = themeName;
+        end
+        
+        %% intermediate-level plotting function headers 
+        % (normally call external low level functions that don't rely on custom objects)
+        % still output a single plot onto provided axes
+
+        function out = plotDistances(obj, varargin)
             % plotDistances - Plot similarity/distance metrics for peri-stimulus traces across subjects.
             %
             % Usage:
@@ -52,14 +61,18 @@ classdef ExperimentViewer
             %
             % Inputs (as name-value pairs):
             %   'ps_lim'        - 2-element vector specifying peri-stimulus window in seconds [default: [1 20]]
+            %   'plotType'      - String selecting which plot to produce
+            %                     opitons: {'full','repetitions'}
             %   'method'        - String specifying similarity/distance metric (e.g., 'correlation') [default: 'correlation']
+            %                     options: see pdist
             %   'trial_sorting' - String specifying trial sorting method (e.g., 'chronological') [default: 'chronological']
+            %                     options: {'chronological','random','stim_id'}
             %   'stim_allowed'  - Cell array of strings containing labels of all stimuli to consider. (eg. {'Arg', 'Leu'})
             %                     or stimulus group name [default: 'all trials']
+            %                     options: {'all trials','all stimuli','all CS+','all CS-','all familiar','all novel'}
             %
             % Outputs:
-            %   hf   - Handle to the generated figure
-            %   out  - Output structure from plotDistances function
+            %   out  - Output structure
             arguments
                 obj
             end
@@ -69,6 +82,7 @@ classdef ExperimentViewer
 
             % Set default values
             ps_lim = [1 20];
+            plotType = 'full';
             method = 'correlation';
             trial_sorting = 'chronological';
             stim_allowed = 'all trials';
@@ -79,6 +93,8 @@ classdef ExperimentViewer
                     switch lower(varargin{k})
                         case 'ps_lim'
                             ps_lim = varargin{k+1};
+                        case 'plottype'
+                            plotType = varargin{k+1};
                         case 'method'
                             method = varargin{k+1};
                         case 'trial_sorting'
@@ -89,8 +105,8 @@ classdef ExperimentViewer
                 end
             end
 
-            % Initialize figure handles
-            hf = gobjects(1,1);
+            % initialize output
+            out = [];
 
             % Isolating relevant data
             nsubjects = numel(obj.filtered_traces);
@@ -119,6 +135,10 @@ classdef ExperimentViewer
                     % If some trials are not in the desired stimuli, filter them out
                     events{i} = events{i}(:,:,idx);
                     all_labs{i} = all_labs{i}(idx);
+                elseif isempty(desired_stimuli) || sum(idx)==0
+                    % If no stimuli are accepted, return without trying to
+                    % plot ... nothing!
+                    return
                 end
             end
 
@@ -138,8 +158,8 @@ classdef ExperimentViewer
                 labs = mockLabels;
             end
 
-            % run plotting function
-            [hf,out] = plotUtils.plotDistances(events,method,labs,obj.plotConfig);
+            % call low-level plotter
+            out.distMat3d = plotUtils.plotDistances(events,plotType,method,labs,obj.plotConfig);
             title([num2str(ps_lim(1)),'-',num2str(ps_lim(2)), ' s'], ...
                 'Color',obj.plotConfig.textcol)
 
@@ -148,8 +168,69 @@ classdef ExperimentViewer
 
         end
 
-        function obj = setTheme(obj, themeName)
-            obj.plotConfig.theme = themeName;
+
+        %% complex and idiosyncratic high-level plotters
+
+        function [hf, out] = plotRepetitionDistances(obj, ps_lim, method)  
+            arguments
+                obj
+                ps_lim = [1 20]
+                method = 'correlation'
+            end
+            
+            % Knobs
+            groups = {'naïve', 'trained', 'uncoupled'};
+            odor_sets = {'all stimuli', ...
+                         {'Arg','Ala','His','Trp','Ser'}, ...
+                         {'Leu'}, ...
+                         'all CS+', ...
+                         'all CS-', ...
+                         'all familiar', ...
+                         'all novel', ...
+                        };
+
+            % useful metrics
+            ngroups = numel(groups);
+            nodor_sets = numel(odor_sets);
+
+            % Initialize output
+            hf = gobjects(1,1);
+            out = cell(ngroups*nodor_sets);
+
+            % define figure size
+            ncols = nodor_sets;
+            nrows = ngroups;
+
+            % produce plots
+            hf = figure; % [groups, odor_sets]
+            n = 1;
+            for i_g = 1:ngroups
+                % filter data by group
+                thisgroup = groups{i_g};
+                obj.dataFilter.subjectGroup = thisgroup;
+
+                for i_o = 1:nodor_sets
+                    thisodorset = odor_sets{i_o};
+                    msg = ['Plotting group ''',thisgroup,''' for odors: ',strjoin(thisodorset, ', ')];
+                    disp(msg)
+
+                    subplot(nrows,ncols,n);
+
+                    % call intermediate-level plotter
+                    out{n} = obj.plotDistances('ps_lim',ps_lim, ...
+                                    'plotType', 'repetitions', ...
+                                    'method',method, ...
+                                    'stim_allowed',thisodorset);
+
+                    % override title and ylabel
+                    title(strcat(thisodorset))
+                    ylabel(thisgroup)
+
+                    % advance axis counter
+                    n = n+1;
+                end
+            end
+            
         end
     end
 end
