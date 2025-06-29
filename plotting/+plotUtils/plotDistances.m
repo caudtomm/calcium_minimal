@@ -26,8 +26,6 @@ out.distanceMAT3D=[];
 
 
 
-
-
 function [hf, distanceMAT3D] = plotFullMat(pl)
     distanceMAT3D = nan(ntrials,ntrials,nsubjects);
 

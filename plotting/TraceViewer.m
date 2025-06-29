@@ -154,7 +154,24 @@ classdef TraceViewer
                 idx = randperm(ntrials);
                 case 'stim_id'
                 stim_ids = obj.traces.stim_series.stimulus;
-                [~, idx] = sort(stim_ids);
+                
+                % Predefined order of stimulus IDs
+                predefined_order = {'Arg', 'Ala', 'His', 'Trp', 'Ser', 'Leu'}; % following the block structure of odorexp004
+
+                % Find indices for each stim in predefined order
+                [is_in_predef, predef_locs] = ismember(stim_ids, predefined_order);
+                % Assign a sorting key: lower numbers for predefined, higher for others
+                sort_key = zeros(size(stim_ids));
+                % For those in predefined order, assign their order index
+                sort_key(is_in_predef) = predef_locs(is_in_predef);
+                % For those not in predefined, assign a large offset plus their alphabetical order
+                not_in_predef = ~is_in_predef;
+                unique_extra = unique(stim_ids(not_in_predef));
+                [~, extra_order] = sort(unique_extra);
+                [~, extra_idx] = ismember(stim_ids(not_in_predef), unique_extra);
+                sort_key(not_in_predef) = numel(predefined_order) + extra_idx;
+
+                [~, idx] = sort(sort_key);
                 otherwise
                 error('Unknown trial_sorting option: %s', trial_sorting);
             end

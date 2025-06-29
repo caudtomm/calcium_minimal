@@ -106,7 +106,7 @@ classdef ExperimentViewer
             end
 
             % run plotting function
-            labs = thistrace.stim_series.stimulus(trial_idx); % based on the last subject
+            labs = thistrace.stim_series.stimulus(trial_idx); % labels are based on the last subject
             [hf,out] = plotUtils.plotDistances(events,method,labs,obj.plotConfig);
             title(['Similarity: ',method, num2str(ps_lim(1)),'-',num2str(ps_lim(2)), ' s'], ...
                 'Color',obj.plotConfig.textcol)

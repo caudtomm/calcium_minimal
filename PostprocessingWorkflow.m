@@ -33,7 +33,7 @@ figs.append(hf);
 close(hf)
 
 % plot for uncoupled fish
-v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.subjectGroup = 'uncoupled';
 hf = v.plotDistances('ps_lim',[1,20],'trial_sorting','stim_id');
 figs.title = 'Trained Groups';
 figs.append(hf);
