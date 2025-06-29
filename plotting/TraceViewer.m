@@ -104,7 +104,7 @@ classdef TraceViewer
         function v = initializeTraces(obj, tracename)
             arguments
                 obj
-                tracename = 'dFoverF_good'
+                tracename = 'dFoverF'
             end
             
             % define which traces to use
@@ -118,7 +118,7 @@ classdef TraceViewer
         function obj = TraceViewer(traces, rois_touse)
             arguments
                 traces ActivityTraces
-                rois_touse double = 1:traces.N
+                rois_touse double = traces.goodNeuron_IDs
             end
             obj.traces = traces;
 
@@ -126,6 +126,41 @@ classdef TraceViewer
             % convert input roi names to use into boolean indices
             allrois = unique(traces.ROImap); allrois = allrois(allrois ~= 0);
             obj.idx = ismember(allrois,rois_touse);
+        end
+
+        function [M, idx] = sortTrials(obj, trial_sorting, tracename)
+            % sorts trials in M according to the specified method
+            % trial_sorting : 'chronological', 'random', 'stim_id', or custom (double)
+            arguments
+            obj
+            trial_sorting = 'chronological'
+            tracename char = 'dFoverF'
+            end
+
+            M = obj.initializeTraces(tracename); % [t, roi, trial]
+            ntrials = obj.traces.ntrials;
+
+            if isnumeric(trial_sorting)
+            idx = trial_sorting;
+            % Validate custom sorting
+            if ~isvector(idx) || numel(idx) ~= ntrials || any(idx < 1) || any(idx > ntrials) || numel(unique(idx)) ~= ntrials
+                error('Custom trial_sorting must be a permutation of 1:ntrials');
+            end
+            else
+            switch lower(trial_sorting)
+                case 'chronological'
+                idx = 1:ntrials;
+                case 'random'
+                idx = randperm(ntrials);
+                case 'stim_id'
+                stim_ids = obj.traces.stim_series.stimulus;
+                [~, idx] = sort(stim_ids);
+                otherwise
+                error('Unknown trial_sorting option: %s', trial_sorting);
+            end
+            end
+
+            M = M(:, :, idx);
         end
 
         function [h, M, curves] = plotAvgCurve(obj, t, M)
@@ -160,7 +195,7 @@ classdef TraceViewer
             % traces : [t, roi, trials]
             arguments
                 obj
-                tracename char = 'dFoverF_good'
+                tracename char = 'dFoverF'
             end
             
             v = obj.initializeTraces(tracename); % [t, roi, trial]
@@ -177,7 +212,7 @@ classdef TraceViewer
             % traces : [t, roi, trials]
             arguments
                 obj
-                tracename char = 'dFoverF_good'
+                tracename char = 'dFoverF'
                 trials double = [1:obj.traces.ntrials]
             end
             
@@ -194,7 +229,7 @@ classdef TraceViewer
         function [h, events, plot_data] = plotPSTH(obj, tracename, ps_lim, event_frames, do_compare_trials, event_order)
             arguments
                 obj 
-                tracename char = 'dFoverF_good'
+                tracename char = 'dFoverF'
                 ps_lim double = [-4, 30] % from event frame [s]
                 event_frames double = [obj.traces.stim_series.frame_onset(1)]
                 do_compare_trials logical = true

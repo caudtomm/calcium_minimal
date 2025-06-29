@@ -90,7 +90,7 @@ classdef DataFilter
                     otherwise   % must be one of the single group names:
                         % can be assumed because we checked for validity
                         % earlier.
-                        g_list = s;
+                        g_list = {s};
                 end
             end
         end

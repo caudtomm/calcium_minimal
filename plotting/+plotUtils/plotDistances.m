@@ -6,19 +6,11 @@ arguments
     cfg = PlotConfig()
 end
 
-
-% Input data parsing
-% expected input:
-% .traces - cell array [nsubjects 1] of double [t, cells, trials] (sorted!)
-% .fs - framerate in seconds (assumes the same for all)
-% .sec_range - double [absolute absolute] (assumes the same for all)
-% .labs - cell array [nsubjects 1] of double indices [ntrials 1] with
-%       stimulus names (sorted!)
-
+% Knobs
 crange = [.2 1];
 
 
-% initialize useful metrics
+% Initialize useful metrics
 nsubjects = numel(traces);
 ntrials = numel(labs);
 
@@ -48,7 +40,7 @@ function [hf, distanceMAT3D] = plotFullMat(pl)
     % (optional) plot full avg intertrial distance matrix
     if ~pl; return; end
     distanceMAT2D = mean(distanceMAT3D,3,'omitmissing');
-    hf = figure; imagesc(1-distanceMAT2D)
+    hf = figure('Color',cfg.bgcol); imagesc(1-distanceMAT2D)
     axis square; hold on
     xticks(1:ntrials); xticklabels(labs); xtickangle(90)
     yticks(1:ntrials); yticklabels(labs)

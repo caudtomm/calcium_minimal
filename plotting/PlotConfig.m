@@ -59,7 +59,7 @@ classdef PlotConfig
         function c = get.bgcol(obj)
             switch obj.theme
                 case 'dark'
-                    c = 'none';  % dark gray
+                    c = [0 0 0];  % dark gray
                 case 'light'
                     c = [1 1 1];        % white
                 otherwise

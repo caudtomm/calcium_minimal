@@ -44,13 +44,47 @@ classdef ExperimentViewer
         end
 
         %% plotting function headers (normally call external functions that don't rely on custom objects)
-        function [hf, out] = plotDistances(obj, ps_lim, method)
+        function [hf, out] = plotDistances(obj, varargin)
+            % plotDistances - Plot similarity/distance metrics for peri-stimulus traces across subjects.
+            %
+            % Usage:
+            %   [hf, out] = obj.plotDistances('ps_lim', [start end], 'method', methodName, 'trial_sorting', sortingType)
+            %
+            % Inputs (as name-value pairs):
+            %   'ps_lim'        - 2-element vector specifying peri-stimulus window in seconds [default: [1 20]]
+            %   'method'        - String specifying similarity/distance metric (e.g., 'correlation') [default: 'correlation']
+            %   'trial_sorting' - String specifying trial sorting method (e.g., 'chronological') [default: 'chronological']
+            %
+            % Outputs:
+            %   hf   - Handle to the generated figure
+            %   out  - Output structure from plotDistances function
             arguments
                 obj
-                ps_lim double = [1 20] % time interval from stimulus onset [s]
-                method char = 'correlation'
+            end
+            arguments (Repeating)
+                varargin
             end
 
+            % Set default values
+            ps_lim = [1 20];
+            method = 'correlation';
+            trial_sorting = 'chronological';
+
+            % Parse name-value pairs
+            if ~isempty(varargin)
+                for k = 1:2:length(varargin)
+                    switch lower(varargin{k})
+                        case 'ps_lim'
+                            ps_lim = varargin{k+1};
+                        case 'method'
+                            method = varargin{k+1};
+                        case 'trial_sorting'
+                            trial_sorting = varargin{k+1};
+                    end
+                end
+            end
+
+            % Initialize figure handles
             hf = gobjects(1,1);
 
             % Isolating relevant data
@@ -59,18 +93,21 @@ classdef ExperimentViewer
             for i = 1:nsubjects
                 thistrace = obj.filtered_traces{i};
 
-                % get peri-stimulus data [t,N,trials]
-                M = thistrace.(obj.dataFilter.traceType);
                 % # TODO : trial filters
-                % # TODO : sorting
+
+                % Trial sorting
+                [~,trial_idx] = TraceViewer(thistrace).sortTrials(trial_sorting);
+
+                % get peri-stimulus data [t,N,trials]
+                M = thistrace.(obj.dataFilter.traceType)(:,:,trial_idx);
                 stim_on_frame = thistrace.stim_series.frame_onset(1);
                 fs = thistrace.framerate;
                 events{i} = TraceViewer.getPeriEventData(M,stim_on_frame,ps_lim,fs);
             end
 
             % run plotting function
-            labs = thistrace.stim_series.stimulus;
-            [hf,out] = plotDistances(events,method,labs,obj.plotConfig);
+            labs = thistrace.stim_series.stimulus(trial_idx); % based on the last subject
+            [hf,out] = plotUtils.plotDistances(events,method,labs,obj.plotConfig);
             title(['Similarity: ',method, num2str(ps_lim(1)),'-',num2str(ps_lim(2)), ' s'], ...
                 'Color',obj.plotConfig.textcol)
 
