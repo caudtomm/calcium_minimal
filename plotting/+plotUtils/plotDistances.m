@@ -46,7 +46,9 @@ function [hf, distanceMAT3D] = plotFullMat(pl)
     ylabel('Stimulus type')
     clim(crange)
     colormap(cfg.colormapName)
-    colorbar('Color',cfg.axcol)
+    a = colorbar('Color',cfg.axcol);
+    a.Label.String = method;
+    a.Label.FontSize= gca().FontSize;
     set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
     set(gcf, 'color', cfg.bgcol); 
     hold off

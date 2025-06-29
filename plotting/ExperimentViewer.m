@@ -54,6 +54,8 @@ classdef ExperimentViewer
             %   'ps_lim'        - 2-element vector specifying peri-stimulus window in seconds [default: [1 20]]
             %   'method'        - String specifying similarity/distance metric (e.g., 'correlation') [default: 'correlation']
             %   'trial_sorting' - String specifying trial sorting method (e.g., 'chronological') [default: 'chronological']
+            %   'stim_allowed'  - Cell array of strings containing labels of all stimuli to consider. (eg. {'Arg', 'Leu'})
+            %                     or stimulus group name [default: 'all trials']
             %
             % Outputs:
             %   hf   - Handle to the generated figure
@@ -69,6 +71,7 @@ classdef ExperimentViewer
             ps_lim = [1 20];
             method = 'correlation';
             trial_sorting = 'chronological';
+            stim_allowed = 'all trials';
 
             % Parse name-value pairs
             if ~isempty(varargin)
@@ -80,6 +83,8 @@ classdef ExperimentViewer
                             method = varargin{k+1};
                         case 'trial_sorting'
                             trial_sorting = varargin{k+1};
+                        case 'stim_allowed'
+                            stim_allowed = varargin{k+1};
                     end
                 end
             end
@@ -90,10 +95,9 @@ classdef ExperimentViewer
             % Isolating relevant data
             nsubjects = numel(obj.filtered_traces);
             events = cell(nsubjects,1);
+            all_labs = cell(nsubjects,1);
             for i = 1:nsubjects
                 thistrace = obj.filtered_traces{i};
-
-                % # TODO : trial filters
 
                 % Trial sorting
                 [~,trial_idx] = TraceViewer(thistrace).sortTrials(trial_sorting);
@@ -103,13 +107,44 @@ classdef ExperimentViewer
                 stim_on_frame = thistrace.stim_series.frame_onset(1);
                 fs = thistrace.framerate;
                 events{i} = TraceViewer.getPeriEventData(M,stim_on_frame,ps_lim,fs);
+
+                % Retrieve stimulus identity labels
+                all_labs{i} = thistrace.stim_series.stimulus(trial_idx);
+
+                % Stimulus filtering
+                thisgroup = thistrace.subject_group;
+                desired_stimuli = getStimuliByGroup(thisgroup,stim_allowed);
+                idx = ismember(all_labs{i}, desired_stimuli);
+                if ~isempty(desired_stimuli) && ~all(idx)
+                    % If some trials are not in the desired stimuli, filter them out
+                    events{i} = events{i}(:,:,idx);
+                    all_labs{i} = all_labs{i}(idx);
+                end
+            end
+
+            % by default, labels are applied based on subject 1
+            labs = all_labs{1};
+
+            % Check that all label arrays are the same. This can happen
+            % when filtering stimuli according to other properties than
+            % identity (ex. trained/novel) from multiple experimental
+            % groups.
+            all_equal = all(cellfun(@(x) isequal(x, labs), all_labs));
+            if ~all_equal
+                warning('Mock labels! Actual stimulus identities differ across subjects!')
+                % Replace labs with mock labels following the identity structure in labs{1}
+                [~, ~, ic] = unique(labs, 'stable');
+                mockLabels = arrayfun(@(x) char('A' + x - 1), ic, 'UniformOutput', false);
+                labs = mockLabels;
             end
 
             % run plotting function
-            labs = thistrace.stim_series.stimulus(trial_idx); % labels are based on the last subject
             [hf,out] = plotUtils.plotDistances(events,method,labs,obj.plotConfig);
-            title(['Similarity: ',method, num2str(ps_lim(1)),'-',num2str(ps_lim(2)), ' s'], ...
+            title([num2str(ps_lim(1)),'-',num2str(ps_lim(2)), ' s'], ...
                 'Color',obj.plotConfig.textcol)
+
+            % return
+            out.all_labs = all_labs;
 
         end
 
