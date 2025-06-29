@@ -1,11 +1,11 @@
-function [hf, out] = plotDistances(data)
+function [hf, out] = plotDistances(traces,method,labs,cfg)
 arguments
-    data struct
+    traces cell % cell array [nsubjects 1] of double [t, cells, trials] (sorted!)
+    method char = 'correlation'
+    labs = [] % stimulus names (sorted!)
+    cfg = PlotConfig()
 end
 
-% Knobs
-method = 'correlation';
-crange = [.2 1];
 
 % Input data parsing
 % expected input:
@@ -14,24 +14,8 @@ crange = [.2 1];
 % .sec_range - double [absolute absolute] (assumes the same for all)
 % .labs - cell array [nsubjects 1] of double indices [ntrials 1] with
 %       stimulus names (sorted!)
-traces = data.traces;
-fs = data.fs;
-sec_range = data.sec_range;
-labs = data.labs;
 
-
-% Color Theme Configuration parsing
-
-% --- Defaults ---
-defaults = struct( ...
-    'colormap', parula, ...
-    'axisColor', [0 0 0], ...
-    'textColor', [0 0 0], ...
-    'backgroundColor', [1 1 1], ...
-    'lineWidth', 1.5 ...
-);
-
-cfg = parseThemeColors(data,defaults,'themeColors');
+crange = [.2 1];
 
 
 % initialize useful metrics
@@ -41,11 +25,11 @@ ntrials = numel(labs);
 
 % Initialize output
 hf = gobjects(1,1);
-out.distanceMAT=[];
+out.distanceMAT3D=[];
 
 
 % Plot all in one big matrix
-[hf(1), out.distanceMAT] = plotFullMat(true);
+[hf(1), out.distanceMAT3D] = plotFullMat(true);
 
 
 
@@ -54,13 +38,11 @@ out.distanceMAT=[];
 
 function [hf, distanceMAT3D] = plotFullMat(pl)
     distanceMAT3D = nan(ntrials,ntrials,nsubjects);
-    interval = [floor(sec_range(1)*fs) : ...
-              1+floor(sec_range(2)*fs)];
-    for i_fish = 1:nsubjects
-        c = calcdistanceMAT(traces{i_fish},interval,method);
-        
-        % store to common matrix
-        distanceMAT3D(1:size(c,1),1:size(c,2),i_fish) = c; % indices are here in case this fish has less than a full trial set
+
+    for i = 1:nsubjects
+        % compress into avg activity vectors
+        avg_actvect = squeeze(mean(traces{i},1,'omitmissing')); % [N,trials]
+        distanceMAT3D(:,:,i) = squareform(pdist(avg_actvect', method)); % [trials, trials]
     end
 
     % (optional) plot full avg intertrial distance matrix
@@ -72,19 +54,12 @@ function [hf, distanceMAT3D] = plotFullMat(pl)
     yticks(1:ntrials); yticklabels(labs)
     xlabel('Stimulus type')
     ylabel('Stimulus type')
-    title(['Similarity: ',method, sec_range(1),'-',sec_range(2), ' s'], 'Color',cfg.textColor)
     clim(crange)
-    colormap(cfg.colormap)
-    colorbar('Color',cfg.axisColor)
-    set(gca, 'color', cfg.backgroundColor, 'XColor',cfg.axisColor, 'YColor',cfg.axisColor, 'ZColor',cfg.axisColor);
-    set(gcf, 'color', cfg.backgroundColor); 
+    colormap(cfg.colormapName)
+    colorbar('Color',cfg.axcol)
+    set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+    set(gcf, 'color', cfg.bgcol); 
     hold off
 end
 
-end
-
-function distanceMAT = calcdistanceMAT(traces,interval,method)
-snippets = traces(interval,:,:);
-avg_actvect = squeeze(mean(snippets,1,'omitmissing'));
-distanceMAT = squareform(pdist(avg_actvect', method));
 end

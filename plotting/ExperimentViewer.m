@@ -6,6 +6,7 @@ classdef ExperimentViewer
         traces
 
         subjects_to_use logical
+        filtered_traces
 
         dataFilter DataFilter
         plotConfig PlotConfig
@@ -31,72 +32,48 @@ classdef ExperimentViewer
             idx = ismember(obj.subjectTab.name,subjectIDs);
         end
 
-        %% functional methods
+        function traces = get.filtered_traces(obj)
+            % filter subjects
+            traces = obj.traces(obj.subjects_to_use);
 
-        function out = prepareForPlot(obj)
-            % Extract and standardize data for selected subjects and traces
-
-            ids = obj.subjectTab.name(obj.subjects_to_use);
-            traceType = obj.dataFilter.traceType;
-
-            idx = obj.subjects_to_use;
-
-            out = struct( ...
-                'subjectIDs', ids, ...
-                'traceType', traceType, ...
-                'traces', cellfun(@(x) x.(traceType),obj.traces(idx),'UniformOutput',false) ...
-            );
+            % % filtering within each subject traces
+            % nsubjects = numel(traces);
+            % for i = 1:nsubjects
+            %     % filter 
+            % end
         end
 
-        function plotSummary(obj, plotFunc)
-            % Call an external plot function using formatted summary data
-            raw = obj.prepareForPlot();
-            formatted = obj.formatFor(plotFunc, raw);
-            plotFunc(formatted);
-        end
-
-        function formatted = formatFor(obj, plotFunc, raw)
-            fname = func2str(plotFunc);
-
-            switch fname
-                case 'plotMeanTrace' % just an example
-                    % Assume single traceType is selected
-                    traces = raw.traces(1, :);  % row: traceType=1, all subjects
-                    valid = ~cellfun(@isempty, traces);
-                    dataMat = cell2mat(traces(valid)');
-                    meanTrace = mean(dataMat, 2);
-    
-                    formatted.meanTrace = meanTrace;
-                    formatted.subjectIDs = raw.subjectIDs(valid);
-                    formatted.traceType = raw.traceTypes{1};
-                    formatted.themeColors = struct( ...
-                        'axis', obj.plotConfig.getAxisColor(), ...
-                        'text', obj.plotConfig.getTextColor(), ...
-                        'background', obj.plotConfig.getBackgroundColor(), ...
-                        'line', obj.plotConfig.getColorCycle(1) ...
-                    );
-
-                case 'plotDistances'
-                    % expected input:
-                    % .traces - cell array [nsubjects 1] of double [t, cells, trials] (sorted!)
-                    % .fs - framerate in seconds (assumes the same for all)
-                    % .sec_range - double [absolute absolute] (assumes the same for all)
-                    % .labs - cell array [nsubjects 1] of double indices [ntrials 1] with
-                    %       stimulus names (sorted!)
-
-                    % # TODO : sorting
-
-                    formatted.traces = raw.traces;
-
-                    % # TODO : individual assignment
-                    formatted.fs = obj.traces{1}.framerate;
-                    formatted.sec_range = [30 50];
-                    formatted.labs = obj.traces{1}.stim_series.stimulus;
-                    
-    
-                otherwise
-                    formatted = raw;
+        %% plotting function headers (normally call external functions that don't rely on custom objects)
+        function [hf, out] = plotDistances(obj, ps_lim, method)
+            arguments
+                obj
+                ps_lim double = [1 20] % time interval from stimulus onset [s]
+                method char = 'correlation'
             end
+
+            hf = gobjects(1,1);
+
+            % Isolating relevant data
+            nsubjects = numel(obj.filtered_traces);
+            events = cell(nsubjects,1);
+            for i = 1:nsubjects
+                thistrace = obj.filtered_traces{i};
+
+                % get peri-stimulus data [t,N,trials]
+                M = thistrace.(obj.dataFilter.traceType);
+                % # TODO : trial filters
+                % # TODO : sorting
+                stim_on_frame = thistrace.stim_series.frame_onset(1);
+                fs = thistrace.framerate;
+                events{i} = TraceViewer.getPeriEventData(M,stim_on_frame,ps_lim,fs);
+            end
+
+            % run plotting function
+            labs = thistrace.stim_series.stimulus;
+            [hf,out] = plotDistances(events,method,labs,obj.plotConfig);
+            title(['Similarity: ',method, num2str(ps_lim(1)),'-',num2str(ps_lim(2)), ' s'], ...
+                'Color',obj.plotConfig.textcol)
+
         end
 
         function obj = setTheme(obj, themeName)

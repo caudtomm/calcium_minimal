@@ -1,6 +1,9 @@
 classdef PlotConfig
-% Sets parameters for the visual appearance of plots
+% Sets plotting parameters
     properties
+        % Data handling
+
+        % Visual appearance
         theme char = 'dark'          % plotting theme ('light', 'dark', etc.)
         colormapName char = 'jet'    % MATLAB colormap name
         showGrid logical = true      % display grid in internal plots

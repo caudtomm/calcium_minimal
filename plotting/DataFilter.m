@@ -2,8 +2,23 @@ classdef DataFilter
     properties
        % Selection filters
         subjectIDs cell = {}         % explicit subject ID list (optional)
-        subjectGroup = {}            % e.g., a tag or label to select by group
-        cells_tag char               % tag of cell-group to use (ex. )
+        subjectGroup = {}            % e.g., a tag or label to select by group;
+                                     % options : {'all','familiarized','trained'}
+                                     % or {'group1','group2','groupN'}
+
+        % % # TODO : for now, screw all of this. I suspect that individual
+        % % function calls are sufficiently idiosyncratic that this actually
+        % % makes things more complex, not less.
+        % stimuli = {'all_stims'}      % options : {'all_trials','all_stims',
+        %                              % 'all CS+','all CS-','all familiar','all novel'} 
+        %                              % or {'stim1','stim2','stimN'};
+        % time_range double = [0 20]   % time range : [from stim_on, from stim_on] (sec)
+        % only_top_variant_units logical = false  % use only top variant units? 
+        % order_trials_by char = 'stim_type'      % options: 
+        %                                         % {'stim_type' : A-A-A-B-B-B-C-C-C ,
+        %                                         % 'trial_num' : A1-A2-B1-A3-B2-B3 ,
+        %                                         % 'relative_trial_num' : A1-A2-A3-B1-B2-B3}
+        % todo_reltrialnum double = [1:5]
 
         traceType char = 'dFoverF_good'     % trace type to select (e.g., 'dFoverF_good' or 'pSpike')
                                             % - match name of ActivityTraces property
