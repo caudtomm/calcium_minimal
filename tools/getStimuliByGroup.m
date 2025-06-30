@@ -6,7 +6,7 @@ function desired_stimuli = getStimuliByGroup(group,tag)
     end
 
     % Selects stimuli based on group and tag (single subject!)
-    all_groups = {'previousnaive';'naive';'trained1';'trained2';'trained1alt';'uncoupled'};
+    all_groups = {'previousnaive';'naïve';'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'};
     all_trials = {{'baseline','noodor','ACSF','Trp','Ala','Ser','Food'}; ...
         {'spont.','ACSF','Arg','Ala','His','Trp','Ser','Leu'}; ...
         {'spont.','ACSF','Arg','Ala','His','Trp','Ser','Leu'}; ...
@@ -20,7 +20,7 @@ function desired_stimuli = getStimuliByGroup(group,tag)
         {'Arg','Ala','His','Trp','Ser','Leu'}; ...
         {'Arg','Ala','His','Trp','Ser','Leu'}};
     all_CSplus = {{''};{''};{'Arg','Ala'};{'Ala','His'};{'Arg','Ala'};{''}};
-    all_CSminus = {{''};{''};{'His'};{'Arg'};{'His'};{'Arg','Ala','His'}};
+    all_CSminus = {{''};{''};{'His'};{'Arg'};{'His'};{}};
     all_familiar = {{''};{''};{'Arg','Ala','His'};{'Arg','Ala','His'};{'Arg','Ala','His'};{'Arg','Ala','His'}}; % CS+ and CS- together
     all_novel = {{'Trp','Ala','Ser','Food'};{'Trp','Ser','Leu'};{'Trp','Ser','Leu'};{'Trp','Ser','Leu'};{'Trp','Ser','Leu'};{'Trp','Ser','Leu'}};
     

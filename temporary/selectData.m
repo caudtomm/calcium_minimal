@@ -73,9 +73,9 @@ if iscolumn(data.stim_type)
     data.stim_type = data.stim_type';
 end
 
-% save folder
-pathout = fullfile(mfilename,tag)
-if ~exist(pathout,'dir'); mkdir(pathout); end
+% % save folder
+% pathout = fullfile(mfilename,tag)
+% if ~exist(pathout,'dir'); mkdir(pathout); end
 
 %% select data
 
