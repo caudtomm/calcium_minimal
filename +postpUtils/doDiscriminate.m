@@ -1,4 +1,33 @@
 function out = doDiscriminate(data, labs, varargin)
+% doDiscriminate performs classification on neural response data using a specified
+% classifier and cross-validation scheme, and optionally computes a shuffle baseline.
+%
+% INPUTS:
+%   data      - double matrix of neural activity, with one of the following shapes:
+%                 [variables x trials]        (e.g., cells x trials)
+%                 [time x variables x trials] (will be averaged across time)
+%   labs      - cell array {trials x 1} of string labels, one per trial
+%
+% NAME-VALUE PAIRS (optional):
+%   'method'          - similarity metric for classification (default: 'correlation')
+%   'trainblockmode'  - cross-validation scheme: 'single' or '3blocks' (default: 'single')
+%   'classifier'      - classification method: 'template_match' (default) or 'SVM' (not implemented)
+%   'nshuffles'       - number of shuffle iterations for significance testing (default: 50)
+%
+% OUTPUT:
+%   out - structure containing classification results:
+%       .input_labs               - original trial labels
+%       .train_trials             - [nTrials x nSets] logical matrix of training indices
+%       .test_trials              - [nTrials x nSets] logical matrix of testing indices
+%       .predicted_labs           - [nTrials x nSets] cell array of predicted labels
+%       .predicted_labs_SH        - [nTrials x nSets x nShuffles] cell array of shuffled predictions
+%       .prediction_iscorrect     - [nTrials x nSets] array of correctness (1=correct, 0=incorrect, NaN=missing)
+%       .prediction_iscorrect_SH  - [nTrials x nSets x nShuffles] array of shuffled correctness
+%       .prediction_confidence    - [nTrials x nSets] array of prediction confidence values
+%
+% Notes:
+% - Trials are grouped into repetition blocks based on label repetition order.
+% - Shuffle testing permutes the neuron identity independently for each trial.
 arguments
     data double % [variables x samples] or [cells x trials]; or [time x variables x samples]
     labs cell % {samples x 1} or {trials x 1} of strings
@@ -59,13 +88,18 @@ end
 
 nsets = numel(trainblocksets);
 
+% initialize output
+out.input_labs = labs;
+out.train_trials = false(ntrials,nsets);
+out.test_trials = false(ntrials,nsets);
+out.predicted_labs = cell(ntrials,nsets);
+out.predicted_labs_SH = cell(ntrials,nsets,nshuffles);
+out.prediction_iscorrect = nan(ntrials,nsets);
+out.prediction_iscorrect_SH = nan(ntrials,nsets,nshuffles);
+out.prediction_confidence = nan(ntrials,nsets);
+
+
 %% action
-correctLab = [];
-correctTest = [];
-correctLabSH = [];
-correctTestSH = [];
-
-
 for i_set = 1:nsets
     % specify trial indices to train and test on
     trials_train = ismember(label_repetitions, trainblocksets{i_set});
@@ -90,80 +124,46 @@ for i_set = 1:nsets
         testData = tmp(:,trials_test);
 
         switch classifier
-            case "SVM"
+            % case "SVM"
                 % [yfit, predictions] = fit_SVM(trainData',trainlabs,testData',stims);
             case "template_match"
-                out = template_matching(trainData', trainlabs, testData', stims, method);
+                res = template_matching(trainData', trainlabs, testData', stims, method);
             otherwise
                 error('unknown classifier')
         end
 
-        correct_test = double(cellfun(@isequal, testlabs, out.predictions_testData));
-        missing_data = cellfun(@isempty, out.predictions_testData);
-        correct_test(missing_data)=nan;
+        % combine predictions for training and testing trials into one cell
+        % array (don't worry, we are holding onto the indices)
+        predicted_labs = cell(ntrials,1);
+        predicted_labs(trials_train) = res.predictions_trainData;
+        predicted_labs(trials_test) = res.predictions_testData;
 
-        correct_train = double(cellfun(@isequal, trainlabs, out.predictions_trainData));
-        missing_data = cellfun(@isempty, out.predictions_trainData);
-        correct_train(missing_data)=nan;
+        % combine confidence values
+        prediction_confidence = nan(ntrials,1);
+        prediction_confidence(trials_train) = res.confidence_trainData;
+        prediction_confidence(trials_test) = res.confidence_testData;
 
-        thiscorrect = nan(ntrials,1);
-        thiscorrect(trials_test) = correct_test;
-        thiscorrect(trials_train) = correct_train;
+        % make an array to note only whether the predictions were correct
+        prediction_iscorrect = double(cellfun(@isequal, labs, predicted_labs));
+        missing_data = cellfun(@isempty, predicted_labs);
+        prediction_iscorrect(missing_data)=nan;
 
         switch i
-            case 1
-                try
-                    correctLab = [correctLab, thiscorrect];
-                    correctTest = [correctTest, correct_test];
-                catch
-                    thiscorrect = [thiscorrect; nan(size(correctLab,1)-length(thiscorrect),1)];
-                    correct_test = [correct_test; nan(size(correctTest,1)-length(correct_test),1)];
+            case 1 % non-shuffled data
+                out.train_trials(:,i_set) = trials_train;
+                out.test_trials(:,i_set) = trials_test;
+                out.predicted_labs(:,i_set) = predicted_labs;
+                out.prediction_iscorrect(:,i_set) = prediction_iscorrect;
+                out.prediction_confidence(:,i_set) = prediction_confidence;
 
-                    correctLab = [correctLab, thiscorrect];
-                    correctTest = [correctTest, correct_test];
-                end
-            otherwise % # TODO this should make a 3d matrix of [trials x sets x nshuffles]
-                try
-                    correctLabSH = [correctLabSH, thiscorrect];
-                    correctTestSH = [correctTestSH, correct_test];
-
-                catch
-                    thiscorrect = [thiscorrect; nan(size(correctLabSH,1)-length(thiscorrect),1)];
-                    correct_test = [correct_test; nan(size(correctTest,1)-length(correct_test),1)];
-
-                    correctLabSH = [correctLabSH, thiscorrect];
-                    correctTestSH = [correctTestSH, correct_test];
-                end
+            otherwise % shuffled data
+                out.predicted_labs_SH(:,i_set,i-1) = predicted_labs;
+                out.prediction_iscorrect_SH(:,i_set,i-1) = prediction_iscorrect;
         end
         
         
     end
 end
-
-correctLab = permute(traceFormat(correctLab',nsets),[2,3,1]);
-correctTest = permute(traceFormat(correctTest',nsets),[2,3,1]);
-
-correctLabSHtmp = permute(traceFormat(correctLabSH',nsets*nshuffles),[2,3,1]);
-correctLabSH = nan(size(correctLab));
-for i_set = 1:nsets
-    idx = (i_set-1)*nshuffles + 1 : i_set*nshuffles;
-    correctLabSH(:,:,i_set) = nanmean(correctLabSHtmp(:,:,idx),3);
-end
-clear correctLabSHtmp
-
-correctTestSHtmp = permute(traceFormat(correctTestSH',nsets*nshuffles),[2,3,1]);
-correctTestSH = nan(size(correctTest));
-for i_set = 1:nsets
-    idx = (i_set-1)*nshuffles + 1 : i_set*nshuffles;
-    correctTestSH(:,:,i_set) = nanmean(correctTestSHtmp(:,:,idx),3);
-end
-clear correctTestSHtmp
-
-% return
-out.correctLab = correctLab;
-out.correctTest = correctTest;
-out.correctLabSH = correctLabSH;
-out.correctTestSH = correctTestSH;
 
 
 %[p,h,stats] = ranksum(totFractionCorrectLab(:,1),totFractionCorrectLab(:,end))
