@@ -190,9 +190,10 @@ classdef ExperimentViewer
 
             % Set default values
             ps_lim = [1 20];
-            plotType = 'full';
+            plotType = 'performance_lines';
             method = 'correlation';
             stim_allowed = 'all stimuli';
+            do_zscore = false;
 
             % Parse name-value pairs
             if ~isempty(varargin)
@@ -206,6 +207,8 @@ classdef ExperimentViewer
                             method = varargin{k+1};
                         case 'stims_allowed'
                             stim_allowed = varargin{k+1};
+                        case 'zscore'
+                            do_zscore = varargin{k+1};
                     end
                 end
             end
@@ -250,13 +253,20 @@ classdef ExperimentViewer
                 thisevents = events{i};
                 thislabs = all_labs{i};
 
+                % if there are no allowed stimuli here, skip subject
+                if isempty(thislabs); continue; end
+
                 % call post-processing function
                 all_out{i} = postpUtils.doDiscriminate(thisevents, thislabs, ...
                                                        'method', method);
             end
 
+            % get rid of empty data
+            all_out(cellfun(@isempty,all_out)) = [];
+            if isempty(all_out); return; end
+
             % call low-level plotter
-            
+            out = plotUtils.plotDiscrimination(all_out,plotType,obj.plotConfig,'zscore',true);
 
             % return
 
@@ -328,7 +338,7 @@ classdef ExperimentViewer
                     out{n} = obj.plotDistances('ps_lim',ps_lim, ...
                                     'plotType', 'repetitions', ...
                                     'method',method, ...
-                                    'stim_allowed',thisodorset);
+                                    'stims_allowed',thisodorset);
 
                     % override title and ylabel
                     title(thisodorset_str)
@@ -380,5 +390,88 @@ classdef ExperimentViewer
             set(gcf,'Position',[1 1 2000 1000])
             hold off
         end
+
+        function [hf, out] = plotDiscriminationPerformanceLines(obj, ps_lim, method,do_zscore)  
+            arguments
+                obj
+                ps_lim = [1 20]
+                method = 'correlation'
+                do_zscore = true
+            end
+            
+            % Knobs
+            groups = {'naïve', ...
+                      'trained', ...
+                      'trained1', ...
+                      'trained2', ...
+                      'trained1 (T-R-S-H-A-ACSF/L)', ...
+                      'uncoupled'};
+            odor_sets = {'all stimuli', ...
+                         {'Arg','Ala','His','Trp','Ser'}, ...
+                         'all familiar', ...
+                         'all novel', ...
+                        };
+
+            % useful metrics
+            ngroups = numel(groups);
+            nodor_sets = numel(odor_sets);
+            nplots = ngroups*nodor_sets;
+
+            % Initialize output
+            hf = gobjects(1,1);
+            out = cell(nplots,1);
+
+
+            %% Figure 1: comparison of discrimination performance curves
+
+            % define figure size
+            ncols = nodor_sets;
+            nrows = ngroups;
+
+            hf(1) = figure; % [groups, odor_sets]
+            n = 1;
+            labs = cell(nplots,1);
+            for i_g = 1:ngroups
+                % filter data by group
+                thisgroup = groups{i_g};
+                obj.dataFilter.subjectGroup = thisgroup;
+
+                for i_o = 1:nodor_sets
+                    thisodorset = odor_sets{i_o};
+
+                    thisodorset_str = thisodorset;
+                    if iscell(thisodorset_str); thisodorset_str = strjoin(thisodorset, ', '); end
+                    msg = ['Plotting group ''',thisgroup,''' for odors: ',thisodorset_str];
+                    disp(msg)
+
+                    % build axes
+                    subplot(nrows,ncols,n);
+
+                    % call intermediate-level plotter
+                    out{n} = obj.plotDiscrimination('ps_lim',ps_lim, ...
+                                    'plotType', 'performance_lines', ...
+                                    'method',method, ...
+                                    'zscore',do_zscore, ...
+                                    'stims_allowed',thisodorset);
+
+                    % override title and ylabel
+                    title(thisodorset_str)
+                    ylabel(thisgroup)
+
+                    % if there is no data, delete the subplot
+                    if isempty(out{n}); axis off; end
+
+                    % export label
+                    labs{n} = [thisgroup,' - ',thisodorset_str];
+
+                    % advance axis counter
+                    n = n+1;
+                end
+            end
+            set(gcf,'Position',[1 1 2000 1000])
+
+
+        end
+
     end
 end

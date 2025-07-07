@@ -213,7 +213,7 @@ classdef Experiment
                 validMethods = methods(p);
                 
                 if ismember(process_name, validMethods)
-                    idx_tosubtract = str2double(obj.subjectTab.manPickedICs_conservative_{i_sub});
+                    idx_tosubtract = str2double(obj.subjectTab.manPickedICs_liberal_{i_sub});
                     if idx_tosubtract==0; continue; end
 
                     p = p.(process_name)(idx_tosubtract); % add any input arguments on the right
