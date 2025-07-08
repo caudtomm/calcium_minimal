@@ -2,7 +2,7 @@ function [totFractionCorrectLab,totFractionCorrectLabSH, m] = doDiscriminate(exp
 
 global tframe
 % todo_fish = [6:7,11:12,14,17,18,21:23];
-todo_fish = find(ismember(experiment.summaryTable.group,{'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'}));% options : {'previousnaive';'naïve';'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'};
+todo_fish = find(~ismember(experiment.summaryTable.group,{'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'}));% options : {'previousnaive';'naïve';'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'};
 % todo_fish = [21:23];
 % todo_fish = [6:7,10:23]
 nfish = numel(todo_fish);
@@ -10,7 +10,7 @@ if isempty(stims2use); stims2use = {'Trp','Ser','Ala','Food'}; end
 nstims = numel(stims2use);
 trialn2usein = 1:5;
 if isempty(s); s = 0; end
-method = 'cosine';
+method = 'correlation';
 
 ntrials=30;
 
@@ -30,9 +30,9 @@ nshuffles = 50;
 
 if isempty(classifier); classifier = "template_match"; end
 
-% time period to include (relative to [stim_on, stim_on) [s]
+% time period to include (relative to [stim_on, stim_off) [s]
 if ~exist('tframe','var') || isempty(tframe); tframe = [1 20]; end
-tframe = [1 20]
+tframe = [20 20]
 
 %% action
 correctLab = [];
@@ -90,6 +90,11 @@ for i_fish = 1:nfish
 %             tmp = tmp - nanmean(tmp,1); % men-subtract each feature (neuron)
             trainData = tmp(trials_train,:);
             testData = tmp(trials_test,:);
+
+            predictions = cell(numel(trainlabs),1);
+            yfit = cell(numel(testlabs),1);
+            predictions_confidence = nan(numel(trainlabs),1);
+            yfit_confidence = nan(numel(testlabs),1);
     
             switch classifier
                 case "SVM"
@@ -115,8 +120,9 @@ for i_fish = 1:nfish
                         end
                     end
                     [distances, idx] = sort(distances,2);
-                    predictions = stims2use(idx(:,1))';
-                    predictions_confidence = diff(distances(:,1:2),[],2) ./ 2; % DIVISION BY 2 IN THE CASE OF COSINE DISTANCE
+                    existing_data = ~isnan(distances(:,1));
+                    predictions(existing_data) = stims2use(idx(existing_data,1))';
+                    predictions_confidence(existing_data) = diff(distances(existing_data,1:2),[],2) ./ 2; % DIVISION BY 2 IN THE CASE OF COSINE DISTANCE
 
 
                     distances = nan(numel(trials_test),nstims);
@@ -128,8 +134,9 @@ for i_fish = 1:nfish
                         end
                     end
                     [distances, idx] = sort(distances,2);
-                    yfit = stims2use(idx(:,1))';
-                    yfit_confidence = diff(distances(:,1:2),[],2);
+                    existing_data = ~isnan(distances(:,1));
+                    yfit(existing_data) = stims2use(idx(existing_data,1))';
+                    yfit_confidence(existing_data) = diff(distances(existing_data,1:2),[],2);
                     
                 case "template_match_adaptive"
                     [templates, templates_weights] = deal(nan(nstims, size(trainData,2)));
@@ -298,10 +305,10 @@ totFractionCorrectLabNovelStims = squeeze(nanmean(correctTest.*mask_novel,2));
 totFractionCorrectLabFamiliarStims = squeeze(nanmean(correctTest.*mask_familiar,2));
 
 totFractionCorrectLab = totFractionCorrectLabAllStims;
-offset = totFractionCorrectLab(:,1);
-totFractionCorrectLab = totFractionCorrectLab-offset;
-maxval = mean(totFractionCorrectLab(:,3:5),2);
-totFractionCorrectLab = totFractionCorrectLab./maxval;
+% offset = totFractionCorrectLab(:,1);
+% totFractionCorrectLab = totFractionCorrectLab-offset;
+% maxval = mean(totFractionCorrectLab(:,3:5),2);
+% totFractionCorrectLab = totFractionCorrectLab./maxval;
 
 
 %%

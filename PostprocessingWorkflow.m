@@ -59,3 +59,15 @@ for i = 1:nwindows
     figs.append(hf);
     close(hf)
 end
+
+% template matching, second by second
+t_lim_sec = [-1 40]; % from 1 sec before to 25 seconds after stimulus onset
+nwindows = diff(t_lim_sec)+1;
+times = linspace(t_lim_sec(1),t_lim_sec(2),nwindows); % 1 per sec
+windows = times(:) + [0 1];
+for i = 1:nwindows
+    hf = v.plotDiscriminationPerformanceLines(windows(i,:), 'correlation',false); % outputs 1 figure
+    figs.title = ['Template-match: sec', num2str(windows(i,1)), '-', num2str(windows(i,2))];
+    figs.append(hf);
+    close(hf)
+end

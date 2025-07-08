@@ -47,7 +47,7 @@ classdef ExperimentViewer
         % (normally call external low level functions that don't rely on custom objects)
         % still output a single plot onto provided axes
 
-        function out = plotDistances(obj, varargin)
+        function out = plotDistancesHead(obj, varargin)
             % plotDistances - Plot similarity/distance metrics for peri-stimulus traces across subjects.
             %
             % Usage:
@@ -163,7 +163,7 @@ classdef ExperimentViewer
         end
 
 
-        function out = plotDiscrimination(obj, varargin)
+        function out = plotDiscriminationHead(obj, varargin)
             % plotDiscrimination - Plot classification performance / discriminability of a across subjects.
             %
             % Usage:
@@ -257,7 +257,7 @@ classdef ExperimentViewer
                 if isempty(thislabs); continue; end
 
                 % call post-processing function
-                all_out{i} = postpUtils.doDiscriminate(thisevents, thislabs, ...
+                all_out{i} = doDiscrimination(thisevents, thislabs, ...
                                                        'method', method);
             end
 
@@ -266,7 +266,7 @@ classdef ExperimentViewer
             if isempty(all_out); return; end
 
             % call low-level plotter
-            out = plotUtils.plotDiscrimination(all_out,plotType,obj.plotConfig,'zscore',true);
+            out = plotDiscrimination(all_out,plotType,obj.plotConfig,'zscore',do_zscore);
 
             % return
 
@@ -335,7 +335,7 @@ classdef ExperimentViewer
                     subplot(nrows,ncols,n);
 
                     % call intermediate-level plotter
-                    out{n} = obj.plotDistances('ps_lim',ps_lim, ...
+                    out{n} = obj.plotDistancesHead('ps_lim',ps_lim, ...
                                     'plotType', 'repetitions', ...
                                     'method',method, ...
                                     'stims_allowed',thisodorset);
@@ -448,7 +448,7 @@ classdef ExperimentViewer
                     subplot(nrows,ncols,n);
 
                     % call intermediate-level plotter
-                    out{n} = obj.plotDiscrimination('ps_lim',ps_lim, ...
+                    out{n} = obj.plotDiscriminationHead('ps_lim',ps_lim, ...
                                     'plotType', 'performance_lines', ...
                                     'method',method, ...
                                     'zscore',do_zscore, ...
@@ -468,7 +468,7 @@ classdef ExperimentViewer
                     n = n+1;
                 end
             end
-            set(gcf,'Position',[1 1 2000 1000])
+            set(gcf,'Position',[1 1 700 4000])
 
 
         end

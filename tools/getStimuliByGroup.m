@@ -22,7 +22,7 @@ function desired_stimuli = getStimuliByGroup(group,tag)
     all_CSplus = {{''};{''};{'Arg','Ala'};{'Ala','His'};{'Arg','Ala'};{''}};
     all_CSminus = {{''};{''};{'His'};{'Arg'};{'His'};{}};
     all_familiar = {{''};{''};{'Arg','Ala','His'};{'Arg','Ala','His'};{'Arg','Ala','His'};{'Arg','Ala','His'}}; % CS+ and CS- together
-    all_novel = {{'Trp','Ala','Ser','Food'};{'Trp','Ser','Leu'};{'Trp','Ser','Leu'};{'Trp','Ser','Leu'};{'Trp','Ser','Leu'};{'Trp','Ser','Leu'}};
+    all_novel = {{'Trp','Ala','Ser','Food'};{'Arg','Ala','His','Trp','Ser','Leu'};{'Trp','Ser','Leu'};{'Trp','Ser','Leu'};{'Trp','Ser','Leu'};{'Trp','Ser','Leu'}};
     
     groups2stims = table(all_groups, ...
                          all_trials, ...

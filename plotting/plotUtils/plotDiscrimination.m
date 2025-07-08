@@ -153,7 +153,18 @@ function out = performanceLines()
         % training set
         performanceSH = cell2mat(cellfun(@(x) x.prediction_iscorrect_SH, p, ...
             'UniformOutput',false)); % [all_trials x nsets x nshuffles]
+
+        % only average over test trials!
+        test_masks = cellfun(@(x) x.test_trials, p, 'UniformOutput', false);
+        test_masks = cellfun(@(x,n) repmat(x,[1,1,n]), test_masks, ...
+                             num2cell(size(performanceSH,3)*ones(numel(p),1)), ...
+                             'UniformOutput', false);
+        test_mask_full = cat(1, test_masks{:});
+        performanceSH(~test_mask_full) = NaN;
+
+        % actually get the average performance for each training set
         performanceSH = mean(performanceSH,[1,3],'omitmissing');
+        
         % plot average performances as little line segments
         x = [1:nsets]'+[-1, 1]*lip*2/3;
         line(x',repmat(performanceSH,2,1), ...

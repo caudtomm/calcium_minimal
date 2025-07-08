@@ -1,4 +1,4 @@
-function out = doDiscriminate(data, labs, varargin)
+function out = doDiscrimination(data, labs, varargin)
 % doDiscriminate performs classification on neural response data using a specified
 % classifier and cross-validation scheme, and optionally computes a shuffle baseline.
 %
