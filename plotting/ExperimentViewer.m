@@ -193,6 +193,7 @@ classdef ExperimentViewer
             plotType = 'performance_lines';
             method = 'correlation';
             stim_allowed = 'all stimuli';
+            focus_stims = 'all trials'; % by default, no further filtering
             do_zscore = false;
 
             % Parse name-value pairs
@@ -207,6 +208,8 @@ classdef ExperimentViewer
                             method = varargin{k+1};
                         case 'stims_allowed'
                             stim_allowed = varargin{k+1};
+                        case 'focus_stims'
+                            focus_stims = varargin{k+1};
                         case 'zscore'
                             do_zscore = varargin{k+1};
                     end
@@ -261,14 +264,27 @@ classdef ExperimentViewer
                                                        'method', method);
             end
 
+            % focus on specific trials for plotting (without changing any of the values!)
+            focus_trials = cell(nsubjects,1);
+            for i = 1:nsubjects
+                thistrace = obj.filtered_traces{i};
+                thisgroup = thistrace.subject_group;
+                desired_stimuli = getStimuliByGroup(thisgroup,focus_stims);
+                idx = ismember(all_labs{i}, desired_stimuli);
+                focus_trials{i} = find(idx);
+            end
+
             % get rid of empty data
-            all_out(cellfun(@isempty,all_out)) = [];
+            idx = cellfun(@isempty,all_out) | cellfun(@isempty,focus_trials);
+            all_out(idx) = [];
+            focus_trials(idx) = [];
             if isempty(all_out); return; end
 
             % call low-level plotter
             out = plotDiscrimination(all_out,...
                 plotType,obj.plotConfig, ...
                 'method',method, ...
+                'FocusTrials',focus_trials, ...
                 'zscore',do_zscore);
 
             % return
@@ -394,11 +410,12 @@ classdef ExperimentViewer
             hold off
         end
 
-        function [hf, out] = plotDiscriminationPerformanceMats(obj, ps_lim, method,do_zscore)  
+        function [hf, out] = plotDiscriminationPerformanceMats(obj, ps_lim, method,focus_stims,do_zscore)  
             arguments
                 obj
                 ps_lim = [1 20]
                 method = 'correlation'
+                focus_stims = 'all trials' % by default no further filtering
                 do_zscore = false
             end
             
@@ -454,11 +471,12 @@ classdef ExperimentViewer
                     out{n} = obj.plotDiscriminationHead('ps_lim',ps_lim, ...
                                     'plotType', 'performance_mat', ...
                                     'method',method, ...
+                                    'focus_stims', focus_stims, ...
                                     'zscore',do_zscore, ...
                                     'stims_allowed',thisodorset);
 
                     % override title and ylabel
-                    title(thisodorset_str)
+                    title(thisodorset_str,'color',cfg.textcol)
                     ylabel(thisgroup)
 
                     % if there is no data, delete the subplot
