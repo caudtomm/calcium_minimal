@@ -50,6 +50,7 @@ end
 ntrials = cellfun(@(x) numel(x.input_labs),predictions);
 % Set default values
 method = '';
+actual_reps = [];
 focus_trials = arrayfun(@(n) (1:n)', ntrials, 'UniformOutput', false);
 do_zscore = false;
 
@@ -61,6 +62,8 @@ if ~isempty(varargin)
                 focus_trials = varargin{k+1};
             case 'method'
                 method = varargin{k+1};
+            case 'actualreps'
+                actual_reps = varargin{k+1};
             case 'zscore'
                 do_zscore = varargin{k+1};
         end
@@ -83,9 +86,14 @@ end
 
 % useful metrics (based on first subject)
 [ntrials,nsets,nshuffles] = size(p{1}.predicted_labs_SH);
-stims = unique(p{1}.input_labs);
+all_labs = cellfun(@(x) x.input_labs, p, 'UniformOutput', false);
+stims = unique(vertcat(all_labs{:}));
 nstims = numel(stims);
-
+% this checks for the max num of repetitions across all stimuli and
+% subjects
+n_repetitions = max(cellfun(@(x) max(cellfun(@(s) sum(ismember(x.input_labs, s)), stims)), p));
+if isempty(actual_reps); actual_reps = 1:n_repetitions; end
+n_sets = width(p{1}.predicted_labs);
 
 %% Plot onto provided axes
 
@@ -212,10 +220,7 @@ function out = performanceMat()
     out = [];
 
     %% extract performance matrix [test rep x train set x subject*stimulus]
-    % this checks for the max num of repetitions across all stimuli and
-    % subjects
-    n_repetitions = max(cellfun(@(x) max(cellfun(@(s) sum(ismember(x.input_labs, s)), stims)), p));
-    performance = nan(n_repetitions,n_repetitions,nsubjects*nstims);
+    performance = nan(n_repetitions,n_sets,nsubjects*nstims);
     for i_subject = 1:nsubjects
         % set training trials = nan, so we can keep the right structure
         % without considering validation performance, only true tests.
@@ -241,6 +246,7 @@ function out = performanceMat()
 
     axis square
     xticks(1:nsets); yticks(1:nsets)
+    xticklabels(actual_reps); yticklabels(actual_reps)
     xlabel('template trial #')
     ylabel('test trial #')
     grid off; box on

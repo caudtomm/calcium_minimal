@@ -559,8 +559,8 @@ classdef ActivityTraces
             data.ROI_map_common = map;
 
             data.idx_by_stim_type = sortbyStimType(data);
-            % data.traces = traceFormat(obj.dFoverF(:,obj.goodNeuron_IDs,:));
-            data.traces = traceFormat(obj.pSpike);
+            data.traces = traceFormat(obj.dFoverF(:,obj.goodNeuron_IDs,:));
+            % data.traces = traceFormat(obj.pSpike(:,obj.goodNeuron_IDs,:));
             data.stim_on_sec = obj.stim_series.frame_onset(1)/obj.framerate;
             data.stim_off_sec = obj.stim_series.frame_offset(1)/obj.framerate;
             data.response_window = [data.stim_on_sec , data.stim_off_sec];

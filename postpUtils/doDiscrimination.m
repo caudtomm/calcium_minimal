@@ -75,13 +75,12 @@ for i = 1:nstims
     label_repetitions(idx) = 1:numel(idx);
 end
 
-repetitions = 1:5;
-oneblock = [1:nstims];
+repetitions = 1:max(label_repetitions);
 switch trainblockmode % # TODO : this should be adaptive to the num of repetitions of each label found in the data
     case '3blocks'
-        trainblocksets = {1:3, 2:4, 3:5};
+        trainblocksets = arrayfun(@(x) x:x+2, 1:repetitions(end)-2, 'UniformOutput', false);
     case 'single'
-        trainblocksets = {1,2,3,4,5};
+        trainblocksets = num2cell(repetitions);
     otherwise
         error('specified training blocks mode is unknown')
 end

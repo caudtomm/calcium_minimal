@@ -193,6 +193,7 @@ classdef ExperimentViewer
             plotType = 'performance_lines';
             method = 'correlation';
             stim_allowed = 'all stimuli';
+            reps_touse = [];
             focus_stims = 'all trials'; % by default, no further filtering
             do_zscore = false;
 
@@ -206,6 +207,8 @@ classdef ExperimentViewer
                             plotType = varargin{k+1};
                         case 'method'
                             method = varargin{k+1};
+                        case 'repetitions'
+                            reps_touse = varargin{k+1};
                         case 'stims_allowed'
                             stim_allowed = varargin{k+1};
                         case 'focus_stims'
@@ -248,6 +251,32 @@ classdef ExperimentViewer
                     % plot ... nothing!
                     return
                 end
+
+                % Stimulus repetition filter
+                if isempty(reps_touse); continue; end % empty argument 'repetitions' leads to all repetitions being used
+                thisstims = unique(all_labs{i});
+                nstims = numel(thisstims);
+                idx_keep = false(1, numel(all_labs{i}));
+                for i_stim = 1:nstims
+                    idx_stim = find(ismember(all_labs{i}, thisstims{i_stim}));
+                    this_nreps = numel(idx_stim);
+                    % Select only allowed repetition indices
+                    reps_available = 1:this_nreps;
+                    reps_valid = reps_available(ismember(reps_available, reps_touse));
+                    if isempty(reps_valid)
+                        continue
+                    end
+                    idx_keep(idx_stim(reps_valid)) = true;
+                end
+                if ~all(idx_keep)
+                    % Filter events and labels to keep only desired repetitions
+                    events{i} = events{i}(:,:,idx_keep);
+                    all_labs{i} = all_labs{i}(idx_keep);
+                elseif sum(idx_keep)==0
+                    % If no trials are accepted, return without trying to
+                    % plot ... nothing!
+                    return
+                end
             end
 
             % call low-level processor (perform discrimination analysis)
@@ -285,6 +314,7 @@ classdef ExperimentViewer
                 plotType,obj.plotConfig, ...
                 'method',method, ...
                 'FocusTrials',focus_trials, ...
+                'actualreps', reps_touse, ...
                 'zscore',do_zscore);
 
             % return
@@ -410,12 +440,13 @@ classdef ExperimentViewer
             hold off
         end
 
-        function [hf, out] = plotDiscriminationPerformanceMats(obj, ps_lim, method,focus_stims,do_zscore)  
+        function [hf, out] = plotDiscriminationPerformanceMats(obj, ps_lim, method,focus_stims,repetitions,do_zscore)  
             arguments
                 obj
                 ps_lim = [1 20]
                 method = 'correlation'
                 focus_stims = 'all trials' % by default no further filtering
+                repetitions = [];
                 do_zscore = false
             end
             
@@ -473,10 +504,11 @@ classdef ExperimentViewer
                                     'method',method, ...
                                     'focus_stims', focus_stims, ...
                                     'zscore',do_zscore, ...
+                                    'repetitions',repetitions, ...
                                     'stims_allowed',thisodorset);
 
                     % override title and ylabel
-                    title(thisodorset_str,'color',cfg.textcol)
+                    title(thisodorset_str,'color',obj.plotConfig.textcol)
                     ylabel(thisgroup)
 
                     % if there is no data, delete the subplot
