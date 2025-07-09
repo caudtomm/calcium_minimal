@@ -266,7 +266,10 @@ classdef ExperimentViewer
             if isempty(all_out); return; end
 
             % call low-level plotter
-            out = plotDiscrimination(all_out,plotType,obj.plotConfig,'zscore',do_zscore);
+            out = plotDiscrimination(all_out,...
+                plotType,obj.plotConfig, ...
+                'method',method, ...
+                'zscore',do_zscore);
 
             % return
 
@@ -391,12 +394,12 @@ classdef ExperimentViewer
             hold off
         end
 
-        function [hf, out] = plotDiscriminationPerformanceLines(obj, ps_lim, method,do_zscore)  
+        function [hf, out] = plotDiscriminationPerformanceMats(obj, ps_lim, method,do_zscore)  
             arguments
                 obj
                 ps_lim = [1 20]
                 method = 'correlation'
-                do_zscore = true
+                do_zscore = false
             end
             
             % Knobs
@@ -449,7 +452,7 @@ classdef ExperimentViewer
 
                     % call intermediate-level plotter
                     out{n} = obj.plotDiscriminationHead('ps_lim',ps_lim, ...
-                                    'plotType', 'performance_lines', ...
+                                    'plotType', 'performance_mat', ...
                                     'method',method, ...
                                     'zscore',do_zscore, ...
                                     'stims_allowed',thisodorset);
@@ -468,7 +471,7 @@ classdef ExperimentViewer
                     n = n+1;
                 end
             end
-            set(gcf,'Position',[1 1 700 4000])
+            set(gcf,'Position',[1 1 2000 1000])
 
 
         end

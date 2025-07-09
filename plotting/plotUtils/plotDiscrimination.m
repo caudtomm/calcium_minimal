@@ -49,6 +49,7 @@ end
 %
 ntrials = cellfun(@(x) numel(x.input_labs),predictions);
 % Set default values
+method = '';
 focus_trials = arrayfun(@(n) (1:n)', ntrials, 'UniformOutput', false);
 do_zscore = false;
 
@@ -58,6 +59,8 @@ if ~isempty(varargin)
         switch lower(varargin{k})
             case 'focustrials'
                 focus_trials = varargin{k+1};
+            case 'method'
+                method = varargin{k+1};
             case 'zscore'
                 do_zscore = varargin{k+1};
         end
@@ -87,8 +90,10 @@ nstims = numel(stims);
 %% Plot onto provided axes
 
 switch plotType
-    case 'performance_lines' % Plot all in one big matrix
+    case 'performance_lines' % Plot line graph as a function of training set
         out = performanceLines();
+    case 'performance_mat' % Plot performance matrix [# test trial x # training trial]
+        out = performanceMat();
     otherwise
         error('Requested plot type is unknown.')
 end
@@ -201,5 +206,55 @@ function out = performanceLines()
     %% return
     out = performance;
 end
+
+
+function out = performanceMat()
+    out = [];
+
+    %% extract performance matrix [test rep x train set x subject*stimulus]
+    % this checks for the max num of repetitions across all stimuli and
+    % subjects
+    n_repetitions = max(cellfun(@(x) max(cellfun(@(s) sum(ismember(x.input_labs, s)), stims)), p));
+    performance = nan(n_repetitions,n_repetitions,nsubjects*nstims);
+    for i_subject = 1:nsubjects
+        % set training trials = nan, so we can keep the right structure
+        % without considering validation performance, only true tests.
+        this_predictions = p{i_subject}.prediction_iscorrect;
+        this_predictions(p{i_subject}.train_trials) = nan;
+        for i_stim = 1:nstims
+            idx = find(ismember(p{i_subject}.input_labs,stims{i_stim})); % only this odor's trials
+            this_nreps = numel(idx); % how many repetitions for this stimulus in this subject (makes it robust)
+
+            performance(1:this_nreps,:,(i_subject-1)*nstims+i_stim) = ...
+                this_predictions(idx,:);
+        end
+    end
+
+    if do_zscore; performance = nanzscore(performance,[],2); end
+
+    %% plotting
+    imagesc(mean(performance,3,'omitmissing'));
+
+    %% cosmetics
+    chance_lvl = 1/nstims;
+    crange = [chance_lvl, 1];
+
+    axis square
+    xticks(1:nsets); yticks(1:nsets)
+    xlabel('template trial #')
+    ylabel('test trial #')
+    grid off; box on
+    clim(crange)
+    colormap(cfg.colormapName)
+    a = colorbar('Color',cfg.axcol);
+    a.Label.String = method;
+    a.Label.FontSize= gca().FontSize;
+    set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+    set(gcf, 'color', cfg.bgcol); 
+
+    %% return
+    out = performance;
+end
+
 
 end

@@ -52,7 +52,7 @@ function [distanceMAT3D] = plotRepetitionSimilarity(C,stims,pl)
         % now, isolate odors
         for i_stim = 1:nstims
             idx = find(ismember(labs,stims{i_stim})); % only this odor's trials
-            distanceMAT3D(:,:,(i_fish-1)*numel(stims)+i_stim) = c(idx,idx);
+            distanceMAT3D(:,:,(i_fish-1)*nstims+i_stim) = c(idx,idx);
         end
     end
 

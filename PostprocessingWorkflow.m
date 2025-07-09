@@ -66,7 +66,7 @@ nwindows = diff(t_lim_sec)+1;
 times = linspace(t_lim_sec(1),t_lim_sec(2),nwindows); % 1 per sec
 windows = times(:) + [0 1];
 for i = 1:nwindows
-    hf = v.plotDiscriminationPerformanceLines(windows(i,:), 'correlation',false); % outputs 1 figure
+    hf = v.plotDiscriminationPerformanceMats(windows(i,:), 'correlation',false); % outputs 1 figure
     figs.title = ['Template-match: sec', num2str(windows(i,1)), '-', num2str(windows(i,2))];
     figs.append(hf);
     close(hf)
