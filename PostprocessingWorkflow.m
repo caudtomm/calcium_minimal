@@ -1,6 +1,11 @@
 %% Knobs
 
-s = true; % save figures to files?
+s = false; % save figures to files?
+
+% for sliding windows
+window_duration = 1; % [seconds]
+t_lim_sec = [-5 35]; % from 5 sec before to 35 seconds after stimulus onset
+overlap = .3; % [seconds]
 
 %% Load dataset
 filename = 'odorexp004_IC1_130625.mat';
@@ -50,18 +55,11 @@ figs.append(hf);
 close(hf)
 
 % stimulus repetitions, second by second
-window_duration = 1; % [seconds]
-t_lim_sec = [-1 25]; % from 1 sec before to 25 seconds after stimulus onset
-nwindows = ceil(diff(t_lim_sec)/window_duration)+1;
-times = linspace(t_lim_sec(1),t_lim_sec(2),nwindows); % 1 per sec
-windows = times(:) + [0 1];
-out = cell(nwindows,1);
-for i = 1:nwindows
-    [hf,out{i}] = v.plotRepetitionDistances(windows(i,:),'correlation'); % outputs 2 figures
-    figs.title = ['Repetitions: sec', num2str(windows(i,1)), '-', num2str(windows(i,2))];
-    % figs.append(hf);
-    close(hf)
-end
+windows = defineTimeWindows(window_duration,t_lim_sec,overlap);
+[hf,data] = similarityDynamics(v,figs,windows,s);
+figs.title = 'Repetitions over time';
+figs.append(hf);
+close(hf)
 
 %% Discrimination analysis (template-matching)
 

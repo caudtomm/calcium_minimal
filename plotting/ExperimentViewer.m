@@ -325,7 +325,7 @@ classdef ExperimentViewer
 
         %% complex and idiosyncratic high-level plotters
 
-        function [hf, out] = plotRepetitionDistances(obj, ps_lim, method)  
+        function [hf, out, groups, odor_sets] = plotRepetitionDistances(obj, ps_lim, method)  
             arguments
                 obj
                 ps_lim = [1 20]
@@ -416,16 +416,21 @@ classdef ExperimentViewer
                 thismat = 1 - out{i}.distMat3d; % convert distance to similarity
                 
                 % knobs # TODO : tunable param
-                repetitions = 2:5;
+                repetitions = 1:5;
 
-                % crop and take out the diagonal
+                % crop and take out the diagonal and lower triangular
+                % matrix
                 thismat = thismat(repetitions,repetitions,:);
-                identity = logical(eye(length(repetitions)));
-                thismat(identity) = nan;
+                idx = triu(true(numel(repetitions)), 1); % only upper triangle idx
+                idx = repmat(idx,1,1,size(thismat,3));
+                thismat = thismat(idx); % column vector
 
                 % store
                 plot_idx = i * ones(numel(thismat),1);
-                data = [data; plot_idx, thismat(:)];
+                data = [data; plot_idx, thismat];
+
+                % return
+                out{i}.data = thismat; % column vector
             end
             
             % plot
@@ -440,7 +445,7 @@ classdef ExperimentViewer
             hold off
         end
 
-        function [hf, out] = plotDiscriminationPerformanceMats(obj, ps_lim, method,focus_stims,repetitions,do_zscore)  
+        function [hf, out, groups, odor_sets] = plotDiscriminationPerformanceMats(obj, ps_lim, method,focus_stims,repetitions,do_zscore)  
             arguments
                 obj
                 ps_lim = [1 20]

@@ -8,7 +8,7 @@ classdef PlotConfig
         colormapName char = 'jet'    % MATLAB colormap name
         showGrid logical = true      % display grid in internal plots
         lineWidth double = 1.5       % default line width
-        c double = lines(10)         % default plot colors
+        c double = lines(100)        % default plot colors
         axcol double = [0 0 0]       % default axis color
         bgcol = [1 1 1]              % default figure background color
         textcol double = [0 0 0]     % default text color
@@ -83,7 +83,7 @@ classdef PlotConfig
         
             switch obj.theme
                 case 'dark'
-                    colors = [
+                    base_colors = [
                         0.90 0.60 0.00; % amber
                         0.00 0.60 0.90; % cyan
                         0.90 0.00 0.60; % magenta
@@ -95,10 +95,13 @@ classdef PlotConfig
                         0.20 1.00 1.00; % aqua
                         1.00 1.00 0.20  % yellow
                     ];
+                    colors = repmat(base_colors, 10, 1);
+                    jitter = 0.05 * randn(size(colors)); % small variation
+                    colors = min(max(colors + jitter, 0), 1); % clamp between 0 and 1
                 case 'light'
-                    colors = lines(10); % MATLAB default
+                    colors = lines(100); % MATLAB default
                 otherwise
-                    colors = colorcube(10); % fallback
+                    colors = colorcube(100); % fallback
             end
         end
 
