@@ -70,6 +70,11 @@ if ~isempty(varargin)
     end
 end
 
+% get all stimulus labels, not only the focused ones
+all_labs = cellfun(@(x) x.input_labs, predictions, 'UniformOutput', false);
+stims_all = unique(vertcat(all_labs{:}));
+nstims_all = numel(stims_all);
+
 % from input predictions, only keep focus trials
 nsubjects = numel(predictions);
 p = cell(nsubjects,1);
@@ -157,7 +162,7 @@ function out = performanceLines()
         csh = [.6 .6 .6]; % color for shuffled data
     
         % chance level dotted line # BUG this assumes equal representation of all labels 
-        chancelv = 1/nstims;
+        chancelv = 1/nstims_all;
         line(xlim,repelem(chancelv,2), ...
             'Color','c','LineWidth',3,'LineStyle',':','DisplayName','chance')
     
@@ -241,7 +246,7 @@ function out = performanceMat()
     imagesc(mean(performance,3,'omitmissing'));
 
     %% cosmetics
-    chance_lvl = 1/nstims;
+    chance_lvl = 1/nstims_all;
     crange = [chance_lvl, 1];
 
     axis square

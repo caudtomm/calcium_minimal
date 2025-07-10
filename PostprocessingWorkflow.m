@@ -50,14 +50,16 @@ figs.append(hf);
 close(hf)
 
 % stimulus repetitions, second by second
+window_duration = 1; % [seconds]
 t_lim_sec = [-1 25]; % from 1 sec before to 25 seconds after stimulus onset
-nwindows = diff(t_lim_sec)+1;
+nwindows = ceil(diff(t_lim_sec)/window_duration)+1;
 times = linspace(t_lim_sec(1),t_lim_sec(2),nwindows); % 1 per sec
 windows = times(:) + [0 1];
+out = cell(nwindows,1);
 for i = 1:nwindows
-    hf = v.plotRepetitionDistances(windows(i,:),'correlation'); % outputs 2 figures
+    [hf,out{i}] = v.plotRepetitionDistances(windows(i,:),'correlation'); % outputs 2 figures
     figs.title = ['Repetitions: sec', num2str(windows(i,1)), '-', num2str(windows(i,2))];
-    figs.append(hf);
+    % figs.append(hf);
     close(hf)
 end
 
@@ -70,12 +72,14 @@ figs.append(hf);
 close(hf)
 
 % template matching, second by second
-t_lim_sec = [-1 40]; % from 1 sec before to 25 seconds after stimulus onset
-nwindows = diff(t_lim_sec)+1;
+window_duration = 1; % [seconds]
+t_lim_sec = [-1 40]; % from 1 sec before to 40 seconds after stimulus onset
+nwindows = ceil(diff(t_lim_sec)/window_duration)+1;
 times = linspace(t_lim_sec(1),t_lim_sec(2),nwindows); % 1 per sec
 windows = times(:) + [0 1];
+out = cell(nwindows,1);
 for i = 1:nwindows
-    hf = v.plotDiscriminationPerformanceMats(windows(i,:), 'correlation','all trials',1:5,false); % outputs 1 figure
+    [hf, out{i}] = v.plotDiscriminationPerformanceMats(windows(i,:), 'correlation','all trials',1:5,false); % outputs 1 figure
     figs.title = ['Template-match: sec', num2str(windows(i,1)), '-', num2str(windows(i,2))];
     figs.append(hf);
     close(hf)
@@ -90,7 +94,7 @@ close(hf)
 
 % template matching, stimulus window, focus on performance for Leu
 hf = v.plotDiscriminationPerformanceMats([1 20], 'correlation',{'Leu'},1:5,false); % outputs 1 figure
-figs.title = 'Template-match performance on novel stimuli';
+figs.title = 'Template-match performance on Leu';
 figs.append(hf);
 close(hf)
 
