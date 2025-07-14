@@ -10,7 +10,7 @@ cfg = v.plotConfig;
 nwindows = height(windows);
 out = cell(nwindows,1);
 for i = 1:nwindows
-    [hf,out{i}, subject_groups, stim_groups] = v.plotRepetitionDistances(windows(i,:),'correlation'); % outputs 2 figures
+    [hf,out{i}, subject_groups, stim_groups] = plotRepetitionDistances(v,windows(i,:),'correlation'); % outputs 2 figures
     figs.title = ['Repetitions: sec', num2str(windows(i,1)), '-', num2str(windows(i,2))];
     if s; figs.append(hf); end
     close(hf)

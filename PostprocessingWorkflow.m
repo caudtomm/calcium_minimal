@@ -49,7 +49,7 @@ figs.append(hf);
 close(hf)
 
 % stimulus repetition comparisons
-hf = v.plotRepetitionDistances([1 20],'correlation'); % outputs 2 figures
+hf = plotRepetitionDistances(v,[1 20],'correlation'); % outputs 2 figures
 figs.title = 'Repetition comparison';
 figs.append(hf);
 close(hf)
@@ -64,7 +64,7 @@ close(hf)
 %% Discrimination analysis (template-matching)
 
 % template matching, stimulus window
-hf = v.plotDiscriminationPerformanceMats([1 20], 'correlation','all trials',1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all trials',1:5,false); % outputs 1 figure
 figs.title = 'Template-match performance comparison';
 figs.append(hf);
 close(hf)
@@ -78,52 +78,52 @@ close(hf)
 
 % template matching, stimulus window, focus on performance for novel
 % stimuli
-hf = v.plotDiscriminationPerformanceMats([1 20], 'correlation','all novel',1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all novel',1:5,false); % outputs 1 figure
 figs.title = 'Template-match performance on novel stimuli';
 figs.append(hf);
 close(hf)
 
 % template matching, stimulus window, focus on performance for Leu
-hf = v.plotDiscriminationPerformanceMats([1 20], 'correlation',{'Leu'},1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation',{'Leu'},1:5,false); % outputs 1 figure
 figs.title = 'Template-match performance on Leu';
 figs.append(hf);
 close(hf)
 
 % template matching, stimulus window, focus on performance for familiar
 % stimuli
-hf = v.plotDiscriminationPerformanceMats([1 20], 'correlation','all familiar',1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all familiar',1:5,false); % outputs 1 figure
 figs.title = 'Template-match performance on familiar stimuli';
 figs.append(hf);
 close(hf)
 
 % template matching, stimulus window, focus on performance for CS+
 % stimuli
-hf = v.plotDiscriminationPerformanceMats([1 20], 'correlation','all CS+',1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all CS+',1:5,false); % outputs 1 figure
 figs.title = 'Template-match performance on CS+ stimuli';
 figs.append(hf);
 close(hf)
 
 % template matching, stimulus window, focus on performance for CS-
 % stimuli
-hf = v.plotDiscriminationPerformanceMats([1 20], 'correlation','all CS-',1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all CS-',1:5,false); % outputs 1 figure
 figs.title = 'Template-match performance on CS- stimuli';
 figs.append(hf);
 close(hf)
 
 % template matching based only on trials 1:4, stimulus window
-hf = v.plotDiscriminationPerformanceMats([1 20], 'correlation','all trials',1:4,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all trials',1:4,false); % outputs 1 figure
 figs.title = 'Template-match performance comparison';
 figs.append(hf);
 close(hf)
 
 % template matching based only on trials 2:4, stimulus window
-hf = v.plotDiscriminationPerformanceMats([1 20], 'correlation','all trials',2:4,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all trials',2:4,false); % outputs 1 figure
 figs.title = 'Template-match performance comparison';
 figs.append(hf);
 close(hf)
 
 % template matching based only on trials 2:5, stimulus window
-hf = v.plotDiscriminationPerformanceMats([1 20], 'correlation','all trials',2:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all trials',2:5,false); % outputs 1 figure
 figs.title = 'Template-match performance comparison';
 figs.append(hf);
 close(hf)
