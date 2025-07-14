@@ -70,18 +70,11 @@ figs.append(hf);
 close(hf)
 
 % template matching, second by second
-window_duration = 1; % [seconds]
-t_lim_sec = [-1 40]; % from 1 sec before to 40 seconds after stimulus onset
-nwindows = ceil(diff(t_lim_sec)/window_duration)+1;
-times = linspace(t_lim_sec(1),t_lim_sec(2),nwindows); % 1 per sec
-windows = times(:) + [0 1];
-out = cell(nwindows,1);
-for i = 1:nwindows
-    [hf, out{i}] = v.plotDiscriminationPerformanceMats(windows(i,:), 'correlation','all trials',1:5,false); % outputs 1 figure
-    figs.title = ['Template-match: sec', num2str(windows(i,1)), '-', num2str(windows(i,2))];
-    figs.append(hf);
-    close(hf)
-end
+windows = defineTimeWindows(window_duration,t_lim_sec,overlap);
+[hf,data] = discriminationDynamics(v,figs,windows,s);
+figs.title = 'Discrimination over time';
+figs.append(hf);
+close(hf)
 
 % template matching, stimulus window, focus on performance for novel
 % stimuli
