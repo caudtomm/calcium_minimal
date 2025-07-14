@@ -4,12 +4,22 @@ s = false; % save figures to files?
 
 % for sliding windows
 window_duration = 1; % [seconds]
-t_lim_sec = [-5 35]; % from 5 sec before to 35 seconds after stimulus onset
+t_lim_sec = [-1 2]; % from 5 sec before to 35 seconds after stimulus onset
 overlap = .3; % [seconds]
 
 %% Load dataset
 filename = 'odorexp004_IC1_130625.mat';
+
+%
 experiment = load(filename).a; % Experiment object
+% or
+experiment = a; clear a
+
+% avoid any spelling mismatches
+for i = 1:numel(experiment.traces)
+experiment.traces{i}.subject_group = experiment.subjectTab.group{i};
+end
+
 
 %% initialize output figure saving
 cfg = PlotConfig('theme', 'light');

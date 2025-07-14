@@ -85,56 +85,35 @@ classdef ExperimentViewer
             if ~isempty(varargin)
                 for k = 1:2:length(varargin)
                     switch lower(varargin{k})
+                        % data filters
                         case 'ps_lim'
                             ps_lim = varargin{k+1};
-                        case 'plottype'
-                            plotType = varargin{k+1};
-                        case 'method'
-                            method = varargin{k+1};
                         case 'trial_sorting'
                             trial_sorting = varargin{k+1};
                         case 'stims_allowed'
                             stim_allowed = varargin{k+1};
+                        % processing parameters
+                        case 'method'
+                            method = varargin{k+1};
+                        % plotting parameters
+                        case 'plottype'
+                            plotType = varargin{k+1};
                     end
                 end
             end
 
             % initialize output
             out = [];
-
+            
             % Isolating relevant data
-            nsubjects = numel(obj.filtered_traces);
-            events = cell(nsubjects,1);
-            all_labs = cell(nsubjects,1);
-            for i = 1:nsubjects
-                thistrace = obj.filtered_traces{i};
+            dft = obj.dataFilter;
+            dft.interval = ps_lim;
+            dft.trial_sorting = trial_sorting;
+            dft.repetitions = []; % always use all repetitions
+            dft.stims_allowed = stim_allowed;
+            [events, all_labs] = dft.filterData(obj);
+            if all(cellfun(@isempty,events)); return; end
 
-                % Trial sorting
-                [~,trial_idx] = TraceViewer(thistrace).sortTrials(trial_sorting);
-
-                % get peri-stimulus data [t,N,trials]
-                M = thistrace.(obj.dataFilter.traceType)(:,:,trial_idx);
-                stim_on_frame = thistrace.stim_series.frame_onset(1);
-                fs = thistrace.framerate;
-                events{i} = TraceViewer.getPeriEventData(M,stim_on_frame,ps_lim,fs);
-
-                % Retrieve stimulus identity labels
-                all_labs{i} = thistrace.stim_series.stimulus(trial_idx);
-
-                % Stimulus filtering
-                thisgroup = thistrace.subject_group;
-                desired_stimuli = getStimuliByGroup(thisgroup,stim_allowed);
-                idx = ismember(all_labs{i}, desired_stimuli);
-                if ~isempty(desired_stimuli) && ~all(idx) && sum(idx)>0
-                    % If some trials are not in the desired stimuli, filter them out
-                    events{i} = events{i}(:,:,idx);
-                    all_labs{i} = all_labs{i}(idx);
-                elseif isempty(desired_stimuli) || sum(idx)==0
-                    % If no stimuli are accepted, return without trying to
-                    % plot ... nothing!
-                    return
-                end
-            end
 
             % by default, labels are applied based on subject 1
             labs = all_labs{1};
@@ -201,16 +180,19 @@ classdef ExperimentViewer
             if ~isempty(varargin)
                 for k = 1:2:length(varargin)
                     switch lower(varargin{k})
+                        % data filters
                         case 'ps_lim'
                             ps_lim = varargin{k+1};
-                        case 'plottype'
-                            plotType = varargin{k+1};
-                        case 'method'
-                            method = varargin{k+1};
                         case 'repetitions'
                             reps_touse = varargin{k+1};
                         case 'stims_allowed'
                             stim_allowed = varargin{k+1};
+                        % processing parameters
+                        case 'method'
+                            method = varargin{k+1};
+                        % plotting parameters
+                        case 'plottype'
+                            plotType = varargin{k+1};
                         case 'focus_stims'
                             focus_stims = varargin{k+1};
                         case 'zscore'
@@ -221,63 +203,18 @@ classdef ExperimentViewer
 
             % initialize output
             out = [];
-
+            
             % Isolating relevant data
+            dft = obj.dataFilter;
+            dft.interval = ps_lim;
+            dft.trial_sorting = 'chronological'; % does not matter here
+            dft.repetitions = reps_touse;
+            dft.stims_allowed = stim_allowed;
+            [events, all_labs] = dft.filterData(obj);
+            if all(cellfun(@isempty,events)); return; end
+
+            % useful metrics
             nsubjects = numel(obj.filtered_traces);
-            events = cell(nsubjects,1);
-            all_labs = cell(nsubjects,1);
-            for i = 1:nsubjects
-                thistrace = obj.filtered_traces{i};
-
-                % get peri-stimulus data [t,N,trials]
-                M = thistrace.(obj.dataFilter.traceType);
-                stim_on_frame = thistrace.stim_series.frame_onset(1);
-                fs = thistrace.framerate;
-                events{i} = TraceViewer.getPeriEventData(M,stim_on_frame,ps_lim,fs);
-
-                % Retrieve stimulus identity labels
-                all_labs{i} = thistrace.stim_series.stimulus;
-
-                % Stimulus filtering
-                thisgroup = thistrace.subject_group;
-                desired_stimuli = getStimuliByGroup(thisgroup,stim_allowed);
-                idx = ismember(all_labs{i}, desired_stimuli);
-                if ~isempty(desired_stimuli) && ~all(idx)
-                    % If some trials are not in the desired stimuli, filter them out
-                    events{i} = events{i}(:,:,idx);
-                    all_labs{i} = all_labs{i}(idx);
-                elseif isempty(desired_stimuli) || sum(idx)==0
-                    % If no stimuli are accepted, return without trying to
-                    % plot ... nothing!
-                    return
-                end
-
-                % Stimulus repetition filter
-                if isempty(reps_touse); continue; end % empty argument 'repetitions' leads to all repetitions being used
-                thisstims = unique(all_labs{i});
-                nstims = numel(thisstims);
-                idx_keep = false(1, numel(all_labs{i}));
-                for i_stim = 1:nstims
-                    idx_stim = find(ismember(all_labs{i}, thisstims{i_stim}));
-                    this_nreps = numel(idx_stim);
-                    % Select only allowed repetition indices
-                    reps_available = 1:this_nreps;
-                    reps_valid = reps_available(ismember(reps_available, reps_touse));
-                    if isempty(reps_valid)
-                        continue
-                    end
-                    idx_keep(idx_stim(reps_valid)) = true;
-                end
-                if ~all(idx_keep)
-                    % Filter events and labels to keep only desired repetitions
-                    events{i} = events{i}(:,:,idx_keep);
-                    all_labs{i} = all_labs{i}(idx_keep);
-                elseif sum(idx_keep)==0
-                    % If no trials are accepted, return without trying to
-                    % plot ... nothing!
-                    return
-                end
-            end
 
             % call low-level processor (perform discrimination analysis)
             all_out = cell(nsubjects,1);
@@ -323,7 +260,7 @@ classdef ExperimentViewer
 
 
 
-        %% complex and idiosyncratic high-level plotters
+        %% complex and idiosyncratic high-level plotters are saved in external files
 
 
     end
