@@ -542,6 +542,7 @@ classdef ExperimentViewer
             % init vars
             nfish = numel(obj.traces);
             hf = gobjects(9,1);
+            cfg = obj.plotConfig;
             
             % figure init
             hf(1) = figure;
@@ -672,16 +673,21 @@ classdef ExperimentViewer
             % heatmap of inferred SR vs dFoverF over all data
             hf(9) = figure;
             subplot(131); h(1)=histogram(dF_all,50);
-            xlabel('dFoverF'); axis square; box off
+            xlabel('dFoverF','Color',cfg.textcol);
+            ylabel('histogram','Color',cfg.textcol);
+            axis square; box off
             subplot(132); h(2)=histogram(pSpike_all,50);
-            xlabel('inferred SR'); axis square; box off
-            x1 = h(1).BinEdges(2:end); x2 = h(2).BinEdges(2:end);
-            vals1 = h(1).Values; vals2 = h(2).Values;
-            hmap = vals2' * vals1;
-            subplot(133); imagesc(x1,x2,log(hmap));
+            xlabel('inferred SR','Color',cfg.textcol);
+            axis square; box off
+            subplot(133); plotHeatmapAndIsoclines(dF_all, pSpike_all, 50, 1,0,1)
             axis square
             b = colorbar; b.Label.String = 'Log Density';
-            xlabel('dFoverF'); ylabel('inferred SR');
+            xlabel('dFoverF','Color',cfg.textcol);
+            ylabel('inferred SR','Color',cfg.textcol);
+            title('')
+            set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol);
+            set(gcf, 'color', cfg.bgcol); 
+            set(gcf,'Position',[100 100 1000 300])
 
 
         end
