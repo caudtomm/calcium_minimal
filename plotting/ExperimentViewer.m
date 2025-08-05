@@ -114,7 +114,6 @@ classdef ExperimentViewer
             [events, all_labs] = dft.filterData(obj);
             if all(cellfun(@isempty,events)); return; end
 
-
             % by default, labels are applied based on subject 1
             labs = all_labs{1};
 
