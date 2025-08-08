@@ -1,0 +1,188 @@
+function [vals, varargout] = extractActivityMetric(events, metric, n_equals, varargin)
+% low level processor : 
+% 
+% start with events : double [time x units x events/trials]
+%
+% calculate metric (switch options) from "activityMetric" or "sparseness"
+% output - vals : double [units x events/trials] or [time x events/trials], depending on argument 'n_equals' : 'cells' or 'frames', respectively
+
+% Validate inputs
+if nargin < 3
+    error('Not enough input arguments.');
+end
+
+% Parse name-value pair inputs
+stim_types = [];
+if ~isempty(varargin)
+    for i = 1:2:numel(varargin)
+        if strcmpi(varargin{i}, 'StimTypes')
+            stim_types = varargin{i+1};
+        end
+    end
+end
+
+nSubjects = numel(events);
+vals = [];
+
+    data = events; % [time x units x events/trials]
+    [L, nUnits, nEvents] = size(data);
+    switch lower(n_equals)
+        case 'cells'
+            % Output: [units x events/trials]
+            % Input : [time x units x events/trials] <-- nothing to do here
+        case 'frames'
+            % Output: [time x events/trials]
+            % Input : [units x time x events/trials]
+            data = permute(data, [2, 1, 3]); % [units x time x events/trials]
+        otherwise
+            error('Unknown n_equals: %s', n_equals);
+    end
+    
+    switch lower(metric)
+
+        % metrics that return a column vector of size [trials x 1]
+        case 'population sparseness'
+            checkn_equals(n_equals, 'cells');
+            data = squeeze(mean(data,1,'omitmissing')); % get mean activity per unit across trials
+            thisvals = squeeze(sum(data.^2, 1, 'omitmissing')) ./ ...
+                (nUnits * sum(data, 1, 'omitmissing').^2);
+        case 'normalized population sparseness'
+            checkn_equals(n_equals, 'cells');
+            data = squeeze(mean(data,1,'omitmissing')); % get mean activity per unit across trials
+            thisvals = (squeeze(sum(data.^2, 1, 'omitmissing')) ./ ...
+                (sum(data, 1, 'omitmissing').^2) - 1/nUnits) ./ (1 - 1/nUnits);
+        case 'participation ratio'
+            thisvals = zeros(1, nEvents);
+            for i = 1:nEvents
+                c = cov(data(:,:,i), 'omitrows'); % covariance matrix
+                eigv = eig(c); % eigenvalues
+                rel_eigv = eigv / sum(eigv); % normalized eigenvalues
+                thisvals(i) = 1 ./ sum(rel_eigv.^2); % participation ratio
+            end
+
+        % metrics that return a column vector of size [units x 1]
+        case 'selectivity of tuning'
+            checkn_equals(n_equals, 'cells');
+            checkexists(stim_types, 'StimTypes');
+            thisvals = calculateTuningSelectivity(data,stim_types);
+        case 'singletrial lifetime kurtosis'
+            checkn_equals(n_equals, 'cells');
+            thisvals = calculateLifetimeKurtosisSingleTrials(data);
+        case 'stimuli lifetime kurtosis'
+            checkn_equals(n_equals, 'cells');
+            checkexists(stim_types, 'StimTypes');
+            thisvals = calculateLifetimeKurtosisStimuli(data,stim_types);
+
+        % metrics that return a matrix of size [time/units x trials]
+        case 'max intensity'
+            thisvals = squeeze(max(data,[],1,'omitmissing'));
+        case 'avg intensity'
+            thisvals = squeeze(mean(data,1,'omitmissing'));
+        case 'variance'
+            thisvals = squeeze(std(data,[],1,'omitmissing')).^2;
+            
+        % metrics that return a matrix of size [trials x trials]
+        case 'common active units' % # TODO: common active units
+        case 'mahalanobis distance' % # TODO: mahalanobis distance
+
+        otherwise
+            error('Unknown metric: %s', metric);
+    end
+
+    vals = thisvals; % Store the computed values
+
+end
+
+% # TODO: output tuning curves or split into two functions
+function sparseness = calculateTuningSelectivity(activityTraces,stim_type)
+    % Get the dimensions of the inputs
+    [timePoints, numNeurons, numTrials] = size(activityTraces);
+    stims = unique(stim_type);
+    numStims = numel(stims);
+
+    % Initialize output vector: vertical vector with one [0->1] tuning
+    % selectivity entry per cell
+    sparseness = nan(numNeurons,1);
+
+    % Calculate mean activity level for each neuron for each stimulus
+    allMeanActivity = squeeze(nanmean(activityTraces, 1)); % cells x trials
+    meanActivity = nan(numNeurons,numStims); % cells x stimuli
+    for i_stim = 1:numStims
+        thisstim = stims(i_stim);
+        idx = ismember(stim_type,thisstim);
+        
+        tmp = nanmean(allMeanActivity(:,idx),2);
+        meanActivity(:,i_stim) = tmp;
+    end
+    
+    % Calculate and store tuning selectivity for each neuron
+    for i_cell = 1:numNeurons
+        numerator = sum(meanActivity(i_cell,:)./numStims,'omitnan');
+        denominator = sum((meanActivity(i_cell,:)).^2./numStims,'omitnan');
+        sparseness(i_cell) = 1 - (numerator^2 / denominator);
+    end
+end
+
+function sparseness = calculateLifetimeKurtosisSingleTrials(activityTraces)
+
+     % Get the dimensions of the activityTraces matrix
+    [timePoints, numNeurons, numTrials] = size(activityTraces);
+
+    % Initialize output vector: vertical vector with one [0->1] sparseness
+    % entry per trial
+    sparseness = nan(numNeurons,1);
+
+    % Calculate mean activity level for each neuron during each trial
+    meanActivity = squeeze(nanmean(activityTraces, 1)); % cells x trials
+    
+    % Calculate and store lifetime kurtosis for each neuron
+    sparseness = (nansum((zscore(meanActivity,[],2)).^4, 2) ./ numTrials ) -3;
+end
+
+function sparseness = calculateLifetimeKurtosisStimuli(activityTraces,stim_type)
+    % Get the dimensions of the inputs
+    [timePoints, numNeurons, numTrials] = size(activityTraces);
+    stims = unique(stim_type);
+    numStims = numel(stims);
+
+    % Initialize output vector: vertical vector with one [0->1] tuning
+    % selectivity entry per cell
+    sparseness = nan(numNeurons,1);
+
+    % Calculate mean activity level for each neuron for each stimulus
+    allMeanActivity = squeeze(nanmean(activityTraces, 1)); % cells x trials
+    meanActivity = nan(numNeurons,numStims); % cells x stimuli
+    for i_stim = 1:numStims
+        thisstim = stims(i_stim);
+        idx = ismember(stim_type,thisstim);
+        
+        tmp = nanmean(allMeanActivity(:,idx),2);
+        meanActivity(:,i_stim) = tmp;
+    end
+    
+    % Calculate and store lifetime kurtosis for each neuron
+    sparseness = (nansum((zscore(meanActivity,[],2)).^4, 2) ./ numStims ) -3;
+end
+
+function checkn_equals(n_equals, expected)
+    if ~strcmpi(n_equals, expected)
+        error('Expected n_equals to be "%s", but got "%s".', expected, n_equals);
+    end
+end
+
+function checkexists(var, name)
+    if isempty(var)
+        error('Expected %s to be provided.', name);
+    end
+end
+
+% intermediate level plotter : dynamics
+% 
+% mode 'curve' : loop processor over a sliding window and plot values on a curve
+% mode 'windows_size' : loop processor over a sliding window and over window sizes, plot imagesc onto provided axes
+% mode 'repetitions' : loop processor over a sliding window and over repetitions, plot imagesc onto provided axes
+
+% high level plotter : dynamics
+% 
+% compare across subject groups and stimulus groups, plot imagesc
+% use colorbar, standard clim, log c?

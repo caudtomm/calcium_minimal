@@ -258,6 +258,105 @@ classdef ExperimentViewer
         end
 
 
+        function out = plotTrialActivityMetricHead(obj, varargin)
+            % plotTrialActivityMetricHead - Plot activity metric (specified as name-value pair argument 'Metric') across subjects.
+            %
+            % Usage:
+            %   [hf, out] = obj.plotActivityMetricHead('ps_lim', [start end], 'method', methodName, 'trial_sorting', sortingType)
+            %
+            % Inputs (as name-value pairs):
+            %   'Metric'        - String specifying activity metric to plot (e.g., 'max-activity', 'dF/F zscore') [default: 'dF/F']
+            %   'ps_lim'        - 2-element vector specifying peri-stimulus window in seconds [default: [1 20]]
+            %   'plotType'      - String selecting which plot to produce
+            %                     opitons: {'full','repetitions'}
+            %   'method'        - String specifying similarity/distance metric (e.g., 'correlation') [default: 'correlation']
+            %                     options: see pdist
+            %   'stim_allowed'  - Cell array of strings containing labels of all stimuli to consider. (eg. {'Arg', 'Leu'})
+            %                     or stimulus group name [default: 'all trials']
+            %                     options: {'all trials','all stimuli','all CS+','all CS-','all familiar','all novel'}
+            %
+            % Outputs:
+            %   out  - Output structure
+            arguments
+                obj
+            end
+            arguments (Repeating)
+                varargin
+            end
+
+            % Set default values
+            ps_lim = [1 20];
+            plotType = 'boxplot';
+            method = 'participation ratio';
+            trial_sorting = 'chronological';
+            stim_allowed = 'all stimuli';
+            reps_touse = [];
+            do_normalize = false;
+
+            % Parse name-value pairs
+            if ~isempty(varargin)
+                for k = 1:2:length(varargin)
+                    switch lower(varargin{k})
+                        % data filters
+                        case 'ps_lim'
+                            ps_lim = varargin{k+1};
+                        case 'repetitions'
+                            reps_touse = varargin{k+1};
+                        case 'stims_allowed'
+                            stim_allowed = varargin{k+1};
+                        case 'trial_sorting'
+                            trial_sorting = varargin{k+1};
+                        % processing parameters
+                        case 'method'
+                            method = varargin{k+1};
+                        % plotting parameters
+                        case 'plottype'
+                            plotType = varargin{k+1};
+                        case 'normalize'
+                            do_normalize = varargin{k+1};
+                    end
+                end
+            end
+
+            % initialize output
+            out = [];
+            
+            % Isolating relevant data
+            dft = obj.dataFilter;
+            dft.interval = ps_lim;
+            dft.trial_sorting = trial_sorting;
+            dft.repetitions = reps_touse;
+            dft.stims_allowed = stim_allowed;
+            [events, all_labs] = dft.filterData(obj);
+            if all(cellfun(@isempty,events)); return; end
+
+            % useful metrics
+            nsubjects = numel(obj.filtered_traces);
+
+            % call low-level processor (perform discrimination analysis)
+            all_out = cell(nsubjects,1);
+            for i = 1:nsubjects
+                thisevents = events{i};
+
+                % call post-processing function
+                all_out{i} = extractActivityMetric(thisevents, method, 'cells');
+            end
+
+            % get rid of empty data
+            idx = cellfun(@isempty,all_out);
+            all_out(idx) = [];
+            if isempty(all_out); return; end
+
+            % call low-level plotter
+            out = plotTrialMetric(all_out,...
+                plotType, all_labs{1}, ...
+                do_normalize, obj.plotConfig);
+
+            % return
+
+        end
+
+
 
         %% complex and idiosyncratic high-level plotters are saved in external files
 

@@ -10,7 +10,7 @@ if isempty(stims2use); stims2use = {'Trp','Ser','Ala','Food'}; end
 nstims = numel(stims2use);
 trialn2usein = 1:5;
 if isempty(s); s = 0; end
-method = 'correlation';
+method = 'cosine';
 
 ntrials=30;
 
@@ -32,7 +32,7 @@ if isempty(classifier); classifier = "template_match"; end
 
 % time period to include (relative to [stim_on, stim_off) [s]
 if ~exist('tframe','var') || isempty(tframe); tframe = [1 20]; end
-tframe = [20 20]
+tframe = [1 20]
 
 %% action
 correctLab = [];
