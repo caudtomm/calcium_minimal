@@ -288,6 +288,7 @@ classdef ExperimentViewer
             ps_lim = [1 20];
             plotType = 'boxplot';
             method = 'participation ratio';
+            n_equals = 'cells';
             trial_sorting = 'chronological';
             stim_allowed = 'all stimuli';
             do_normalize = false;
@@ -306,6 +307,8 @@ classdef ExperimentViewer
                         % processing parameters
                         case 'method'
                             method = varargin{k+1};
+                        case 'n_equals'
+                            n_equals = varargin{k+1};
                         % plotting parameters
                         case 'plottype'
                             plotType = varargin{k+1};
@@ -336,7 +339,7 @@ classdef ExperimentViewer
                 thisevents = events{i};
 
                 % call post-processing function
-                all_out{i} = extractActivityMetric(thisevents, method, 'cells');
+                all_out{i} = extractActivityMetric(thisevents, method, n_equals);
             end
 
             % get rid of empty data

@@ -1,8 +1,9 @@
-function [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, ps_lim, method)  
+function [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, ps_lim, method, distr_over)  
     arguments
         v ExperimentViewer
         ps_lim = [1 20]
         method = 'population sparseness'
+        distr_over = 'cells'
     end
     
     % Knobs
@@ -29,22 +30,57 @@ function [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, ps_lim, method)
     %% Figure 1: comparison of trial metric distributions
     i_hf = i_hf+1;
     plotType = 'boxplot';
-    n_subplots = plotGrid;
+    plotGrid;
 
     %% Figure 2: plot by repetition number
     i_hf = i_hf+1;
     plotType = 'boxplot_repetitions';
-    n_subplots = plotGrid;
+    [data,~,n_subplots] = plotGrid;
     set(gcf,'Position',[1 1 300 1000])
 
-    %% Figure 3: comparison of group averages
+    %% Figure 3: imagesc of group and repetition averages
+    i_hf = i_hf+1;
+    hf(i_hf) = figure; % imagesc plot
+    cfg = v.plotConfig;
+    
+    % Take average along dim 1 of each element in 'data' and concatenate
+    avg_data = cellfun(@(x) mean(x,1,'omitmissing'), data, 'UniformOutput', false);
+    avg_matrix = vertcat(avg_data{:});
+    imagesc(avg_matrix, 'AlphaData', ~isnan(avg_matrix)); % plot with NaNs transparent
+
+    % labels should be stimulus groups by default, and subject groups if there
+    % is only one column (=stimulus group)
+    labs = repelem(odor_sets,ngroups);
+    if nodor_sets == 1
+        labs = groups;
+    end
+
+    % Cosmetics and labels
+    crange = [min(avg_matrix,[],'all','omitmissing'), ...
+        max(avg_matrix,[],'all','omitmissing')];
+    n_repetitions = size(avg_matrix, 2);
+    clim(crange)
+    colormap(cfg.colormapName)
+    a = colorbar('Color',cfg.axcol);
+    a.Label.String = method;
+    a.Label.FontSize= gca().FontSize;
+    axis equal
+    axis tight
+    set(gca, 'XTick', 1:n_repetitions, ...
+        'YTick', 1:n_subplots, 'YTickLabel', labs);
+    xlabel('repetition number')
+    set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+    set(gcf, 'color', cfg.bgcol); 
+    hold off
+
+    %% Figure 4: comparison of group averages
 
     i_hf = i_hf+1;
-    hf(3) = figure; % single comparison plot
+    hf(i_hf) = figure; % single comparison plot
     cfg = v.plotConfig;
 
     % linearized output distributions (all trials and subjects)
-    ytmp = cellfun(@(x) x(:),out,'UniformOutput',false);
+    ytmp = cellfun(@(x) x(:),data,'UniformOutput',false);
 
     % combine into 1D vectors [labels] , [values]
     labid = [];
@@ -55,12 +91,7 @@ function [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, ps_lim, method)
         y = [y; ytmp{i}];
     end
     
-    % labels should be stimulus groups by default, and subject groups if there
-    % is only one column (=stimulus group)
-    labs = repelem(odor_sets,ngroups);
-    if nodor_sets == 1
-        labs = groups;
-    end
+    % labels are inherited from figure 3
 
     boxplot(y,labid,'Labels',labs,'PlotStyle','compact')
 
@@ -75,7 +106,7 @@ function [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, ps_lim, method)
     
     %% functions 
 
-    function n_subplots = plotGrid()
+    function [out, labs, n_subplots] = plotGrid()
 
     % define figure size
     ncols = nodor_sets;
@@ -104,7 +135,8 @@ function [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, ps_lim, method)
             out{n} = v.plotTrialActivityMetricHead('ps_lim',ps_lim, ...
                             'plotType', plotType, ...
                             'method', method, ...
-                            'trial_sorting', 'chronological', ...
+                            'n_equals', distr_over, ...
+                            'trial_sorting', 'stim_id', ...
                             'stim_allowed', thisodorset, ...
                             'reps_touse', [], ...
                             'do_normalize', false);

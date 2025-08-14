@@ -152,8 +152,14 @@ close(hf)
 
 % [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'stimuli lifetime kurtosis');
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'max intensity');
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'max intensity', 'cells');
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'avg intensity');
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'avg intensity', 'cells');
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'variance');
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'variance', 'cells');
+
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'max intensity', 'frames');
+
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'avg intensity', 'frames');
+
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'variance', 'frames');
