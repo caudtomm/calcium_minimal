@@ -65,11 +65,30 @@ vals = [];
             checkn_equals(n_equals, 'cells');
             thisvals = getTuningCurves(data, stim_types); % [units x stimuli x repetitions]
 
+
+        % metrics that return a column vector of size [units x repetitions]
+        case 'selectivity of tuning repetitions'
+            checkn_equals(n_equals, 'cells');
+            checkexists(stim_types, 'StimTypes');
+
+            % Calculate mean activity level for each neuron for each stimulus
+            meanActivity = getTuningCurves(activityTraces, stim_type);
+
+            % Calculate and store tuning selectivity for each neuron
+            thisvals = calculateTuningSelectivity(meanActivity);
+
+
         % metrics that return a column vector of size [units x 1]
         case 'selectivity of tuning'
             checkn_equals(n_equals, 'cells');
             checkexists(stim_types, 'StimTypes');
-            thisvals = calculateTuningSelectivity(data,stim_types);
+
+            % Calculate mean activity level for each neuron for each stimulus
+            [~, meanActivity] = getTuningCurves(activityTraces, stim_type);
+
+            % Calculate and store tuning selectivity for each neuron
+            thisvals = calculateTuningSelectivity(meanActivity);
+
         case 'singletrial lifetime kurtosis'
             checkn_equals(n_equals, 'cells');
             thisvals = calculateLifetimeKurtosisSingleTrials(data);
@@ -99,24 +118,23 @@ vals = [];
 
 end
 
-function sparseness = calculateTuningSelectivity(activityTraces,stim_type)
+function sparseness = calculateTuningSelectivity(tuningCurves)
     % Get the dimensions of the inputs
-    [timePoints, numNeurons, numTrials] = size(activityTraces);
-    stims = unique(stim_type);
-    numStims = numel(stims);
+    [numNeurons, numStims, numRepetitions] = size(tuningCurves);
 
     % Initialize output vector: vertical vector with one [0->1] tuning
     % selectivity entry per cell
-    sparseness = nan(numNeurons,1);
+    sparseness = nan(numNeurons,numRepetitions);
 
-    % Calculate mean activity level for each neuron for each stimulus
-    [~, meanActivity] = getTuningCurves(activityTraces, stim_type);
+    for i_rep = 1:numRepetitions
+        meanActivity = tuningCurves(:,:,i_rep); % cells x stimuli
 
-    % Calculate and store tuning selectivity for each neuron
-    for i_cell = 1:numNeurons
-        numerator = sum(meanActivity(i_cell,:)./numStims,'omitnan');
-        denominator = sum((meanActivity(i_cell,:)).^2./numStims,'omitnan');
-        sparseness(i_cell) = 1 - (numerator^2 / denominator);
+        % Calculate and store tuning selectivity for each neuron
+        for i_cell = 1:numNeurons
+            numerator = sum(meanActivity(i_cell,:)./numStims,'omitnan');
+            denominator = sum((meanActivity(i_cell,:)).^2./numStims,'omitnan');
+            sparseness(i_cell,i_rep) = 1 - (numerator^2 / denominator);
+        end
     end
 end
 

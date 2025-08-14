@@ -22,7 +22,7 @@ function [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, ps_lim, method,
     nplots = ngroups*nodor_sets;
 
     % Initialize output
-    hf = gobjects(3,1);
+    hf = gobjects(4,1);
     i_hf = 0;
     out = cell(nplots,1);
 
