@@ -371,6 +371,109 @@ classdef ExperimentViewer
         end
 
 
+        function out = plotUnitActivityMetricHead(obj, varargin)
+            % plotUnitActivityMetricHead - Plot classification performance / discriminability of a across subjects.
+            %
+            % Usage:
+            %   [hf, out] = obj.plotDistances('ps_lim', [start end], 'method', methodName, 'trial_sorting', sortingType)
+            %
+            % Inputs (as name-value pairs):
+            %   'ps_lim'        - 2-element vector specifying peri-stimulus window in seconds [default: [1 20]]
+            %   'plotType'      - String selecting which plot to produce
+            %                     opitons: {'full','repetitions'}
+            %   'method'        - String specifying similarity/distance metric (e.g., 'correlation') [default: 'correlation']
+            %                     options: see pdist
+            %   'stim_allowed'  - Cell array of strings containing labels of all stimuli to consider. (eg. {'Arg', 'Leu'})
+            %                     or stimulus group name [default: 'all trials']
+            %                     options: {'all trials','all stimuli','all CS+','all CS-','all familiar','all novel'}
+            %
+            % Outputs:
+            %   out  - Output structure
+            arguments
+                obj
+            end
+            arguments (Repeating)
+                varargin
+            end
+
+            % Set default values
+            ps_lim = [1 20];
+            plotType = 'boxplot';
+            method = 'tuning curves';
+            n_equals = 'cells';
+            trial_sorting = 'chronological';
+            stim_allowed = 'all stimuli';
+            do_normalize = false;
+
+            % Parse name-value pairs
+            if ~isempty(varargin)
+                for k = 1:2:length(varargin)
+                    switch lower(varargin{k})
+                        % data filters
+                        case 'ps_lim'
+                            ps_lim = varargin{k+1};
+                        case 'stims_allowed'
+                            stim_allowed = varargin{k+1};
+                        case 'trial_sorting'
+                            trial_sorting = varargin{k+1};
+                        % processing parameters
+                        case 'method'
+                            method = varargin{k+1};
+                        case 'n_equals'
+                            n_equals = varargin{k+1};
+                        % plotting parameters
+                        case 'plottype'
+                            plotType = varargin{k+1};
+                        case 'normalize'
+                            do_normalize = varargin{k+1};
+                    end
+                end
+            end
+
+            % initialize output
+            out = [];
+            
+            % Isolating relevant data
+            dft = obj.dataFilter;
+            dft.interval = ps_lim;
+            dft.trial_sorting = trial_sorting;
+            dft.repetitions = []; % always use all repetitions
+            dft.stims_allowed = stim_allowed;
+            [events, all_labs] = dft.filterData(obj);
+            if all(cellfun(@isempty,events)); return; end
+
+            % useful metrics
+            nsubjects = numel(obj.filtered_traces);
+
+            % call low-level processor (perform discrimination analysis)
+            all_out = cell(nsubjects,1);
+            for i = 1:nsubjects
+                thisevents = events{i};
+                thislabs = all_labs{i};
+
+                % if there are no allowed stimuli here, skip subject
+                if isempty(thislabs); continue; end
+
+                % call post-processing function
+                all_out{i} = extractActivityMetric(thisevents, method, n_equals, ...
+                    'StimTypes', thislabs);
+            end
+
+            % get rid of empty data
+            idx = cellfun(@isempty,all_out);
+            all_out(idx) = [];
+            if isempty(all_out); return; end
+
+            % call low-level plotter
+            out = plotUnitActivityMetric(all_out,...
+                plotType, all_labs, ...
+                do_normalize, obj.plotConfig);
+
+            % return
+
+        end
+
+
 
         %% complex and idiosyncratic high-level plotters are saved in external files
 
