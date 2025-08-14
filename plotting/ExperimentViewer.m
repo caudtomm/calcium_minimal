@@ -290,7 +290,6 @@ classdef ExperimentViewer
             method = 'participation ratio';
             trial_sorting = 'chronological';
             stim_allowed = 'all stimuli';
-            reps_touse = [];
             do_normalize = false;
 
             % Parse name-value pairs
@@ -300,8 +299,6 @@ classdef ExperimentViewer
                         % data filters
                         case 'ps_lim'
                             ps_lim = varargin{k+1};
-                        case 'repetitions'
-                            reps_touse = varargin{k+1};
                         case 'stims_allowed'
                             stim_allowed = varargin{k+1};
                         case 'trial_sorting'
@@ -325,7 +322,7 @@ classdef ExperimentViewer
             dft = obj.dataFilter;
             dft.interval = ps_lim;
             dft.trial_sorting = trial_sorting;
-            dft.repetitions = reps_touse;
+            dft.repetitions = []; % always use all repetitions
             dft.stims_allowed = stim_allowed;
             [events, all_labs] = dft.filterData(obj);
             if all(cellfun(@isempty,events)); return; end
@@ -347,9 +344,23 @@ classdef ExperimentViewer
             all_out(idx) = [];
             if isempty(all_out); return; end
 
+            % if output metrics are not 1D, assume that the last available dimension is trials
+            for i = 1:numel(all_out)
+                sz = size(all_out{i});
+                if numel(sz) > 1 && sz(end) > 1
+                    % average along all other dimensions except the last (trials)
+                    dims_to_avg = 1:(numel(sz)-1);
+                    all_out{i} = squeeze(mean(all_out{i}, dims_to_avg));
+                    % ensure column vector
+                    if isrow(all_out{i})
+                        all_out{i} = all_out{i}';
+                    end
+                end
+            end
+
             % call low-level plotter
             out = plotTrialMetric(all_out,...
-                plotType, all_labs{1}, ...
+                plotType, all_labs, ...
                 do_normalize, obj.plotConfig);
 
             % return

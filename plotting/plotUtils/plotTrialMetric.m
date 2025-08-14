@@ -1,4 +1,4 @@
-function [h,out] = plotTrialMetric(traces,plotType,labs,do_normalize,cfg)
+function out = plotTrialMetric(traces,plotType,labs,do_normalize,cfg)
 % Low level distance plotter
 arguments
     traces cell % cell array [nsubjects 1] of double [1, trials] (sorted!)
@@ -10,16 +10,22 @@ end
 
 
 % Parse input
-assert(numel(labs) == length(traces{1}), 'Mismatch between labs and trial dimension.'); % labs length validation
+assert(numel(labs{1}) == length(traces{1}), 'Mismatch between labs and trial dimension.'); % labs length validation
 
 % Initialize useful metrics
 nsubjects = numel(traces);
-ntrials = numel(labs);
+ntrials = cellfun(@numel,traces);
 
 
 % Initialize output
-out = cell2mat(traces);
+out = nan(nsubjects, max(ntrials));
 h = [];
+
+% data cell->mat
+for i = 1:nsubjects
+    n = numel(traces{i});
+    out(i, 1:n) = traces{i};
+end
 
 % Normalize the traces if requested
 if do_normalize
@@ -30,6 +36,11 @@ end
 
 switch plotType
     case 'boxplot'
+        % select longest labs available
+        [~,i]=max(ntrials);
+        labs = labs{i}; % #TODO: this is WRONG, because labels may differ
+
+        % plot
         h = boxplot(out, 'Labels', labs, 'PlotStyle', 'compact');
         box off
         set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);

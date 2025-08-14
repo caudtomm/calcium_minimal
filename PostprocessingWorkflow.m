@@ -137,3 +137,23 @@ hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all trials',2:5,
 figs.title = 'Template-match performance comparison';
 figs.append(hf);
 close(hf)
+
+%% 
+
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'population sparseness');
+
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'normalized population sparseness');
+
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'participation ratio');
+
+% [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'selectivity of tuning');
+
+% [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'singletrial lifetime kurtosis');
+
+% [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'stimuli lifetime kurtosis');
+
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'max intensity');
+
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'avg intensity');
+
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'variance');
