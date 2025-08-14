@@ -59,6 +59,11 @@ vals = [];
                 rel_eigv = eigv / sum(eigv); % normalized eigenvalues
                 thisvals(i) = 1 ./ sum(rel_eigv.^2); % participation ratio
             end
+       
+        % metrics that return a column vector of size [units x stimuli]
+        case 'tuning curves'
+            checkn_equals(n_equals, 'cells');
+            thisvals = getTuningCurves(data, stim_types); % [units x stimuli x repetitions]
 
         % metrics that return a column vector of size [units x 1]
         case 'selectivity of tuning'
@@ -83,6 +88,7 @@ vals = [];
             
         % metrics that return a matrix of size [trials x trials]
         case 'common active units' % # TODO: common active units
+
         case 'mahalanobis distance' % # TODO: mahalanobis distance
 
         otherwise
@@ -93,7 +99,6 @@ vals = [];
 
 end
 
-% # TODO: output tuning curves or split into two functions
 function sparseness = calculateTuningSelectivity(activityTraces,stim_type)
     % Get the dimensions of the inputs
     [timePoints, numNeurons, numTrials] = size(activityTraces);
@@ -105,16 +110,8 @@ function sparseness = calculateTuningSelectivity(activityTraces,stim_type)
     sparseness = nan(numNeurons,1);
 
     % Calculate mean activity level for each neuron for each stimulus
-    allMeanActivity = squeeze(nanmean(activityTraces, 1)); % cells x trials
-    meanActivity = nan(numNeurons,numStims); % cells x stimuli
-    for i_stim = 1:numStims
-        thisstim = stims(i_stim);
-        idx = ismember(stim_type,thisstim);
-        
-        tmp = nanmean(allMeanActivity(:,idx),2);
-        meanActivity(:,i_stim) = tmp;
-    end
-    
+    [~, meanActivity] = getTuningCurves(activityTraces, stim_type);
+
     % Calculate and store tuning selectivity for each neuron
     for i_cell = 1:numNeurons
         numerator = sum(meanActivity(i_cell,:)./numStims,'omitnan');
@@ -162,6 +159,36 @@ function sparseness = calculateLifetimeKurtosisStimuli(activityTraces,stim_type)
     
     % Calculate and store lifetime kurtosis for each neuron
     sparseness = (nansum((zscore(meanActivity,[],2)).^4, 2) ./ numStims ) -3;
+end
+
+function [tuningCurves, avgTuningCurves] = getTuningCurves(activityTraces, stim_type)
+    % Returns tuning curves: [units x stimuli x repetitions]
+    if nargin < 2
+        error('getTuningCurves requires activityTraces and stim_type.');
+    end
+
+    [~, numUnits, numTrials] = size(activityTraces);
+    stims = unique(stim_type);
+    numStims = numel(stims);
+
+    % Find repetitions per stimulus
+    repCounts = arrayfun(@(s) sum(stim_type == s), stims);
+    maxReps = max(repCounts);
+
+    tuningCurves = nan(numUnits, numStims, maxReps);
+
+    for i_stim = 1:numStims
+        stim = stims(i_stim);
+        idx = find(stim_type == stim);
+        nReps = numel(idx);
+        for r = 1:nReps
+            % Mean activity for each unit in this repetition
+            tuningCurves(:, i_stim, r) = squeeze(mean(activityTraces(:, :, idx(r)), 1, 'omitmissing'));
+        end
+    end
+
+    % Average tuning curves across repetitions
+    avgTuningCurves = squeeze(mean(tuningCurves, 3, 'omitmissing'));
 end
 
 function checkn_equals(n_equals, expected)
