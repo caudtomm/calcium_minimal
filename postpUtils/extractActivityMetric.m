@@ -165,18 +165,18 @@ function sparseness = calculateLifetimeKurtosisStimuli(activityTraces,stim_type)
     sparseness = nan(numNeurons,1);
 
     % Calculate mean activity level for each neuron for each stimulus
-    allMeanActivity = squeeze(nanmean(activityTraces, 1)); % cells x trials
+    allMeanActivity = squeeze(mean(activityTraces, 1,"omitmissing")); % cells x trials
     meanActivity = nan(numNeurons,numStims); % cells x stimuli
     for i_stim = 1:numStims
         thisstim = stims(i_stim);
         idx = ismember(stim_type,thisstim);
         
-        tmp = nanmean(allMeanActivity(:,idx),2);
+        tmp = mean(allMeanActivity(:,idx),2,'omitmissing');
         meanActivity(:,i_stim) = tmp;
     end
     
     % Calculate and store lifetime kurtosis for each neuron
-    sparseness = (nansum((zscore(meanActivity,[],2)).^4, 2) ./ numStims ) -3;
+    sparseness = (sum((zscore(meanActivity,[],2)).^4, 2,'omitmissing') ./ numStims ) -3;
 end
 
 function [tuningCurves, avgTuningCurves] = getTuningCurves(activityTraces, stim_type)
@@ -190,14 +190,14 @@ function [tuningCurves, avgTuningCurves] = getTuningCurves(activityTraces, stim_
     numStims = numel(stims);
 
     % Find repetitions per stimulus
-    repCounts = arrayfun(@(s) sum(stim_type == s), stims);
+    repCounts = arrayfun(@(s) sum(ismember(stim_type,s)), stims);
     maxReps = max(repCounts);
 
     tuningCurves = nan(numUnits, numStims, maxReps);
 
     for i_stim = 1:numStims
         stim = stims(i_stim);
-        idx = find(stim_type == stim);
+        idx = find(ismember(stim_type,stim));
         nReps = numel(idx);
         for r = 1:nReps
             % Mean activity for each unit in this repetition
