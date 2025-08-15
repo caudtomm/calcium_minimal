@@ -72,7 +72,7 @@ vals = [];
             checkexists(stim_types, 'StimTypes');
 
             % Calculate mean activity level for each neuron for each stimulus
-            meanActivity = getTuningCurves(activityTraces, stim_type);
+            meanActivity = getTuningCurves(data, stim_types);
 
             % Calculate and store tuning selectivity for each neuron
             thisvals = calculateTuningSelectivity(meanActivity);
@@ -84,7 +84,7 @@ vals = [];
             checkexists(stim_types, 'StimTypes');
 
             % Calculate mean activity level for each neuron for each stimulus
-            [~, meanActivity] = getTuningCurves(activityTraces, stim_type);
+            [~, meanActivity] = getTuningCurves(data, stim_types);
 
             % Calculate and store tuning selectivity for each neuron
             thisvals = calculateTuningSelectivity(meanActivity);
