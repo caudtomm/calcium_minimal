@@ -35,7 +35,7 @@ end
 % Set default values
 method = 'nmf'; % 'nmf' or 'pca' or 'ica' or 'rastermap' or 'dpca'
 nfactors = 15; % Number of factors to extract
-labs = []; % Default to empty if not provided
+knownLatents = [];
 
 % Parse name-value pairs
 if ~isempty(varargin)
@@ -45,8 +45,8 @@ if ~isempty(varargin)
                 method = varargin{k+1};
             case 'nfactors'
                 nfactors = varargin{k+1};
-            case 'labs'
-                labs = varargin{k+1};
+            case 'knownlatents'
+                knownLatents = varargin{k+1};
         end
     end
 end
@@ -65,11 +65,11 @@ switch lower(method)
     case 'ica'
         [out.vals, out.coeffs] = fastica(data', 'numOfIC', nfactors);
         out.vals = out.vals';
-    case 'rastermap'
+    case 'rastermap' % # TODO: Implement rastermap
         % Placeholder for rastermap implementation
         error('Rastermap method not implemented yet.');
-    case 'dpca'
-        % Placeholder for dpca implementation
+    case 'dpca' % # TODO: Implement dPCA
+        % Placeholder for dpca implementation (dPCA requires latents)
         error('dPCA method not implemented yet.');
     otherwise
         error('Unknown method: %s', method);
