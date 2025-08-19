@@ -1,10 +1,32 @@
 function [vals, varargout] = extractActivityMetric(events, metric, n_equals, varargin)
-% low level processor : 
+% This function extracts various activity metrics from neural event data.
 % 
-% start with events : double [time x units x events/trials]
+% INPUTS:
+%   events      - A 3D matrix of neural activity data [time x units x events/trials].
+%   metric      - A string specifying the metric to calculate (e.g., 'population sparseness', 'tuning curves').
+%   n_equals    - A string specifying the output format ('cells' or 'frames').
+%   varargin    - Optional name-value pair arguments:
+%                 'StimTypes': A vector specifying stimulus types for each trial.
 %
-% calculate metric (switch options) from "activityMetric" or "sparseness"
-% output - vals : double [units x events/trials] or [time x events/trials], depending on argument 'n_equals' : 'cells' or 'frames', respectively
+% OUTPUTS:
+%   vals        - The computed metric values. The size and format depend on the selected metric and 'n_equals'.
+%   varargout   - Additional outputs, if applicable (e.g., average tuning curves for 'tuning curves' metric).
+%
+% DESCRIPTION:
+%   This function processes neural activity data to compute various metrics
+%   such as sparseness, tuning curves, selectivity, suppression scores, and more.
+%   The input data is expected to be a 3D matrix where dimensions represent
+%   time, units (neurons), and events/trials. The output format and size
+%   depend on the selected metric and the 'n_equals' argument.
+%
+% EXAMPLES:
+%   [vals] = extractActivityMetric(events, 'population sparseness', 'cells');
+%   [vals] = extractActivityMetric(events, 'tuning curves', 'cells', 'StimTypes', stim_types);
+%
+% NOTES:
+%   - The function includes several helper functions for specific calculations.
+%   - Ensure that the 'metric' and 'n_equals' arguments are compatible.
+%   - Some metrics require additional inputs (e.g., 'StimTypes').
 
 % Validate inputs
 if nargin < 3

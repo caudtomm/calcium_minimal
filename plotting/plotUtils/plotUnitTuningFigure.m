@@ -1,4 +1,20 @@
 function [hf, out, groups, odor_sets] = plotUnitTuningFigure(v, ps_lim, method, do_animate)  
+% plotUnitTuningFigure - Plot single unit tuning distributions and low-dimensional embeddings.
+%
+% Usage:
+%   [hf, out, groups, odor_sets] = plotUnitTuningFigure(v, ps_lim, method, do_animate)
+%
+% Inputs:
+%   v          - ExperimentViewer object containing data and plotting methods.
+%   ps_lim     - 1x2 vector specifying limits for plotting (default: [1 20]).
+%   method     - String specifying embedding method ('pca' or 'isomap', default: 'pca').
+%   do_animate - Logical flag to animate embedding transitions (default: false).
+%
+% Outputs:
+%   hf         - Array of figure handles.
+%   out        - Cell array of output data from plots.
+%   groups     - Cell array of subject group names.
+%   odor_sets  - Cell array of odor set names.
     arguments
         v ExperimentViewer
         ps_lim = [1 20]
@@ -6,7 +22,7 @@ function [hf, out, groups, odor_sets] = plotUnitTuningFigure(v, ps_lim, method, 
         do_animate logical = false
     end
     
-    % Knobs b
+    % Knobs
     groups = {'naïve', ...
                 'trained', ...
                 'uncoupled'};
