@@ -6,7 +6,7 @@ function [hf, out, groups, odor_sets] = plotUnitTuningFigure(v, ps_lim, method, 
         do_animate logical = false
     end
     
-    % Knobs
+    % Knobs b
     groups = {'naïve', ...
                 'trained', ...
                 'uncoupled'};

@@ -89,6 +89,38 @@ vals = [];
             % Calculate and store tuning selectivity for each neuron
             thisvals = calculateTuningSelectivity(meanActivity);
 
+        case 'stimulus specific suppression score'
+            % answers the question: how much is the activity of a neuron 
+            % suppressed over repetitions for one stimulus over all others?
+            checkn_equals(n_equals, 'cells');
+            checkexists(stim_types, 'StimTypes');
+            
+            % Calculate mean activity level for each neuron for each stimulus
+            meanActivity = getTuningCurves(data, stim_types); % [numNeurons x numStims x numReps]
+
+            suppression = getSuppressionScores(meanActivity); % [numNeurons x numStims]
+            [numNeurons, nStims] = size(suppression);
+            
+            % compare across stimuli: how many units of STD of the others is the maximum away?
+            suppression = sort(suppression, 2, 'descend'); % sort by suppression score
+            suppression = suppression - mean(suppression(2:nStims), 2, 'omitnan'); % subtract mean suppression score of the non-maximum stimuli
+            
+            thisvals = suppression(:,1) / std(suppression(:,2:nStims), 0, 2, 'omitnan'); % divide by STD of the non-maximum stimuli
+
+        case 'general suppression score'
+            % answers the question: how much is the activity of a neuron 
+            % suppressed over repetitions on average?
+            checkn_equals(n_equals, 'cells');
+            checkexists(stim_types, 'StimTypes');
+            
+            % Calculate mean activity level for each neuron for each stimulus
+            meanActivity = getTuningCurves(data, stim_types); % [numNeurons x numStims x numReps]
+
+            suppression = getSuppressionScores(meanActivity); % [numNeurons x numStims]
+            [numNeurons, nStims] = size(suppression);
+
+            thisvals = mean(suppression, 2, 'omitnan'); % average across stimuli
+
         case 'singletrial lifetime kurtosis'
             checkn_equals(n_equals, 'cells');
             thisvals = calculateLifetimeKurtosisSingleTrials(data);
@@ -115,6 +147,18 @@ vals = [];
     end
 
     vals = thisvals; % Store the computed values
+
+end
+
+function suppression = getSuppressionScores(meanActivity)
+    % Get the dimensions of the meanActivity matrix
+    [numNeurons, numStims, numReps] = size(meanActivity);
+
+    meanActivity = nanzscore(meanActivity, [], 3); % z-score across reps
+    meanActivity = diff(meanActivity, 1, 3); % calculate difference across repetitions
+
+    suppression = sum(meanActivity, 3, 'omitnan'); % sum over repetitions
+    % [numNeurons x numStims]
 
 end
 
