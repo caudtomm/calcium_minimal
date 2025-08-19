@@ -1,5 +1,19 @@
 function out = plotDistances(traces,plotType,method,labs,cfg)
-% Low level distance plotter
+% <Low level symmetric distance plotter>
+% plotDistances - Plots symmetric distance matrices for trial data
+% 
+% Usage:
+%   out = plotDistances(traces, plotType, method, labs, cfg)
+%
+% Inputs:
+%   traces   - cell array [nsubjects x 1] of double [t, cells, trials] (sorted)
+%   plotType - char, 'full' or 'repetitions'
+%   method   - char, distance metric for pdist (e.g., 'correlation')
+%   labs     - cell array, stimulus names (sorted)
+%   cfg      - PlotConfig object with plotting parameters
+%
+% Outputs:
+%   out      - distance matrix or similarity matrix depending on plotType
 arguments
     traces cell % cell array [nsubjects 1] of double [t, cells, trials] (sorted!)
     plotType char = 'full'
