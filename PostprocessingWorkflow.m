@@ -163,3 +163,15 @@ close(hf)
 [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'avg intensity', 'frames');
 
 [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'variance', 'frames');
+
+%%
+
+plotUnitTuningFigure(v, [1 20], 'pca')
+plotUnitTuningFigure(v, [1 3], 'pca')
+plotUnitTuningFigure(v, [3 8], 'pca')
+plotUnitTuningFigure(v, [12 20], 'pca')
+
+plotUnitTuningFigure(v, [1 20], 'isomap')
+plotUnitTuningFigure(v, [1 3], 'isomap')
+plotUnitTuningFigure(v, [3 8], 'isomap')
+plotUnitTuningFigure(v, [12 20], 'isomap')

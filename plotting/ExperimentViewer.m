@@ -465,11 +465,12 @@ classdef ExperimentViewer
             if isempty(all_out); return; end
 
             % call low-level plotter
-            out = plotUnitActivityMetric(all_out,...
-                plotType, all_labs, ...
-                do_normalize, obj.plotConfig);
+            % out = plotUnitActivityMetric(all_out,...
+            %     plotType, all_labs, ...
+            %     do_normalize, obj.plotConfig);
 
             % return
+            out = all_out;
 
         end
 
