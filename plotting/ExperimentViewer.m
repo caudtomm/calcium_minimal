@@ -474,6 +474,81 @@ classdef ExperimentViewer
 
         end
 
+        function out = getModeDecomposition(obj, varargin)
+            % getModeDecomposition - Perform mode decomposition on the data across subjects.
+            %
+            arguments
+                obj
+            end
+            arguments (Repeating)
+                varargin
+            end
+
+            % Set default values
+            ps_lim = [1 20];
+            method = 'nmf'; % 'nmf' or 'pca' or 'ica' or 'rastermap' or 'dpca'
+            trial_sorting = 'chronological';
+            reps_touse = [];
+            stim_allowed = 'all stimuli';
+
+            % Parse name-value pairs
+            if ~isempty(varargin)
+                for k = 1:2:length(varargin)
+                    switch lower(varargin{k})
+                        % data filters
+                        case 'ps_lim'
+                            ps_lim = varargin{k+1};
+                        case 'stims_allowed'
+                            stim_allowed = varargin{k+1};
+                        case 'repetitions'
+                            reps_touse = varargin{k+1};
+                        case 'trial_sorting'
+                            trial_sorting = varargin{k+1};
+                        % processing parameters
+                        case 'method'
+                            method = varargin{k+1};
+                    end
+                end
+            end
+
+            % initialize output
+            out = [];
+            
+            % Isolating relevant data
+            dft = obj.dataFilter;
+            dft.interval = ps_lim;
+            dft.trial_sorting = trial_sorting;
+            dft.repetitions = reps_touse;
+            dft.stims_allowed = stim_allowed;
+            [events, all_labs] = dft.filterData(obj);
+            if all(cellfun(@isempty,events)); return; end
+
+            % useful metrics
+            nsubjects = numel(obj.filtered_traces);
+
+            % concatenate all events across subjects - data: [time x cells x trials]
+            data = [];
+            for i = 1:nsubjects
+                thisevents = events{i};
+                thislabs = all_labs{i};
+
+                % if there are no allowed stimuli here, skip subject
+                if isempty(thislabs); continue; end
+
+                % concatenate data across subjects
+                data = cat(3, data, thisevents);
+            end
+
+            % if no data is available, return empty
+            if isempty(data); return; end
+
+            % call low-level processor (perform mode decomposition)
+            all_out = doModeDecomposition(data, method);
+
+            % return
+            out = all_out;
+
+        end
 
 
         %% complex and idiosyncratic high-level plotters are saved in external files
