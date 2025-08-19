@@ -1,4 +1,4 @@
-function [hf, out, groups, odor_sets] = plotModeDecompositionFigure(v, ps_lim, method, plotType, varargin)  
+function [hf, out, groups, odor_sets] = plotModeDecompositionFigure(v, ps_lim, method, plotType)  
     arguments
         v ExperimentViewer
         ps_lim = [1 20]
