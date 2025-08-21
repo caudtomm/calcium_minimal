@@ -146,12 +146,6 @@ close(hf)
 
 [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'participation ratio');
 
-% [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'selectivity of tuning');
-
-% [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'singletrial lifetime kurtosis');
-
-% [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'stimuli lifetime kurtosis');
-
 [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'max intensity', 'cells');
 
 [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'avg intensity', 'cells');
@@ -175,3 +169,6 @@ plotUnitTuningFigure(v, [1 20], 'isomap')
 plotUnitTuningFigure(v, [1 3], 'isomap')
 plotUnitTuningFigure(v, [3 8], 'isomap')
 plotUnitTuningFigure(v, [12 20], 'isomap')
+
+%% 
+

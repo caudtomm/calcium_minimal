@@ -7,6 +7,16 @@ classdef TraceViewer
     methods (Static)
         function [events, intervals, t] = getPeriEventData(M, event_startfr, ps_lim, fs)
             [L, nrois, nreplicas] = size(M);
+
+            % initialize output
+            events = M;
+            intervals = repmat(1:L,nreplicas,1);
+            t = 0:(L-1)/fs;
+
+            % if no perievent limits are chosen, simply return input in
+            % full.
+            if isempty(ps_lim); return; end
+
             t = ps_lim(1) : 1/fs : ps_lim(2)-1/fs;
 
             % define peri-event frame intervals

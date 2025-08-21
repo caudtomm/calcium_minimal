@@ -474,7 +474,7 @@ classdef ExperimentViewer
 
         end
 
-        function out = getModeDecomposition(obj, varargin)
+        function [out,all_labs] = getModeDecomposition(obj, varargin)
             % getModeDecomposition - Perform mode decomposition on the data across subjects.
             %
             arguments
@@ -490,6 +490,8 @@ classdef ExperimentViewer
             trial_sorting = 'chronological';
             reps_touse = [];
             stim_allowed = 'all stimuli';
+            do_pool = false;
+            nfactors = 15;
 
             % Parse name-value pairs
             if ~isempty(varargin)
@@ -507,6 +509,10 @@ classdef ExperimentViewer
                         % processing parameters
                         case 'method'
                             method = varargin{k+1};
+                        case 'nfactors'
+                            nfactors = varargin{k+1};
+                        case 'dopool'
+                            do_pool = varargin{k+1};
                     end
                 end
             end
@@ -526,24 +532,64 @@ classdef ExperimentViewer
             % useful metrics
             nsubjects = numel(obj.filtered_traces);
 
-            % concatenate all events across subjects - data: [time x cells x trials]
-            data = [];
-            for i = 1:nsubjects
-                thisevents = events{i};
-                thislabs = all_labs{i};
-
-                % if there are no allowed stimuli here, skip subject
-                if isempty(thislabs); continue; end
-
-                % concatenate data across subjects
-                data = cat(3, data, thisevents);
+            % additional data required for some methods
+            GSS = []; % general suppression score
+            TuningSelectivity = []; % tuning selectivity
+            if strcmpi(method, 'general suppression score vs tuning selectivity')
+                % calculate general suppression score and tuning selectivity
+                GSS = obj.plotUnitActivityMetricHead(...
+                        'method', 'general suppression score', ...
+                        'ps_lim', ps_lim, ...
+                        'trial_sorting', trial_sorting, ...
+                        'stim_allowed', stim_allowed);
+                TuningSelectivity = obj.plotUnitActivityMetricHead(...
+                        'method', 'selectivity of tuning', ...
+                        'ps_lim', ps_lim, ...
+                        'trial_sorting', trial_sorting, ...
+                        'stim_allowed', stim_allowed);
             end
 
-            % if no data is available, return empty
-            if isempty(data); return; end
+            if do_pool
+                % concatenate all events across subjects - data: [time x cells x trials]
+                data = [];
+                for i = 1:nsubjects
+                    thisevents = events{i};
+                    thislabs = all_labs{i};
+    
+                    % if there are no allowed stimuli here, skip subject
+                    if isempty(thislabs); continue; end
+    
+                    % concatenate data across subjects
+                    data = [data, ActivityTraces.format(thisevents)];
 
-            % call low-level processor (perform mode decomposition)
-            all_out = doModeDecomposition(data, method);
+                    if isempty(GSS); continue; end
+
+                end
+
+                % if no data is available, return empty
+                if isempty(data); return; end
+    
+                % call low-level processor (perform mode decomposition)
+                all_out = doModeDecomposition(data, method);
+            else
+                all_out = cell(nsubjects,1);
+                for i = 1:nsubjects
+                    thisevents = events{i};
+                    thislabs = all_labs{i};
+    
+                    % if there are no allowed stimuli here, skip subject
+                    if isempty(thislabs); continue; end
+    
+                    % call post-processing function
+                    all_out{i} = doModeDecomposition(...
+                        ActivityTraces.format(thisevents), ...
+                        'method', method, ...
+                        'nfactors', nfactors, ...
+                        'suppression score',GSS, ...
+                        'selectivity of tuning',TuningSelectivity);
+                end
+            end
+
 
             % return
             out = all_out;

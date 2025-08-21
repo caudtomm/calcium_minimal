@@ -125,9 +125,9 @@ switch lower(metric)
         
         % compare across stimuli: how many units of STD of the others is the maximum away?
         suppression = sort(suppression, 2, 'descend'); % sort by suppression score
-        suppression = suppression - mean(suppression(2:nStims), 2, 'omitnan'); % subtract mean suppression score of the non-maximum stimuli
+        % suppression = suppression - mean(suppression(2:nStims), 2, 'omitnan'); % subtract mean suppression score of the non-maximum stimuli
         
-        thisvals = suppression(:,1) / std(suppression(:,2:nStims), 0, 2, 'omitnan'); % divide by STD of the non-maximum stimuli
+        thisvals = suppression(:,1) ./ std(suppression(:,2:nStims), 0, 2, 'omitnan'); % divide by STD of the non-maximum stimuli
 
     case 'general suppression score'
         % answers the question: how much is the activity of a neuron 
@@ -139,7 +139,6 @@ switch lower(metric)
         meanActivity = getTuningCurves(data, stim_types); % [numNeurons x numStims x numReps]
 
         suppression = getSuppressionScores(meanActivity); % [numNeurons x numStims]
-        [numNeurons, nStims] = size(suppression);
 
         thisvals = mean(suppression, 2, 'omitnan'); % average across stimuli
 
@@ -180,6 +179,8 @@ function suppression = getSuppressionScores(meanActivity)
     meanActivity = diff(meanActivity, 1, 3); % calculate difference across repetitions
 
     suppression = sum(meanActivity, 3, 'omitnan'); % sum over repetitions
+    
+    suppression = -suppression; % positive = more suppression
     % [numNeurons x numStims]
 
 end
