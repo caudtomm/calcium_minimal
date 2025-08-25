@@ -1,4 +1,4 @@
-function [vals, varargout] = extractActivityMetric(events, metric, n_equals, varargin)
+function vals = extractActivityMetric(events, metric, n_equals, varargin)
 % This function extracts various activity metrics from neural event data.
 % 
 % INPUTS:
@@ -10,7 +10,6 @@ function [vals, varargout] = extractActivityMetric(events, metric, n_equals, var
 %
 % OUTPUTS:
 %   vals        - The computed metric values. The size and format depend on the selected metric and 'n_equals'.
-%   varargout   - Additional outputs, if applicable (e.g., average tuning curves for 'tuning curves' metric).
 %
 % DESCRIPTION:
 %   This function processes neural activity data to compute various metrics
@@ -100,7 +99,7 @@ switch lower(metric)
         thisvals = calculateTuningSelectivity(meanActivity);
 
 
-    % metrics that return a column vector of size [units x 1]
+    % metrics that return a column vector of size [units x 1], and optionally a shuffled-avg selectivity value
     case 'selectivity of tuning'
         checkn_equals(n_equals, 'cells');
         checkexists(stim_types, 'StimTypes');
@@ -110,6 +109,21 @@ switch lower(metric)
 
         % Calculate and store tuning selectivity for each neuron
         thisvals = calculateTuningSelectivity(meanActivity);
+
+    case 'stimulus shuffled selectivity of tuning'
+        checkn_equals(n_equals, 'cells');
+        checkexists(stim_types, 'StimTypes');
+
+        % Calculate selectivity of stimulus-shuffled data
+        nshuffles = 100;
+        shuffledSelectivity = nan(nUnits, nshuffles);
+        for i_shuffle = 1:nshuffles
+            shuffledStimTypes = stim_types(randperm(length(stim_types)));
+            [~, shuffledMeanActivity] = getTuningCurves(data, shuffledStimTypes);
+            shuffledSelectivity(:, i_shuffle) = calculateTuningSelectivity(shuffledMeanActivity);
+        end
+
+        thisvals = shuffledSelectivity; % return
 
     case 'stimulus specific suppression score'
         % answers the question: how much is the activity of a neuron 

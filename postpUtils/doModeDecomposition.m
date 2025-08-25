@@ -37,6 +37,7 @@ nfactors = 15; % Number of factors to extract
 knownLatents = [];
 SuS = []; % Suppression Score
 SoT = []; % Selectivity of Tuning
+SoTzero = []; % Selectivity of Tuning 'zero'
 
 % Parse name-value pairs
 if ~isempty(varargin)
@@ -54,6 +55,8 @@ if ~isempty(varargin)
                 SuS = varargin{k+1};
             case 'selectivity of tuning'
                 SoT = varargin{k+1};
+            case 'sot_zero'
+                SoTzero = varargin{k+1};
         end
     end
 end
@@ -67,13 +70,13 @@ switch lower(method)
         % NMF employs the concept of low-rank approximation with respect to the feature space, 
         % and it would require that the matrix be void of empty elements/values.
         % Therefore, we interpolate missing values using a spline alg.
-        data = fillmissing(data,'spline',1);
+        data = fillmissing(data,'constant',0);
 
         options = statset; options.Display = 'final';
         [out.vals, out.coeffs, out.sqresiduals] = ...
             nnmf(nanzscore(data), nfactors,options=options);
     case 'pca'
-        data = fillmissing(data,'spline',1);
+        data = fillmissing(data,'constant',0);
         [coeff, score, ~] = pca(nanzscore(data), 'NumComponents', nfactors);
         out.vals = score;
         out.coeffs = coeff;
@@ -98,16 +101,23 @@ switch lower(method)
         % of the suppression score vs tuning selectivity, centered around the origin.
         % Additionally, a score is associated with each cell, indicating how 'extreme' the cell is in its quadrant.
 
-        out.upperLeft = SuS > 0 & SoT < 0;
+        SuSzero = 0; % definition of separating value for Suppression Score
+        if isempty(SoTzero) % default value
+            SoTzero = median(SoT,'omitmissing'); % definition of separating value for Selectivity of Tuning
+        end
+        out.SuSzero = SuSzero;
+        out.SoTzero = SoTzero;
+
+        out.upperLeft = SuS > SuSzero & SoT < SoTzero;
         out.upperLeftScore = SuS ./ SoT;
 
-        out.upperRight = SuS > 0 & SoT > 0;
+        out.upperRight = SuS > SuSzero & SoT > SoTzero;
         out.upperRightScore = SuS .* SoT;
 
-        out.lowerLeft = SuS < 0 & SoT < 0;
-        out.lowerLeftScore = 1/ (SuS .* SoT);
+        out.lowerLeft = SuS < SuSzero & SoT < SoTzero;
+        out.lowerLeftScore = 1 ./ (SuS .* SoT);
 
-        out.lowerRight = SuS < 0 & SoT > 0;
+        out.lowerRight = SuS < SuSzero & SoT > SoTzero;
         out.lowerRightScore = SoT ./ SuS;
 
         out.unassigned = ~(out.upperLeft | out.upperRight | out.lowerLeft | out.lowerRight);
@@ -115,11 +125,11 @@ switch lower(method)
         % coeff treats the subsets as modes
         out.coeffs = [out.upperLeft, out.upperRight, out.lowerLeft, out.lowerRight];
         
+        out.coeffs2 = [out.upperLeftScore, out.upperRightScore, out.lowerLeftScore, out.lowerRightScore];
+        out.coeffs2 = out.coeffs .* out.coeffs2;
+
         % vals is the average data value for each mode
-        out.vals = [mean(data(out.upperLeft, :), 1);
-                    mean(data(out.upperRight, :), 1);
-                    mean(data(out.lowerLeft, :), 1);
-                    mean(data(out.lowerRight, :), 1)];
+        out.vals = fillmissing(data, 'constant',0) * out.coeffs;
         
     otherwise
         error('Unknown method: %s', method);
