@@ -99,7 +99,7 @@ switch lower(metric)
         thisvals = calculateTuningSelectivity(meanActivity);
 
 
-    % metrics that return a column vector of size [units x 1], and optionally a shuffled-avg selectivity value
+    % metrics that return a column vector of size [units x 1]
     case 'selectivity of tuning'
         checkn_equals(n_equals, 'cells');
         checkexists(stim_types, 'StimTypes');
@@ -109,6 +109,24 @@ switch lower(metric)
 
         % Calculate and store tuning selectivity for each neuron
         thisvals = calculateTuningSelectivity(meanActivity);
+
+    case 'stability of tuning'
+        checkn_equals(n_equals, 'cells');
+        checkexists(stim_types, 'StimTypes');
+
+        % Calculate mean activity level for each neuron for each stimulus
+        meanActivity = getTuningCurves(data, stim_types); % [numNeurons x numStims x numReps]
+
+        % Calculate average distance between tuning curves of all repetitions for each neuron
+        avgDistance = nan(nUnits, 1);
+        for i_unit = 1:nUnits
+            tuningReps = squeeze(meanActivity(i_unit, :, :)); % [stimuli x repetitions]
+            distances = squareform(pdist(tuningReps', 'euclidean')); % pairwise distances between repetitions
+            avgDistance(i_unit) = mean(distances(~triu(distances)), 'omitnan'); % average distance
+        end
+
+        % Calculate and store tuning selectivity for each neuron
+        thisvals = avgDistance;
 
     case 'stimulus shuffled selectivity of tuning'
         checkn_equals(n_equals, 'cells');
