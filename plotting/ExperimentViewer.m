@@ -401,6 +401,7 @@ classdef ExperimentViewer
             plotType = 'boxplot';
             method = 'tuning curves';
             n_equals = 'cells';
+            mode_touse = 'cells';
             trial_sorting = 'chronological';
             stim_allowed = 'all stimuli';
             do_normalize = false;
@@ -416,6 +417,9 @@ classdef ExperimentViewer
                             stim_allowed = varargin{k+1};
                         case 'trial_sorting'
                             trial_sorting = varargin{k+1};
+                        % mode selection
+                        case 'mode_touse'
+                            mode_touse = varargin{k+1};
                         % processing parameters
                         case 'method'
                             method = varargin{k+1};
@@ -433,13 +437,32 @@ classdef ExperimentViewer
             % initialize output
             out = [];
             
-            % Isolating relevant data
-            dft = obj.dataFilter;
-            dft.interval = ps_lim;
-            dft.trial_sorting = trial_sorting;
-            dft.repetitions = []; % always use all repetitions
-            dft.stims_allowed = stim_allowed;
-            [events, all_labs] = dft.filterData(obj);
+            % Define input
+            switch lower(mode_touse)
+                case 'cells'
+                    % Isolating relevant data
+                    dft = obj.dataFilter;
+                    dft.interval = ps_lim;
+                    dft.trial_sorting = trial_sorting;
+                    dft.repetitions = []; % always use all repetitions
+                    dft.stims_allowed = stim_allowed;
+                    [events, all_labs] = dft.filterData(obj);
+                case {'nmf', 'pca', 'ica', 'rastermap', 'dpca'}
+                    [events,all_labs] = getModeDecomposition(obj, ...
+                        'ps_lim', ps_lim, ...
+                        'trial_sorting', trial_sorting, ...
+                        'stims_allowed', stim_allowed, ...
+                        'dopool', false, ...
+                        'method', mode_touse, ...
+                        'nfactors', 15);
+                    if isempty(events); return; end
+                    events = cellfun(@(x) x.vals, events, 'UniformOutput', false);
+                    for i = 1:numel(events)
+                        events{i} = ActivityTraces.format(events{i},numel(all_labs{i}));
+                    end
+                otherwise
+                    error('Unknown mode_touse option %s', mode_touse);
+            end
             if all(cellfun(@isempty,events)); return; end
 
             % useful metrics
