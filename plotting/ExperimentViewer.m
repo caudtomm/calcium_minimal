@@ -510,6 +510,7 @@ classdef ExperimentViewer
             % Set default values
             ps_lim = [1 20];
             method = 'nmf'; % 'nmf' or 'pca' or 'ica' or 'rastermap' or 'dpca'
+            units_are = 'cells'; % 'cells' or a mode type
             trial_sorting = 'chronological';
             reps_touse = [];
             stim_allowed = 'all stimuli';
@@ -532,6 +533,8 @@ classdef ExperimentViewer
                         % processing parameters
                         case 'method'
                             method = varargin{k+1};
+                        case 'units_are'
+                            units_are = varargin{k+1};
                         case 'nfactors'
                             nfactors = varargin{k+1};
                         case 'dopool'
@@ -543,13 +546,32 @@ classdef ExperimentViewer
             % initialize output
             out = [];
             
-            % Isolating relevant data
-            dft = obj.dataFilter;
-            dft.interval = ps_lim;
-            dft.trial_sorting = trial_sorting;
-            dft.repetitions = reps_touse;
-            dft.stims_allowed = stim_allowed;
-            [events, all_labs] = dft.filterData(obj);
+            % Define input
+            switch lower(units_are)
+                case 'cells'
+                    % Isolating relevant data
+                    dft = obj.dataFilter;
+                    dft.interval = ps_lim;
+                    dft.trial_sorting = trial_sorting;
+                    dft.repetitions = reps_touse;
+                    dft.stims_allowed = stim_allowed;
+                    [events, all_labs] = dft.filterData(obj);
+                case {'nmf', 'pca', 'ica', 'rastermap', 'dpca'}
+                    [events,all_labs] = getModeDecomposition(obj, ...
+                        'ps_lim', ps_lim, ...
+                        'trial_sorting', trial_sorting, ...
+                        'stims_allowed', stim_allowed, ...
+                        'dopool', false, ...
+                        'method', units_are, ...
+                        'nfactors', 15);
+                    if isempty(events); return; end
+                    events = cellfun(@(x) x.vals, events, 'UniformOutput', false);
+                    for i = 1:numel(events)
+                        events{i} = ActivityTraces.format(events{i},numel(all_labs{i}));
+                    end
+                otherwise
+                    error('Unknown mode_touse option %s', mode_touse);
+            end
             if all(cellfun(@isempty,events)); return; end
 
             % useful metrics
@@ -564,16 +586,19 @@ classdef ExperimentViewer
                 GSS = obj.plotUnitActivityMetricHead(...
                         'method', 'general suppression score', ...
                         'ps_lim', ps_lim, ...
+                        'mode_touse', units_are, ...
                         'trial_sorting', trial_sorting, ...
                         'stims_allowed', stim_allowed);
                 TuningSelectivity = obj.plotUnitActivityMetricHead(...
                         'method', 'selectivity of tuning', ...
                         'ps_lim', ps_lim, ...
+                        'mode_touse', units_are, ...
                         'trial_sorting', trial_sorting, ...
                         'stims_allowed', stim_allowed);
                 ShuffledSelectivity = obj.plotUnitActivityMetricHead(...
                         'method', 'stimulus shuffled selectivity of tuning', ...
                         'ps_lim', ps_lim, ...
+                        'mode_touse', units_are, ...
                         'trial_sorting', trial_sorting, ...
                         'stims_allowed', stim_allowed);
                 TuningSelectivityZero = cellfun(@(x) mean(x(:), 'omitnan'), ShuffledSelectivity, 'UniformOutput', false);

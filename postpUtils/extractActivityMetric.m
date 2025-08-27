@@ -70,8 +70,7 @@ switch lower(metric)
     case 'normalized population sparseness'
         checkn_equals(n_equals, 'cells');
         data = squeeze(mean(data,1,'omitmissing')); % get mean activity per unit across trials
-        thisvals = (squeeze(sum(data.^2, 1, 'omitmissing')) ./ ...
-            (sum(data, 1, 'omitmissing').^2) - 1/nUnits) ./ (1 - 1/nUnits);
+        thisvals = calculateNormalizedSparseness(meanActivity, 1);
     case 'participation ratio'
         thisvals = zeros(1, nEvents);
         for i = 1:nEvents
@@ -96,7 +95,7 @@ switch lower(metric)
         meanActivity = getTuningCurves(data, stim_types);
 
         % Calculate and store tuning selectivity for each neuron
-        thisvals = calculateTuningSelectivity(meanActivity);
+        thisvals = calculateNormalizedSparseness(meanActivity, 2); % lifetime sparseness using average activity across repetitions
 
 
     % metrics that return a column vector of size [units x 1]
@@ -108,7 +107,7 @@ switch lower(metric)
         [~, meanActivity] = getTuningCurves(data, stim_types);
 
         % Calculate and store tuning selectivity for each neuron
-        thisvals = calculateTuningSelectivity(meanActivity);
+        thisvals = calculateNormalizedSparseness(meanActivity, 2); % lifetime sparseness using average tuning curves
 
     case 'stability of tuning'
         checkn_equals(n_equals, 'cells');
@@ -122,7 +121,9 @@ switch lower(metric)
         for i_unit = 1:nUnits
             tuningReps = squeeze(meanActivity(i_unit, :, :)); % [stimuli x repetitions]
             distances = squareform(pdist(tuningReps', 'euclidean')); % pairwise distances between repetitions
-            avgDistance(i_unit) = mean(distances(~triu(distances)), 'omitnan'); % average distance
+            idx = logical(triu(ones(size(distances)),1)); % upper triangular indices
+            
+            avgDistance(i_unit) = mean(distances(idx), 'omitnan'); % average distance
         end
 
         % Calculate and store tuning selectivity for each neuron
@@ -138,7 +139,7 @@ switch lower(metric)
         for i_shuffle = 1:nshuffles
             shuffledStimTypes = stim_types(randperm(length(stim_types)));
             [~, shuffledMeanActivity] = getTuningCurves(data, shuffledStimTypes);
-            shuffledSelectivity(:, i_shuffle) = calculateTuningSelectivity(shuffledMeanActivity);
+            shuffledSelectivity(:, i_shuffle) = calculateNormalizedSparseness(shuffledMeanActivity, 2); % lifetime sparseness using average tuning curves
         end
 
         thisvals = shuffledSelectivity; % return
@@ -203,6 +204,42 @@ vals = thisvals; % Store the computed values
 
 end
 
+function sparseness = calculateNormalizedSparseness(meanActivity, dim)
+    arguments
+        meanActivity double % [neurons x stimuli] or [neurons x trials]
+        dim (1,1) double {mustBeMember(dim, [1,2])} = 1 % dimension to operate along
+    end
+
+    % Handle 3D input by iterating over slices
+    if ndims(meanActivity) == 3
+        [dim1, dim2, dim3] = size(meanActivity);
+        remainingdim = dim2;
+        if dim==2; remainingdim = dim1; end
+        sparseness = nan(remainingdim, dim3);
+        for i = 1:dim3
+            sparseness(:, i) = calculateNormalizedSparseness(meanActivity(:, :, i), dim);
+        end
+        return;
+    end
+
+    % If operating along dimension 2, transpose the matrix
+    if dim == 2
+        meanActivity = meanActivity'; % [stimuli x neurons] or [trials x neurons]
+    end
+
+    % Get the dimensions of the meanActivity matrix
+    [numVars, numSamples] = size(meanActivity);
+
+    % Calculate normalized sparseness for each column
+    sparseness = nan(numSamples, 1);
+    for i = 1:numSamples
+        numerator = sum(meanActivity(:, i) ./ numVars, 'omitnan');
+        denominator = sum((meanActivity(:, i)).^2 ./ numVars, 'omitnan');
+        sparseness(i) = (numerator^2 / denominator - 1 / numVars) / (1 - 1 / numVars);
+    end
+
+end
+
 function suppression = getSuppressionScores(meanActivity)
     % Get the dimensions of the meanActivity matrix
     [numNeurons, numStims, numReps] = size(meanActivity);
@@ -217,7 +254,7 @@ function suppression = getSuppressionScores(meanActivity)
 
 end
 
-function sparseness = calculateTuningSelectivity(tuningCurves)
+function sparseness = calculateTuningSelectivity(tuningCurves) % DEPRECATED
     % Get the dimensions of the inputs
     [numNeurons, numStims, numRepetitions] = size(tuningCurves);
 

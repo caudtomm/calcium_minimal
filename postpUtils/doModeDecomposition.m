@@ -75,6 +75,7 @@ switch lower(method)
         options = statset; options.Display = 'final';
         [out.vals, out.coeffs, out.sqresiduals] = ...
             nnmf(nanzscore(data), nfactors,options=options);
+        out.coeffs = out.coeffs';
     case 'pca'
         data = fillmissing(data,'constant',0);
         [coeff, score, ~] = pca(nanzscore(data), 'NumComponents', nfactors);
