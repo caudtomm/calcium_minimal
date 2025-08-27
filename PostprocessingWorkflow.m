@@ -140,8 +140,6 @@ close(hf)
 
 %% 
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'population sparseness');
-
 [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'normalized population sparseness');
 
 [hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'participation ratio');
@@ -183,3 +181,9 @@ v.dataFilter.subjectGroup = 'uncoupled';
 compareModeMetricsFigure(v, []);
 
 %%
+
+
+
+
+
+
