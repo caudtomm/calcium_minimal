@@ -10,18 +10,21 @@ function hf = compareModeMetricsFigure(v, dft)
     nsubjects2use = 5;
     idx = randi(nsubjects,nsubjects2use,1);
     
+    hf = SJwiseCorrelations();
     hf = ExamplesFigure(idx);
     
     % NMF
     m = ModeSelector(v,'nmf',dft,'nfactors',15); % extract modes
     [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
     hf = ScatterFigure();
+    hf = SJwiseCorrelations();
     hf = ExamplesFigure(idx);
     
     % PCA
     m = ModeSelector(v,'pca',dft,'nfactors',15); % extract modes
     [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
     hf = ScatterFigure();
+    hf = SJwiseCorrelations();
     hf = ExamplesFigure(idx);
 
     %% functions
@@ -42,6 +45,8 @@ function hf = compareModeMetricsFigure(v, dft)
     
     function hf = ScatterFigure()
         hf = figure;
+        metric3 = cell2mat(Tuning);
+        metric3 = mean(metric3,[2 3],'omitmissing');
         
         subplot(131)
         plotScatter(StT,GSS,cfg,'subject')
@@ -58,17 +63,49 @@ function hf = compareModeMetricsFigure(v, dft)
         ylabel('g. Suppression')
         
         subplot(133)
-        plotScatter(StT,SeT,cfg,'subject')
+        plotScatter(StT,SeT,cfg,'subject', metric3)
         box off
         axis square
         xlabel('Stability of Tuning')
         ylabel('Selectivity of Tuning')
+        zlabel('Mean activity')
         
         for i = 1:3
             subplot(1,3,i)
             set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol);
         end
         set(gcf, 'color', cfg.bgcol);
+    end
+
+    function hf = SJwiseCorrelations()
+        hf = figure;
+
+        GSS_StT_corr = zeros(nsubjects,1);
+        GSS_SeT_corr = zeros(nsubjects,1);
+        SeT_StT_corr = zeros(nsubjects,1);
+
+        for i = 1:nsubjects
+            GSS_StT_corr(i) = 1-pdist([GSS{i},StT{i}]', 'correlation');
+            GSS_SeT_corr(i) = 1-pdist([GSS{i},SeT{i}]', 'correlation');
+            SeT_StT_corr(i) = 1-pdist([SeT{i},StT{i}]', 'correlation');
+        end
+
+        y = [GSS_StT_corr,GSS_SeT_corr,SeT_StT_corr];
+
+        boxplot(y)
+
+        xticks(1:3)
+        xticklabels({'g. Suppression vs Stability', ...
+            'g. Suppression vs Selectivity', ...
+            'Selectivity vs Stability'})
+        ylabel('correlation')
+
+        box off
+
+        set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol);
+        set(gcf, 'color', cfg.bgcol);
+        set(gcf, "Position", [0 200 200 500])
+
     end
     
     function hf = ExamplesFigure(idx)
@@ -149,7 +186,7 @@ for i = 1:params.nsubjects2use
 end
 end
 
-function plotScatter(metric1, metric2, cfg, color_by)
+function plotScatter(metric1, metric2, cfg, color_by, metric3)
 nsubjects = numel(metric1);
 
 c = defcolor();
@@ -157,8 +194,13 @@ c = defcolor();
 metric1 = cell2mat(metric1); % [modes*subjects x 1]
 metric2 = cell2mat(metric2); % [modes*subjects x 1]
 
-scatter(metric1,metric2,20,cfg.c(c,:),"filled")
 
+if exist("metric3","var") 
+    scatter3(metric1,metric2,metric3,20,cfg.c(c,:),"filled")
+else
+    scatter(metric1,metric2,20,cfg.c(c,:),"filled")
+end
+% plotHeatmapAndIsoclines(metric1,metric2,20,1,1,1)
     function c = defcolor()
         c = [];
         for i = 1:nsubjects

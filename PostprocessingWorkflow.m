@@ -172,3 +172,14 @@ plotUnitTuningFigure(v, [12 20], 'isomap')
 
 %% 
 
+% Stability of Tuning depends on correlation- or cosine-similarity-based
+% definition (see extractActivityMetric.m)
+
+v.dataFilter.subjectGroup = 'naïve';
+compareModeMetricsFigure(v, []);
+v.dataFilter.subjectGroup = 'trained';
+compareModeMetricsFigure(v, []);
+v.dataFilter.subjectGroup = 'uncoupled';
+compareModeMetricsFigure(v, []);
+
+%%
