@@ -120,14 +120,13 @@ switch lower(metric)
         avgDistance = nan(nUnits, 1);
         for i_unit = 1:nUnits
             tuningReps = squeeze(meanActivity(i_unit, :, :)); % [stimuli x repetitions]
-            distances = squareform(pdist(tuningReps', 'euclidean')); % pairwise distances between repetitions
-            idx = logical(triu(ones(size(distances)),1)); % upper triangular indices
+            distances = pdist(tuningReps', 'correlation'); % pairwise distances between repetitions (sensitive to NaNs)
             
-            avgDistance(i_unit) = mean(distances(idx), 'omitnan'); % average distance
+            avgDistance(i_unit) = mean(distances, 'omitnan'); % average distance
         end
 
         % Calculate and store tuning selectivity for each neuron
-        thisvals = avgDistance;
+        thisvals = 1 - avgDistance; % [-1 -> 1], higher = more stable, 0 = uncorrelated, -1 = anticorrelated
 
     case 'stimulus shuffled selectivity of tuning'
         checkn_equals(n_equals, 'cells');
@@ -235,7 +234,7 @@ function sparseness = calculateNormalizedSparseness(meanActivity, dim)
     for i = 1:numSamples
         numerator = sum(meanActivity(:, i) ./ numVars, 'omitnan');
         denominator = sum((meanActivity(:, i)).^2 ./ numVars, 'omitnan');
-        sparseness(i) = (numerator^2 / denominator - 1 / numVars) / (1 - 1 / numVars);
+        sparseness(i) = (1 - numerator^2 / denominator) / (1 - 1 / numVars);
     end
 
 end
