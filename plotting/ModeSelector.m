@@ -8,6 +8,7 @@ classdef ModeSelector
         data cell % [subjects, 1] cell of double [time, units, trials]
         labels cell
         params struct = struct() % Additional parameters (mode specific)
+        fullout
     end
 
     methods (Static)
@@ -120,6 +121,7 @@ classdef ModeSelector
                         
                         % store output
                         obj.coeffs{i} = out.W;
+                        obj.fullout{i} = out;
                     end
 
                 otherwise
