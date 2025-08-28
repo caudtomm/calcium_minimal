@@ -75,7 +75,7 @@ classdef ModeSelector
             switch obj.mode_name
                 case 'native_units'
                     obj.coeffs = cellfun(@(x) diag(ones(1,width(x))), obj.data, 'UniformOutput', false);
-               case {'pca', 'nmf', 'ica', 'dpca'}
+               case {'pca', 'nmf', 'ica'}
                     obj.coeffs = cell(size(obj.data));
                     for i = 1:length(obj.data)
                         thisdata = ActivityTraces.format(obj.data{i});
@@ -85,6 +85,43 @@ classdef ModeSelector
                             'nfactors', obj.params.nfactors);
                         obj.coeffs{i} = tempout.coeffs;
                     end
+                case 'dpca'
+                    for i = 1:length(obj.data)
+                        nReps = obj.params.nReps;
+                        framerate = obj.params.framerate;
+
+                        % prepare data for dpca
+                        thisdata = obj.data{i}; % [time, units, trials]
+                        [nTime, nUnits, nTrials] = size(thisdata);
+                        thisdata = ActivityTraces.format(thisdata);
+                        thisdata = fillmissing(thisdata,"previous");
+                        thisdata = fillmissing(thisdata,"constant",0);
+                        thisdata = ActivityTraces.format(thisdata,nTrials);
+                        thislabels = obj.labels{i};
+                        [thislabels, idx] = sort(thislabels); % sort labels
+                        thisdata = thisdata(:,:,idx); % sort data accordingly
+                        uniqueLabels = unique(thislabels, 'rows');
+                        nLabels = size(uniqueLabels, 1);
+                        tmp = nan(nTime, nUnits, nLabels, nReps);
+                        for l = 1:nLabels
+                            labelMask = ismember(thislabels, uniqueLabels(l,:), 'rows');
+                            tmp(:,:,l,:) = thisdata(:,:,labelMask);
+                        end
+                        thisdata = tmp; % [time, units, labels, repetitions]
+
+                        % prepare inputs for dpca
+                        trialNum = nReps * ones(nUnits,nLabels,1); % [N, S, D]
+                        firingRates = permute(thisdata,[2,3,5,1,4]); % [N, S, D, T, E]
+                        firingRatesAverage = mean(firingRates,5,'omitmissing'); % [N, S, D, T]
+                        t = (1:nTime)/framerate;
+
+                        % run dpca
+                        out = dpca_fromdemo(trialNum, firingRates, firingRatesAverage, t, 0);
+                        
+                        % store output
+                        obj.coeffs{i} = out.W;
+                    end
+
                 otherwise
                     error('Unknown mode name: %s', obj.mode_name);
             end

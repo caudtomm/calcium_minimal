@@ -87,9 +87,6 @@ switch lower(method)
     case 'rastermap' % # TODO: Implement rastermap
         % Placeholder for rastermap implementation
         error('Rastermap method not implemented yet.');
-    case 'dpca' % # TODO: Implement dPCA
-        % Placeholder for dpca implementation (dPCA requires latents)
-        error('dPCA method not implemented yet.');
     case 'general suppression score vs tuning selectivity'
         % This method requires specific data structure and is not a standard decomposition method.
         if isempty(SuS) || isempty(SoT)
