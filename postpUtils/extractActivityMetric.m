@@ -120,7 +120,7 @@ switch lower(metric)
         avgDistance = nan(nUnits, 1);
         for i_unit = 1:nUnits
             tuningReps = squeeze(meanActivity(i_unit, :, :)); % [stimuli x repetitions]
-            distances = pdist(tuningReps', 'cosine'); % pairwise distances between repetitions (sensitive to NaNs)
+            distances = pdist(tuningReps', 'correlation'); % pairwise distances between repetitions (sensitive to NaNs)
             
             avgDistance(i_unit) = mean(distances, 'omitnan'); % average distance
         end

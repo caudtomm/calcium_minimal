@@ -1,13 +1,16 @@
 classdef ModeSelector
     properties
         v ExperimentViewer
-        dataFilter DataFilter
         mode_name char = 'native_units' % Name of the mode
+        mode_method char = 'mode_values' % {'mode_values', 'isolate', 'subtract'}
+        mode_OI = 'all' % modes of interest: {'all', 'stimulus', 'non-stimulus', 'novelty'}
+        mode_file char = ''; % if empty, extracts by default. Else, it looks for coefficients in the file specified.
         values cell 
         coeffs cell % [subjects, 1] cell of double [units, ]
         data cell % [subjects, 1] cell of double [time, units, trials]
         labels cell
         params struct = struct() % Additional parameters (mode specific)
+
         fullout
     end
 
@@ -19,7 +22,8 @@ classdef ModeSelector
                 thisdata = data{i};
                 [nTime, nUnits, nTrials] = size(thisdata);
                 thisdata = ActivityTraces.format(thisdata); % [time*trials, units]
-                thisvalues = thisdata * coeffs{i}; % # TODO might need fillmissing
+                if isempty(thisdata); continue; end
+                thisvalues = thisdata * coeffs{i};
                 thisvalues = ActivityTraces.format(thisvalues, nTrials); % [time, modes, trials]
                 values{i} = thisvalues;
             end
@@ -27,11 +31,9 @@ classdef ModeSelector
     end
     
     methods
-        function obj = ModeSelector(v, mode_name, dataFilter, varargin)
+        function obj = ModeSelector(v, varargin)
             arguments
                 v ExperimentViewer
-                mode_name char = []
-                dataFilter = []
             end
             arguments (Repeating)
                 varargin
@@ -39,23 +41,17 @@ classdef ModeSelector
 
             % Parse single value inputs
             obj.v = v;
-            if ~isempty(mode_name) && ischar(mode_name)
-                obj.mode_name = mode_name; % input
-            else
-                obj.mode_name = 'native_units'; % default
-            end
-            if ~isempty(dataFilter) && isa(dataFilter,'DataFilter')
-                obj.dataFilter = dataFilter; % input
-            else
-                obj.dataFilter = v.dataFilter; % default
-            end
-            if ~isempty(dataFilter); obj.dataFilter = dataFilter; end
-            
-            % Parse name-value pair arguments and store them in params
-            obj.params = struct(varargin{:});
+
+            % Parse DataFilter-derived mode selection options
+            dft = v.dataFilter;
+            obj.mode_name = dft.mode_name;
+            obj.mode_method = dft.mode_method;
+            obj.mode_OI = dft.mode_OI;
+            obj.mode_file = dft.mode_file;            
+            obj.params = dft.mode_params;
 
             % Specify input data
-            [obj.data, obj.labels] = obj.dataFilter.filterData(v);
+            [obj.data, obj.labels] = dft.filterData(v);
             
             % if pooling across subjects, concatenate data
             if isfield(obj.params, 'do_pool') && ~isempty(obj.params.do_pool)
@@ -66,12 +62,65 @@ classdef ModeSelector
                 end
             end
 
-            % extract mode-specific values and coefficients
-            obj = obj.extract;
+        end
 
+        % extract modes according to specified method
+        function [obj, values, labels, coeffs] = extract(obj, force_import, force_recompute)
+            arguments
+                obj ModeSelector
+                force_import logical = false
+                force_recompute logical = false
+            end
+
+            if force_recompute; obj = obj.wipeResults; end
+
+            % initialize output
+            labels = obj.labels; % this is it for the labels
+            values = obj.data; % compute values from scratch to avoid recursion
+            coeffs = obj.coeffs;
+
+            % options
+            method = obj.mode_method;
+            fname = obj.mode_file;
+            nsubjects = numel(obj.data);
+
+            [obj, coeffs] = obj.importWeightsFile(force_import);
+
+            % compute if needed
+            if isempty(coeffs) || force_recompute
+                obj = obj.compute;
+                coeffs = obj.coeffs;
+            end
+            
+            values = obj.calculateValues(coeffs, obj.data);
+            obj.values = values;
+            if all(cellfun(@isempty,values)); return; end
+            
+            switch method
+                case 'mode_values'
+                    % only retain values of interest
+                    for i = 1:nsubjects
+                        mids = obj.parseModeOI(i);
+                        values{i} = values{i}(:, mids, :);
+                    end
+                case 'isolate'
+                    values = obj.isolate;
+                case 'subtract'
+                    values = obj.isolate;
+                    % elementwise subtraction from obj.data
+                    for i = 1:nsubjects
+                        values{i} = obj.data{i} - values{i};
+                    end
+                otherwise
+                    error('Unknown mode_method: %s', method);
+            end
+
+            obj.values = values;
         end
         
-        function obj = extract(obj)
+        % compute mode-specific coefficients
+        function obj = compute(obj)
+            disp(['Computing coefficients. Mode: ',obj.mode_name])
             % Extract mode-specific coefficients
             switch obj.mode_name
                 case 'native_units'
@@ -128,9 +177,93 @@ classdef ModeSelector
                     error('Unknown mode name: %s', obj.mode_name);
             end
 
-            obj.values = obj.calculateValues(obj.coeffs, obj.data);
         end
         
+        % recontruct unit activity based only on a subset of modes
+        function values = isolate(obj)
+            values = obj.values;
+            coeffs = obj.coeffs;
+            nsubjects = numel(obj.data);
+
+            for i_sj = 1:nsubjects
+                thiscoeffs = coeffs{i_sj};
+                thisvalues = values{i_sj};
+                [T, nmodes, nTrials] = size(thisvalues);
+                thisvalues = ActivityTraces.format(thisvalues); % [T * nTrials x nmodes]
+
+                % specify ids for modes of interest
+                mids = obj.parseModeOI(i_sj);
+
+                % zero-out values for any unselected modes
+                zeromat = zeros(T*nTrials, sum(~mids));
+                thisvalues(:, ~mids) = zeromat;
+            
+                % get inverse weight matrix
+                W = pinv(thiscoeffs); % [modes x units]
+
+                % reconstruct unit activity
+                thisvalues = thisvalues * W; % [T * nTrials x N]
+
+                % refold 
+                values{i_sj} = ActivityTraces.format(thisvalues, nTrials); % [T x N x nTrials]
+            end
+        end
+
+        function mids = parseModeOI(obj, subjectNum)
+            mode_OI = obj.mode_OI;
+            thiscoeffs = obj.coeffs{subjectNum};
+
+            if ischar(mode_OI)
+            mids = obj.getModeIDs(subjectNum); % logical
+            elseif isnumeric(mode_OI)
+            mids = false(size(thiscoeffs, 2), 1);
+            mids(mode_OI) = true;
+            elseif islogical(mode_OI)
+            mids = mode_OI;
+            if length(mids) ~= size(thiscoeffs, 2)
+                error('Length of logical mode_OI does not match number of modes.');
+            end
+            elseif iscell(mode_OI)
+            if subjectNum > numel(mode_OI)
+                error('Subject number exceeds the number of elements in mode_OI cell array.');
+            end
+            mids = obj.parseModeOI(subjectNum); % Recursive call on the content of mode_OI{subjectNum}
+            else
+            error('mode_OI must be char, numeric, logical, or cell.');
+            end
+        end
+
+        % turn mode_OI string into logical mode ids
+        function idx = getModeIDs(obj, subjectNum)
+            [N,nmodes] = size(obj.coeffs{subjectNum});
+            moistr = obj.mode_OI;
+            if numel(obj.fullout)>=subjectNum && isfield(obj.fullout{subjectNum}, 'whichMarg')
+                whichMarg = obj.fullout{subjectNum}.whichMarg;
+                stimulus_marginalizations = ismember(whichMarg, [1,2,4]);
+            elseif ~strcmp(moistr, 'all')
+                warning('Field "whichMarg" does not exist in fullout{%d}. Defaulting mode_OI to "all".', subjectNum);
+                moistr = 'all';
+            end
+
+            idx = true(nmodes,1);
+
+            switch moistr
+                case 'all'
+                    % do nothing
+                case 'stimulus'
+                    idx = stimulus_marginalizations;
+                    idx(find(idx,1)) = false; % eliminate the highest variant one
+                case 'non-stimulus'
+                    idx = ~stimulus_marginalizations;
+                case 'novelty'
+                    idx = stimulus_marginalizations;
+                    idx(find(idx,1)) = false; % eliminate the highest variant one
+                    idx = ~idx; % keep only the highest variant stimulus mode ("novelty")
+                otherwise
+                    warning('Unknown mode_OI: %s. Returning all modes.', moistr);
+            end
+        end
+
         function [values, coeffs] = binarize(obj, threshold)
             arguments
                 obj ModeSelector
@@ -149,5 +282,53 @@ classdef ModeSelector
 
             
         end
+
+        function [obj, coeffs] = importWeightsFile(obj, force_import)
+            % Initialize output
+            coeffs = obj.coeffs;
+            fname = obj.mode_file;
+
+            % If no file specified, skip
+            if isempty(fname)
+                disp('No weights file specified. Skipping import.');
+                return;
+            end
+
+            % Check if file exists and load weights
+            if isempty(coeffs) || force_import
+            if exist(fname, "file")
+                try
+                disp(['Loading weights from file: ', fname]);
+                fileIn = load(fname);
+                
+                % Check if the required field exists in the loaded file
+                if isfield(fileIn, 'dpca')
+                    obj.fullout = fileIn.dpca;
+                    coeffs = cellfun(@(x) x.W, fileIn.dpca, 'UniformOutput', false);
+                    obj.coeffs = coeffs;
+                    disp('Weights successfully loaded and assigned.');
+                else
+                    warning('The file does not contain the expected "dpca" field. Skipping weight import.');
+                end
+                catch ME
+                warning(['An error occurred while loading weights from file: ', fname]);
+                disp(['Error message: ', ME.message]);
+                end
+            else
+                warning(['Specified weights file does not exist: ', fname]);
+            end
+            else
+            disp('Coefficients are already initialized. Skipping file import.');
+            end
+        end
+        
+        function obj = wipeResults(obj)
+            obj.values = {};
+            obj.coeffs = {};
+            obj.fullout = {};
+        end
+
+        % plotting by external function hf = genFigures(obj)
     end
+
 end

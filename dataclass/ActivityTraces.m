@@ -410,7 +410,7 @@ classdef ActivityTraces
             obj = obj.elimBadTrials;
         end
 
-        % check behavior with partial arguments ################
+        % # TODO : check behavior with partial arguments ################
         function obj = loadMovieData(obj,subject,fname_PMToffmeta,fname_noLightmeta)
             arguments
                 obj

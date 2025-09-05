@@ -4,7 +4,7 @@ s = false; % save figures to files?
 
 % for sliding windows
 window_duration = 1; % [seconds]
-t_lim_sec = [-1 2]; % from 5 sec before to 35 seconds after stimulus onset
+t_lim_sec = [-5 35]; % from 5 sec before to 35 seconds after stimulus onset
 overlap = .3; % [seconds]
 
 %% Load dataset
@@ -31,7 +31,7 @@ figs.config = cfg;
 
 %% Plotting average similarity matrices and related metrics for each experimental group.
 v = ExperimentViewer(experiment);
-v.dataFilter.traceType = 'dFoverF_good';
+v.dataFilter.traceType = 'pSpike';
 v.plotConfig = cfg;
 
 % plot for naive fish
@@ -174,11 +174,11 @@ plotUnitTuningFigure(v, [12 20], 'isomap')
 % definition (see extractActivityMetric.m)
 
 v.dataFilter.subjectGroup = 'naïve';
-compareModeMetricsFigure(v, []);
+compareModeMetricsFigure(v);
 v.dataFilter.subjectGroup = 'trained';
-compareModeMetricsFigure(v, []);
+compareModeMetricsFigure(v);
 v.dataFilter.subjectGroup = 'uncoupled';
-compareModeMetricsFigure(v, []);
+compareModeMetricsFigure(v);
 
 %%
 

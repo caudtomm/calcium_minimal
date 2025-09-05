@@ -3,16 +3,16 @@ run_grid = false;
 
 %% single run parameters
 params = Params(); % update attributes below
-params.groups = {'naïve';'trained1';'trained2';'uncoupled'}; ... % options : {'previousnaive';'naïve';'trained1';'trained2';'trained1alt';'uncoupled'};
-params.stimuli = {'Arg','Ala','His','Trp','Ser','Leu','ACSF','spont.'}; ... % options : {'all CS+','all CS-','all familiar','all novel'} or {'Arg','Ala','His','Trp','Ser','Leu','Food','ACSF','spont.'};
+params.groups = {'naive'}; ... % options : {'previousnaive';'naïve';'trained1';'trained2';'trained1alt';'uncoupled'};
+params.stimuli = 'all novel'; ... % options : {'all CS+','all CS-','all familiar','all novel'} or {'Arg','Ala','His','Trp','Ser','Leu','Food','ACSF','spont.'};
 params.time_range = [1 20]; ... % time range : [from stim_on, from stim_on] (sec)
 params.only_top_variant_units = false; ...  % only_top_variant_units
 params.metric = 'avg_activity'; ... % metric : options {'max_activity','avg_activity','variance'}
 params.dimension = 'over_time'; ...% options: {'over_cells', 'over_time'}
 params.n_equals = 'all'; ... % n = ?
-params.order_by = 'trial_num'; ... % order by : options {'trial_num','relative_trial_num','stim_type'};
+params.order_by = 'relative_trial_num'; ... % order by : options {'trial_num','relative_trial_num','stim_type'};
 params.todo_reltrialnum = [1:5]; % todo_reltrialnum
-params.isolate_quantile = 'bottom';
+params.isolate_quantile = 'top';
 params.quantile = .9;
 
 %% 'all_options' structure
@@ -54,7 +54,7 @@ end
 
 function [datatab,ax] = plotActivityMetric(experiment,params)
 %% get plottable data table [organizer,metric]
-[output_struct, datatab] = extractActivityMetric(experiment,params);
+[output_struct, datatab] = extractActivityMetric2(experiment,params);
 n_vals = size(datatab,1);
 
 %% plot the progression of the metric across relative trials
@@ -98,52 +98,52 @@ ax= [];
 % linear plot
 % figure
 % scatter(datatab,"organizer_value","metric_value")
-figure;
-boxplot(datatab.metric_value,datatab.organizer_value,'Color','w','symbol' ,' ')
-hold on; scatter(1:numel(ymean),ymean,80,'r','filled')
+% figure;
+% boxplot(datatab.metric_value,datatab.organizer_value,'Color','k','symbol' ,' ')
+hold on; scatter(1:numel(ymean),ymean,80,'m','filled')
 % plot(efit(~isnan(ymedian_orgtrue)),'r-','LineWidth',2);
 hold on
 title(figlab,'Color','k')
 try; ylim([0 1.2*nanmax(ymean)]); catch; end
-set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w','FontSize',14);
-set(gcf, 'color', 'none'); 
+% set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w','FontSize',14);
+% set(gcf, 'color', 'none'); 
 set(gcf, 'Position', [50 50 350 400]);
 ax = gca;
 box off
 
-%loglog plot
-figure;
-loglog(1:numel(ymean_orgtrue),ymean_orgtrue,'Color','w');hold on
-% loglog(efit,'r-','LineWidth',2); hold on
-title(figlab,'Color','w')
-try; ylim([0 1.2*nanmax(ymean_orgtrue)]); catch; end
-set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w','FontSize',14);
-set(gcf, 'color', 'none'); 
-set(gcf, 'Position', [50 50 350 400]);
-
-figure;
-% plot(efit,'r-','LineWidth',2); hold on
-err = nan(1,numel(ymean_orgtrue));
-for i=1:max(orgs)
-    idx = datatab.organizer_value==i;
-    if isempty(idx); continue; end
-    tmp = datatab(idx,:);
-    err(i)=std(tmp.metric_value);
-end
-errorbar(ymean_orgtrue,err,'Color','k');
-title(figlab,'Color','k')
-try; ylim([0 1.2*nanmax(ymean)]); catch; end
-xlim([.5, .5+numel(ymean)])
-set(gcf, 'Position', [50 50 350 400]);
-
-figure;
-plot(zeros(1,max(orgs)),'b--','LineWidth',3); hold on
-% scatter(datatab,"organizer_value","metric_minus_efit",'filled','SizeData',5,'MarkerFaceColor','cyan')
-% plot(ymean_orgtrue'-efit,'r-','LineWidth',5)
-% ylim([-3 25])
-xlabel(params.order_by)
-ylabel([params.metric,' - fit'])
-
+% %loglog plot
+% figure;
+% loglog(1:numel(ymean_orgtrue),ymean_orgtrue,'Color','w');hold on
+% % loglog(efit,'r-','LineWidth',2); hold on
+% title(figlab,'Color','w')
+% try; ylim([0 1.2*nanmax(ymean_orgtrue)]); catch; end
+% set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w','FontSize',14);
+% set(gcf, 'color', 'none'); 
+% set(gcf, 'Position', [50 50 350 400]);
+% 
+% figure;
+% % plot(efit,'r-','LineWidth',2); hold on
+% err = nan(1,numel(ymean_orgtrue));
+% for i=1:max(orgs)
+%     idx = datatab.organizer_value==i;
+%     if isempty(idx); continue; end
+%     tmp = datatab(idx,:);
+%     err(i)=std(tmp.metric_value);
+% end
+% errorbar(ymean_orgtrue,err,'Color','k');
+% title(figlab,'Color','k')
+% try; ylim([0 1.2*nanmax(ymean)]); catch; end
+% xlim([.5, .5+numel(ymean)])
+% set(gcf, 'Position', [50 50 350 400]);
+% 
+% figure;
+% plot(zeros(1,max(orgs)),'b--','LineWidth',3); hold on
+% % scatter(datatab,"organizer_value","metric_minus_efit",'filled','SizeData',5,'MarkerFaceColor','cyan')
+% % plot(ymean_orgtrue'-efit,'r-','LineWidth',5)
+% % ylim([-3 25])
+% xlabel(params.order_by)
+% ylabel([params.metric,' - fit'])
+% 
 
 
 end

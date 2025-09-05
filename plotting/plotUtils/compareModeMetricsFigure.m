@@ -1,7 +1,8 @@
-function hf = compareModeMetricsFigure(v, dft)
+function hf = compareModeMetricsFigure(v)
     cfg = v.plotConfig;
     
-    m = ModeSelector(v,'native_units',dft); % extract modes
+    v.dataFilter.mode_name = 'native_units';
+    m = ModeSelector(v).extract; % extract modes
     [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
     hf = ScatterFigure();
     
@@ -14,14 +15,29 @@ function hf = compareModeMetricsFigure(v, dft)
     hf = ExamplesFigure(idx);
     
     % NMF
-    m = ModeSelector(v,'nmf',dft,'nfactors',15); % extract modes
+    % v.dataFilter.mode_name = 'nmf';
+    % v.dataFilter.mode_params.nfactors = 15;
+    % m = ModeSelector(v).extract; % extract modes
+    % [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
+    % hf = ScatterFigure();
+    % hf = SJwiseCorrelations();
+    % hf = ExamplesFigure(idx);
+    
+    % PCA
+    v.dataFilter.mode_name = 'pca';
+    v.dataFilter.mode_params.nfactors = 15;
+    m = ModeSelector(v).extract; % extract modes
     [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
     hf = ScatterFigure();
     hf = SJwiseCorrelations();
     hf = ExamplesFigure(idx);
-    
-    % PCA
-    m = ModeSelector(v,'pca',dft,'nfactors',15); % extract modes
+
+    % dPCA
+    v.dataFilter.mode_name = 'dpca';
+    v.dataFilter.mode_file = 'dpca_trained.mat';
+    v.dataFilter.mode_OI = 'stimulus';
+    v.dataFilter.mode_method = 'mode_values';
+    m = ModeSelector(v).extract; % extract modes
     [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
     hf = ScatterFigure();
     hf = SJwiseCorrelations();

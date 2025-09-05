@@ -40,7 +40,7 @@ end
 % end
 title(figlabs{1})
 u = legendUnq();
-legend(u,'Box','on','color','none','Location','best','EdgeColor','w','TextColor','w')
+legend(u,'Box','on','color','none','Location','best','EdgeColor','k','TextColor','k')
 xlim([min(xlim)-1,max(xlim)+1])
 ylim([min(ylim)-1,max(ylim)+1])
 zlim([min(zlim)-1,max(zlim)+1])

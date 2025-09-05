@@ -6,20 +6,6 @@ classdef DataFilter
                                      % options : {'all','familiarized','trained'}
                                      % or {'group1','group2','groupN'}
 
-        % % # TODO : for now, screw all of this. I suspect that individual
-        % % function calls are sufficiently idiosyncratic that this actually
-        % % makes things more complex, not less.
-        % stimuli = {'all_stims'}      % options : {'all_trials','all_stims',
-        %                              % 'all CS+','all CS-','all familiar','all novel'} 
-        %                              % or {'stim1','stim2','stimN'};
-        % time_range double = [0 20]   % time range : [from stim_on, from stim_on] (sec)
-        % only_top_variant_units logical = false  % use only top variant units? 
-        % order_trials_by char = 'stim_type'      % options: 
-        %                                         % {'stim_type' : A-A-A-B-B-B-C-C-C ,
-        %                                         % 'trial_num' : A1-A2-B1-A3-B2-B3 ,
-        %                                         % 'relative_trial_num' : A1-A2-A3-B1-B2-B3}
-        % todo_reltrialnum double = [1:5]
-
         traceType char = 'dFoverF_good'     % trace type to select (e.g., 'dFoverF_good' or 'pSpike')
                                             % - match name of ActivityTraces property
 
@@ -27,6 +13,13 @@ classdef DataFilter
         trial_sorting char = 'stim_id' % trial sorting method, options: {'stim_id', 'chronological', 'relative_trial_num'}
         repetitions double = [] % stimulus repetitions to use (empty = all)
         stims_allowed = 'all stimuli' % list of allowed stimuli, type cell or char vector, see accepted inputs to getStimuliByGroup()
+        
+        % mode selection (unused here, but passed on to ModeSelector)
+        mode_name char = 'native_units' % {'native_units', 'pca', 'nmf', 'dpca'}
+        mode_method char = 'mode_values' % {'mode_values', 'isolate', 'subtract'}
+        mode_OI = 'all' % modes of interest: {'all', 'stimulus', 'non-stimulus', 'novelty'}
+        mode_file char = ''; % if empty, extracts by default. Else, it looks for coefficients in the file specified.
+        mode_params = struct(); % specify manually as needed
     end
 
     methods (Static)
