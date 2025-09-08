@@ -15,13 +15,13 @@ function hf = compareModeMetricsFigure(v)
     hf = ExamplesFigure(idx);
     
     % NMF
-    % v.dataFilter.mode_name = 'nmf';
-    % v.dataFilter.mode_params.nfactors = 15;
-    % m = ModeSelector(v).extract; % extract modes
-    % [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
-    % hf = ScatterFigure();
-    % hf = SJwiseCorrelations();
-    % hf = ExamplesFigure(idx);
+    v.dataFilter.mode_name = 'nmf';
+    v.dataFilter.mode_params.nfactors = 15;
+    m = ModeSelector(v).extract; % extract modes
+    [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
+    hf = ScatterFigure();
+    hf = SJwiseCorrelations();
+    hf = ExamplesFigure(idx);
     
     % PCA
     v.dataFilter.mode_name = 'pca';
@@ -34,7 +34,6 @@ function hf = compareModeMetricsFigure(v)
 
     % dPCA
     v.dataFilter.mode_name = 'dpca';
-    v.dataFilter.mode_file = 'dpca_trained.mat';
     v.dataFilter.mode_OI = 'stimulus';
     v.dataFilter.mode_method = 'mode_values';
     m = ModeSelector(v).extract; % extract modes

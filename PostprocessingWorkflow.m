@@ -1,6 +1,8 @@
 %% Knobs
 
-s = false; % save figures to files?
+dbstop if error
+
+s = true; % save figures to files?
 
 % for sliding windows
 window_duration = 1; % [seconds]
@@ -11,7 +13,7 @@ overlap = .3; % [seconds]
 filename = 'odorexp004_IC1_130625.mat';
 
 %
-experiment = load(filename).a; % Experiment object
+% experiment = load(filename).a; % Experiment object
 % or
 experiment = a; clear a
 
@@ -31,13 +33,18 @@ figs.config = cfg;
 
 %% Plotting average similarity matrices and related metrics for each experimental group.
 v = ExperimentViewer(experiment);
-v.dataFilter.traceType = 'pSpike';
 v.plotConfig = cfg;
+
+v.dataFilter.traceType = 'pSpike';
+v.dataFilter.interval = [1,20];
+v.dataFilter.trial_sorting = 'stim_id';
+dft = v.dataFilter;
 
 % plot for naive fish
 v.dataFilter.subjectGroup = 'naïve';
 hf = figure;
-v.plotDistances('ps_lim',[1,20],'trial_sorting','stim_id');
+v.plotDistancesHead;
+v.dataFilter = dft;
 figs.title = 'Naive Group';
 figs.append(hf);
 close(hf)
@@ -45,7 +52,8 @@ close(hf)
 % plot for trained fish
 v.dataFilter.subjectGroup = 'trained';
 hf = figure;
-v.plotDistances('ps_lim',[1,20],'trial_sorting','stim_id');
+v.plotDistancesHead;
+v.dataFilter = dft;
 figs.title = 'Trained Groups';
 figs.append(hf);
 close(hf)
@@ -53,13 +61,14 @@ close(hf)
 % plot for uncoupled fish
 v.dataFilter.subjectGroup = 'uncoupled';
 hf = figure;
-v.plotDistances('ps_lim',[1,20],'trial_sorting','stim_id');
+v.plotDistancesHead;
+v.dataFilter = dft;
 figs.title = 'Uncoupled Group';
 figs.append(hf);
 close(hf)
 
 % stimulus repetition comparisons
-hf = plotRepetitionDistances(v,[1 20],'correlation'); % outputs 2 figures
+hf = plotRepetitionDistances(v,'correlation'); % outputs 2 figures
 figs.title = 'Repetition comparison';
 figs.append(hf);
 close(hf)
@@ -74,7 +83,7 @@ close(hf)
 %% Discrimination analysis (template-matching)
 
 % template matching, stimulus window
-hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all trials',1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v, 'correlation','all trials',false); % outputs 1 figure
 figs.title = 'Template-match performance comparison';
 figs.append(hf);
 close(hf)
@@ -88,85 +97,103 @@ close(hf)
 
 % template matching, stimulus window, focus on performance for novel
 % stimuli
-hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all novel',1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v, 'correlation','all novel',false); % outputs 1 figure
 figs.title = 'Template-match performance on novel stimuli';
 figs.append(hf);
 close(hf)
 
 % template matching, stimulus window, focus on performance for Leu
-hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation',{'Leu'},1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v, 'correlation',{'Leu'},false); % outputs 1 figure
 figs.title = 'Template-match performance on Leu';
 figs.append(hf);
 close(hf)
 
 % template matching, stimulus window, focus on performance for familiar
 % stimuli
-hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all familiar',1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v, 'correlation','all familiar',false); % outputs 1 figure
 figs.title = 'Template-match performance on familiar stimuli';
 figs.append(hf);
 close(hf)
 
 % template matching, stimulus window, focus on performance for CS+
 % stimuli
-hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all CS+',1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v, 'correlation','all CS+',false); % outputs 1 figure
 figs.title = 'Template-match performance on CS+ stimuli';
 figs.append(hf);
 close(hf)
 
 % template matching, stimulus window, focus on performance for CS-
 % stimuli
-hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all CS-',1:5,false); % outputs 1 figure
+hf = plotDiscriminationPerformanceMats(v, 'correlation','all CS-',false); % outputs 1 figure
 figs.title = 'Template-match performance on CS- stimuli';
 figs.append(hf);
 close(hf)
 
 % template matching based only on trials 1:4, stimulus window
-hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all trials',1:4,false); % outputs 1 figure
+v.dataFilter.repetitions = 1:4;
+hf = plotDiscriminationPerformanceMats(v, 'correlation','all trials',false); % outputs 1 figure
+v.dataFilter = dft;
 figs.title = 'Template-match performance comparison';
 figs.append(hf);
 close(hf)
 
 % template matching based only on trials 2:4, stimulus window
-hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all trials',2:4,false); % outputs 1 figure
+v.dataFilter.repetitions = 2:4;
+hf = plotDiscriminationPerformanceMats(v, 'correlation','all trials',false); % outputs 1 figure
+v.dataFilter = dft;
 figs.title = 'Template-match performance comparison';
 figs.append(hf);
 close(hf)
 
 % template matching based only on trials 2:5, stimulus window
-hf = plotDiscriminationPerformanceMats(v,[1 20], 'correlation','all trials',2:5,false); % outputs 1 figure
+v.dataFilter.repetitions = 2:5;
+hf = plotDiscriminationPerformanceMats(v, 'correlation','all trials',false); % outputs 1 figure
+v.dataFilter = dft;
 figs.title = 'Template-match performance comparison';
 figs.append(hf);
 close(hf)
 
 %% 
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'normalized population sparseness');
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, 'normalized population sparseness');
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'participation ratio');
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, 'participation ratio');
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'max intensity', 'cells');
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, 'max intensity', 'cells');
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'avg intensity', 'cells');
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, 'avg intensity', 'cells');
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'variance', 'cells');
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, 'variance', 'cells');
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'max intensity', 'frames');
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, 'max intensity', 'frames');
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'avg intensity', 'frames');
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, 'avg intensity', 'frames');
 
-[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, [1 20], 'variance', 'frames');
+[hf, out, groups, odor_sets] = plotTrialMetricFigure(v, 'variance', 'frames');
 
 %%
 
-plotUnitTuningFigure(v, [1 20], 'pca')
-plotUnitTuningFigure(v, [1 3], 'pca')
-plotUnitTuningFigure(v, [3 8], 'pca')
-plotUnitTuningFigure(v, [12 20], 'pca')
+% embedding tuning curves using PCA
+v.dataFilter.interval = [1 20];
+plotUnitTuningFigure(v,'pca')
+v.dataFilter.interval = [1 3];
+plotUnitTuningFigure(v, 'pca')
+v.dataFilter.interval = [3 8];
+plotUnitTuningFigure(v, 'pca')
+v.dataFilter.interval = [12 20];
+plotUnitTuningFigure(v, 'pca')
 
-plotUnitTuningFigure(v, [1 20], 'isomap')
-plotUnitTuningFigure(v, [1 3], 'isomap')
-plotUnitTuningFigure(v, [3 8], 'isomap')
-plotUnitTuningFigure(v, [12 20], 'isomap')
+% embedding tuning curves using Isomap
+v.dataFilter.interval = [1 20];
+plotUnitTuningFigure(v, 'isomap')
+v.dataFilter.interval = [1 3];
+plotUnitTuningFigure(v, 'isomap')
+v.dataFilter.interval = [3 8];
+plotUnitTuningFigure(v, 'isomap')
+v.dataFilter.interval = [12 20];
+plotUnitTuningFigure(v, 'isomap')
+
+v.dataFilter = dft; % recover
 
 %% 
 
@@ -174,10 +201,15 @@ plotUnitTuningFigure(v, [12 20], 'isomap')
 % definition (see extractActivityMetric.m)
 
 v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = 'dpca_naive.mat';
 compareModeMetricsFigure(v);
+
 v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.mode_file = 'dpca_trained.mat';
 compareModeMetricsFigure(v);
+
 v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.mode_file = 'dpca_uncoupled.mat';
 compareModeMetricsFigure(v);
 
 %%

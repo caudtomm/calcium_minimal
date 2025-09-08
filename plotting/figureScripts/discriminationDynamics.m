@@ -10,7 +10,8 @@ cfg = v.plotConfig;
 nwindows = height(windows);
 out = cell(nwindows,1);
 for i = 1:nwindows
-    [hf,out{i}, subject_groups, stim_groups] = plotDiscriminationPerformanceMats(v,windows(i,:), 'cosine','all stimuli',1:5,0);
+    v.dataFilter.interval = windows(i,:);
+    [hf,out{i}, subject_groups, stim_groups] = plotDiscriminationPerformanceMats(v, 'cosine','all stimuli',0);
     figs.title = ['Repetitions: sec', num2str(windows(i,1)), '-', num2str(windows(i,2))];
     if s; figs.append(hf); end
     close(hf)
