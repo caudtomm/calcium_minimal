@@ -212,10 +212,18 @@ v.dataFilter.subjectGroup = 'uncoupled';
 v.dataFilter.mode_file = 'dpca_uncoupled.mat';
 compareModeMetricsFigure(v);
 
+v.dataFilter = dft; % recover
+
 %%
 
+v.dataFilter.subjectGroup = 'naïve';
+R = driftMetricsFigure(v);
 
+v.dataFilter.subjectGroup = 'trained';
+R = driftMetricsFigure(v);
 
+v.dataFilter.subjectGroup = 'uncoupled';
+R = driftMetricsFigure(v);
 
 
 
