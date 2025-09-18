@@ -125,14 +125,21 @@ classdef ModeSelector
             switch obj.mode_name
                 case 'native_units'
                     obj.coeffs = cellfun(@(x) diag(ones(1,width(x))), obj.data, 'UniformOutput', false);
-               case {'pca', 'nmf', 'ica'}
+                case {'pca', 'nmf', 'ica'}
                     obj.coeffs = cell(size(obj.data));
                     for i = 1:length(obj.data)
                         thisdata = ActivityTraces.format(obj.data{i});
-                        tempout = doModeDecomposition(...
-                            thisdata, ...
-                            'method', obj.mode_name, ...
-                            'nfactors', obj.params.nfactors);
+                        if ~isfield(obj.params,'nfactors')
+                            % use defaults
+                            tempout = doModeDecomposition(...
+                                thisdata, ...
+                                'method', obj.mode_name);
+                        else
+                            tempout = doModeDecomposition(...
+                                thisdata, ...
+                                'method', obj.mode_name, ...
+                                'nfactors', obj.params.nfactors);
+                        end
                         obj.coeffs{i} = tempout.coeffs;
                     end
                 case 'dpca'
@@ -250,6 +257,8 @@ classdef ModeSelector
             switch moistr
                 case 'all'
                     % do nothing
+                case 'all_stimulus'
+                    idx = stimulus_marginalizations;
                 case 'stimulus'
                     idx = stimulus_marginalizations;
                     idx(find(idx,1)) = false; % eliminate the highest variant one

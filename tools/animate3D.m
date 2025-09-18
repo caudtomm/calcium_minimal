@@ -1,10 +1,11 @@
-function [im, map] = animate3D(pathout,degStep)
-global s
+function [im, map] = animate3D(s,pathout,degStep)
 
 az = 0;
 el = 90;
 view([az,el])
 
+
+if ~exist('s','var'); s = false; end
 
 if ~exist('degStep','var'); degStep = 2; end
 detlaT = 0.1;

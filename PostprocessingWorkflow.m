@@ -175,7 +175,7 @@ close(hf)
 
 % embedding tuning curves using PCA
 v.dataFilter.interval = [1 20];
-plotUnitTuningFigure(v,'pca')
+[hf, out] = plotUnitTuningFigure(v,'pca');
 v.dataFilter.interval = [1 3];
 plotUnitTuningFigure(v, 'pca')
 v.dataFilter.interval = [3 8];
@@ -216,14 +216,76 @@ v.dataFilter = dft; % recover
 
 %%
 
+v.dataFilter.mode_file = '';
+v.dataFilter.mode_name = 'pca';
+v.dataFilter.mode_OI = [1 2 3];
+v.dataFilter.mode_method = 'mode_values';
+
 v.dataFilter.subjectGroup = 'naïve';
-R = driftMetricsFigure(v);
+driftMetricsFigure(v);
 
 v.dataFilter.subjectGroup = 'trained';
-R = driftMetricsFigure(v);
+driftMetricsFigure(v);
 
 v.dataFilter.subjectGroup = 'uncoupled';
-R = driftMetricsFigure(v);
+driftMetricsFigure(v);
+
+v.dataFilter = dft; % recover
+
+%% 
+
+metric = 'correlation';
+
+
+% native units
+v.dataFilter.mode_file = '';
+v.dataFilter.mode_name = 'native_units';
+v.dataFilter.mode_OI = 'all';
+v.dataFilter.mode_method = 'mode_values';
+
+v.dataFilter.subjectGroup = 'naïve';
+plotTuningCorrelationsOverReps(v, metric);
+
+v.dataFilter.subjectGroup = 'trained';
+plotTuningCorrelationsOverReps(v, metric);
+
+v.dataFilter.subjectGroup = 'uncoupled';
+plotTuningCorrelationsOverReps(v, metric);
 
 
 
+% all stimulus dPCs
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'all_stimulus';
+v.dataFilter.mode_method = 'isolate';
+
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = 'dpca_naive.mat';
+plotTuningCorrelationsOverReps(v, metric);
+
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.mode_file = 'dpca_trained.mat';
+plotTuningCorrelationsOverReps(v, metric);
+
+v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.mode_file = 'dpca_uncoupled.mat';
+plotTuningCorrelationsOverReps(v, metric);
+
+
+
+% stimulus dPCs except #1
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'stimulus';
+v.dataFilter.mode_method = 'isolate';
+
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = 'dpca_naive.mat';
+plotTuningCorrelationsOverReps(v, metric);
+
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.mode_file = 'dpca_trained.mat';
+plotTuningCorrelationsOverReps(v, metric);
+
+v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.mode_file = 'dpca_uncoupled.mat';
+plotTuningCorrelationsOverReps(v, metric);

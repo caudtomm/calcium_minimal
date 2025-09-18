@@ -28,10 +28,16 @@ function R = driftMetricsFigure(v, varargin)
 %
 % Example
 %   R = driftMetricsFigure(v,'repetitions',1:5,'stimname','all novel','cfg',cfg);
+%
+% # TODO: (1) run using first 3 PCs; (2) drift vector angles within stimulus : new 
+% helper function (3) shuffle control (4) alignment to standard vector (5) predict 
+% drift (6) synth data ctrl
+%
 
 % -------- parse args
 p = inputParser;
 addParameter(p,'plot',true);
+addParameter(p,'nfactors',15);
 parse(p,varargin{:});
 o = p.Results;
 cfg = v.plotConfig;
