@@ -564,7 +564,7 @@ function [stack,scanimage_meta,path,meta] = readSource(src)
                 catch
                 end
                 path = getFileNameSpecs(src);
-                        elseif endsWith(src,'.avi')
+            elseif endsWith(src,'.avi')
                 [stack, meta] = ingestAvi(src, 10); % GB limit for double
                 path = getFileNameSpecs(src);
             end
@@ -663,8 +663,36 @@ od = fullfile(tempdir, 'movie_h5_shards');
 if ~exist(od,'dir'), mkdir(od); end
 d = dir(fullfile(od,'shard_*.h5')); for i=1:numel(d), try, delete(fullfile(od,d(i).name)); end, end
 
-p = gcp('nocreate'); n = 1; if ~isempty(p), n = max(1,p.NumWorkers); end
-n = min(n, max(1, ceil(F/256)));
+% --- ensure a PROCESS-BASED pool (not threads) ---
+p = gcp('nocreate');
+
+% If an existing pool is thread-based, close it (HDF5 MEX not supported there)
+if ~isempty(p) && isa(p,'parallel.ThreadPool')
+    delete(p);
+    p = [];
+end
+
+% Start a process pool if none is running
+if isempty(p)
+    try
+        % Newer MATLAB: explicit process pool
+        p = parpool('Processes');
+    catch
+        try
+            % Fallback: local profile (usually processes)
+            p = parpool('local');
+        catch
+            p = [];
+        end
+    end
+end
+
+isProcessPool = ~isempty(p) && ~isa(p,'parallel.ThreadPool');
+numWorkers = 1;
+if isProcessPool, numWorkers = max(1, p.NumWorkers); end
+
+% decide shard count
+n = min(numWorkers, max(1, ceil(F/256)));
 cuts = round(linspace(1,F+1,n+1));
 rngs = [cuts(1:end-1).' (cuts(2:end)-1).'];
 
@@ -678,44 +706,52 @@ nn = zeros(size(rngs,1),1);
 
 B = 128; % frames per write slab
 
-parfor i = 1:size(rngs,1)
-    a = rngs(i,1); b = rngs(i,2); L = b-a+1;
-    v = VideoReader(src); v.CurrentTime = (a-1)/v.FrameRate;
-
-    hf = fullfile(od,sprintf('shard_%03d.h5',i));
-    h5create(hf,'/stack',[H W L],'Datatype','uint8','Chunksize',[H W min(L,128)],'Deflate',0);
-
-    S_loc = zeros(H,W,'double');
-    s1_loc = 0; s2_loc = 0; n_loc = 0;
-
-    off = 1;
-    while off <= L
-        nwrite = min(B, L - off + 1);
-        buf = zeros(H,W,nwrite,'uint8');
-        for k = 1:nwrite
-            f = readFrame(v);
-            buf(:,:,k) = rgb2gray(f);
-        end
-        h5write(hf,'/stack',buf,[1 1 off],[H W nwrite]);
-
-        bd = double(buf);
-        S_loc = S_loc + sum(bd,3);
-        s1_loc = s1_loc + sum(bd(:));
-        s2_loc = s2_loc + sum(bd(:).^2);
-        n_loc  = n_loc  + numel(bd);
-
-        off = off + nwrite;
+% --- parallel if we have a process pool; else serial fallback ---
+if isProcessPool && size(rngs,1) > 1
+    parfor i = 1:size(rngs,1)
+        [files(i), lens(i), S_cell{i}, s1(i), s2(i), nn(i)] = ...
+            write_one_shard(src, od, H, W, rngs(i,1), rngs(i,2), B); %#ok<PFBNS>
     end
-
-    files(i) = string(hf);
-    lens(i)  = L;
-    S_cell{i} = S_loc;
-    s1(i) = s1_loc; s2(i) = s2_loc; nn(i) = n_loc;
+else
+    for i = 1:size(rngs,1)
+        [files(i), lens(i), S_cell{i}, s1(i), s2(i), nn(i)] = ...
+            write_one_shard(src, od, H, W, rngs(i,1), rngs(i,2), B);
+    end
 end
 
-S = zeros(H,W,'double');
-for i=1:numel(S_cell), S = S + S_cell{i}; end
+S = zeros(H,W,'double'); for i=1:numel(S_cell), S = S + S_cell{i}; end
 sum1 = sum(s1); sum2 = sum(s2); N = sum(nn);
+end
+
+% --- worker-safe shard writer (used by parfor/for) ---
+function [fpath, L, S_loc, s1_loc, s2_loc, n_loc] = write_one_shard(src, od, H, W, a, b, B)
+L = b - a + 1;
+v = VideoReader(src); v.CurrentTime = (a-1)/v.FrameRate;
+
+fpath = fullfile(od,sprintf('shard_%03d.h5',a));  % name by start idx (unique)
+h5create(fpath,'/stack',[H W L],'Datatype','uint8','Chunksize',[H W min(L,128)],'Deflate',0);
+
+S_loc = zeros(H,W,'double');
+s1_loc = 0; s2_loc = 0; n_loc = 0;
+
+off = 1;
+while off <= L
+    nwrite = min(B, L - off + 1);
+    buf = zeros(H,W,nwrite,'uint8');
+    for k = 1:nwrite
+        f = readFrame(v);
+        buf(:,:,k) = rgb2gray(f);
+    end
+    h5write(fpath,'/stack',buf,[1 1 off],[H W nwrite]);
+
+    bd = double(buf);
+    S_loc  = S_loc + sum(bd,3);
+    s1_loc = s1_loc + sum(bd(:));
+    s2_loc = s2_loc + sum(bd(:).^2);
+    n_loc  = n_loc  + numel(bd);
+
+    off = off + nwrite;
+end
 end
 
 function prefetch_worker(obj, dq, doneFlag, prefetchN)
