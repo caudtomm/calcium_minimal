@@ -270,6 +270,140 @@ classdef Movie
             end
         end
 
+        function playFast(obj, framerate_Hz, useGPU, prefetchN)
+            arguments
+                obj
+                framerate_Hz double = obj.fs
+                useGPU logical = true
+                prefetchN double {mustBeInteger, mustBePositive} = 32   % frames buffered ahead
+            end
+
+            if isempty(framerate_Hz) || ~isfinite(framerate_Hz) || framerate_Hz<=0
+                framerate_Hz = 16;
+            end
+            dt = 1/framerate_Hz;
+
+            % Ensure we use the GPU for figure rendering if available
+            try, opengl hardware; catch, end
+
+            % Choose display range & type (uint8 path is fastest)
+            isDiskBacked = isa(obj.stack,'StackH5') || isa(obj.stack,'StackH5Multi');
+            if isDiskBacked
+                cspan = [0 255]; xspan = [0 255]; toUint8 = @(x) x;   % shards are uint8
+            else
+                cspan = [0 obj.getmaxval]; xspan = cspan;
+                toUint8 = @(x) im2uint8(mat2gray(x, cspan));           % convert once per frame
+            end
+
+            % Figure (lean)
+            hfig = figure('Name','Movie','NumberTitle','off','Color','w', ...
+                        'MenuBar','none','ToolBar','none','Renderer','opengl');
+            setappdata(hfig,'stop',false);
+            hfig.CloseRequestFcn = @(src,evt) setappdata(src,'stop',true);
+            hfig.Position = [50 50 1500 800];
+            set(hfig,'GraphicsSmoothing','off');
+
+            tl = tiledlayout(hfig,1,2,'Padding','compact','TileSpacing','compact');
+            colormap(hfig, gray(256));  % fixed LUT for indexed display
+
+            % First frame (synchronously)
+            f = 1;
+            frame = obj.stack(:,:,f);                   % expect uint8 for disk-backed path
+            frameU8 = toUint8(frame);
+
+            % LEFT: show as indexed image (fastest path)
+            ax1 = nexttile(tl,1);
+            him = image(ax1, frameU8, 'CDataMapping','direct');  % uint8 indices -> colormap
+            axis(ax1,'image','off')
+            ax1.CLim = [0 255];                         % fixed
+            htxt = text(ax1,10,20,sprintf('frame: %d',f),'Color','w','FontWeight','bold');
+
+            % RIGHT: histogram (GPU-optional, throttled)
+            ax2 = nexttile(tl,2);
+            nbins = 256;
+            centers = uint8(0:255);
+            if useGPU && canUseGPU(); 
+                counts = gather(histcounts(gpuArray(frameU8), nbins, 'BinLimits',[0,255]));
+            else
+                counts = histcounts(frameU8(:), nbins, 'BinLimits',[0,255]);
+            end
+            harea = area(ax2, double(centers), counts);
+            harea.LineWidth = 0.5; harea.EdgeAlpha = 0.5; harea.FaceAlpha = 0.25;
+            xlim(ax2, xspan); ax2.YLimMode = 'auto'; ax2.Box = 'on';
+            hold(ax2,'on')
+            l1 = line(ax2,[cspan(1) cspan(1)],[0 1],'Color','r','LineStyle','--','LineWidth',2);
+            l2 = line(ax2,[cspan(2) cspan(2)],[0 1],'Color','r','LineStyle','--','LineWidth',2);
+            hold(ax2,'off')
+
+            % --- Prefetch setup (background worker) ---
+            import parallel.pool.*
+            dq = PollableDataQueue;      % main thread polls frames
+            doneFlag = parallel.pool.DataQueue; % worker reports finish/errors
+            setappdata(hfig,'dq_done',false);
+            afterEach(doneFlag, @(msg) setappdata(hfig,'dq_done',true));
+
+            F = obj.nfr;
+            % Start worker to prefetch in batches
+            if F>1
+                pool = gcp('nocreate');
+                if isempty(pool), parpool('threads'); end  % light-weight pool
+                % Pass a lightweight handle to the reader via function handle
+                fcn = @() prefetch_worker(obj, dq, doneFlag, prefetchN);
+                parfeval(@() fcn(), 0);   % fire and forget
+            end
+
+            % Playback loop with frame skipping + throttled histogram
+            HIST_EVERY = 4;  next_hist = 1;
+            t0 = tic; frame_start_time = 0;
+            f = 1;
+
+            while isvalid(hfig)
+                if getappdata(hfig,'stop'), safe_close(hfig); return; end
+
+                % Try to poll a prefetched frame; fallback to synchronous read
+                data = poll(dq, 0);   % non-blocking
+                if ~isempty(data)
+                    f = data.frameIdx;
+                    frameU8 = data.frameU8;
+                else
+                    % synchronous (should be rare if prefetch keeps up)
+                    frameU8 = toUint8(obj.stack(:,:,f));
+                end
+
+                % Catch up if behind: skip forward
+                now = toc(t0); target = frame_start_time + (f-1)*dt;
+                if now > target + dt
+                    behind = floor((now - target)/dt);
+                    f = min(F, f + behind);
+                end
+
+                % Update visuals
+                set(him,'CData',frameU8);
+                set(htxt,'String',sprintf('frame: %d',f));
+
+                if mod(f, HIST_EVERY)==next_hist
+                    if useGPU && canUseGPU()
+                        counts = gather(histcounts(gpuArray(frameU8), nbins, 'BinLimits',[0,255]));
+                    else
+                        counts = histcounts(frameU8(:), nbins, 'BinLimits',[0,255]);
+                    end
+                    set(harea,'XData',double(centers),'YData',counts);
+                    ymax = max(counts); if ~isfinite(ymax) || ymax<=0, ymax = 1; end
+                    set(l1,'YData',[0 ymax*2/3]); set(l2,'YData',[0 ymax*2/3]);
+                end
+
+                drawnow limitrate   % allow callbacks (close button)
+                if ~ishghandle(hfig) || getappdata(hfig,'stop'), safe_close(hfig); return; end
+
+                % Sleep remainder to hit FPS
+                now = toc(t0);
+                to_sleep = target + dt - now;
+                if to_sleep > 0, pause(to_sleep); end
+
+                % Next frame (wrap)
+                f = f + 1; if f>F, f = 1; frame_start_time = toc(t0); end
+            end
+        end
 
         function FileOut = save(obj, newpath, type, newfname, auto_overwrite)
             arguments
@@ -391,6 +525,7 @@ classdef Movie
         end
     end
 end
+
 
 function [stack,scanimage_meta,path,meta] = readSource(src)
     % initialize
@@ -583,8 +718,30 @@ for i=1:numel(S_cell), S = S + S_cell{i}; end
 sum1 = sum(s1); sum2 = sum(s2); N = sum(nn);
 end
 
-function safe_close(h)
-    if ishghandle(h)
-        try, delete(h); end
+function prefetch_worker(obj, dq, doneFlag, prefetchN)
+    % simple ring buffer prefetcher
+    try
+        F = obj.nfr; k = 1;
+        while true
+            % fill up to prefetchN frames ahead
+            for j = 1:prefetchN
+                fidx = k + j - 1; if fidx>F, fidx = fidx - F; end
+                fr = obj.stack(:,:,fidx);     % should be uint8 (fast path)
+                send(dq, struct('frameIdx', fidx, 'frameU8', fr));
+            end
+            k = k + prefetchN;
+            if k>F, k = k - F; end
+            pause(0.001); % yield a bit
+        end
+    catch
+        send(doneFlag, true);
     end
+end
+
+function tf = canUseGPU()
+    try, tf = parallel.gpu.GPUDevice.isAvailable; catch, tf = false; end
+end
+
+function safe_close(h)
+    if ishghandle(h), try, delete(h); end, end
 end
