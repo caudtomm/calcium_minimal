@@ -31,7 +31,7 @@ figs.outputfolder = fullfiletol('figures',extractBefore(filename,'.'));
 figs.outputfile = 'all_plots.pdf';
 figs.config = cfg;
 
-%% Plotting average similarity matrices and related metrics for each experimental group.
+
 v = ExperimentViewer(experiment);
 v.plotConfig = cfg;
 
@@ -39,6 +39,9 @@ v.dataFilter.traceType = 'pSpike';
 v.dataFilter.interval = [1,20];
 v.dataFilter.trial_sorting = 'stim_id';
 dft = v.dataFilter;
+
+
+%% Plotting average similarity matrices and related metrics for each experimental group.
 
 % plot for naive fish
 v.dataFilter.subjectGroup = 'naïve';
