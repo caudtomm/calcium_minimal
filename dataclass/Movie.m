@@ -281,7 +281,7 @@ function [stack,scanimage_meta,path] = readSource(src)
                 stack = movie.stack;
                 scanimage_meta = movie.scanimage_meta;
                 path = movie.path;
-            else
+            elseif endsWith(src,'.tif') || endsWith(src,'.tiff')
                 [stack, scanimage_meta] = loadTiffStack(src);
                 stack = double(stack);
                 try
@@ -289,6 +289,32 @@ function [stack,scanimage_meta,path] = readSource(src)
                 catch
                 end
                 path = getFileNameSpecs(src);
+            elseif endsWith(src,'.avi')
+                v = VideoReader(src);
+                % Estimate the byte size of the output matrix before computing
+                numFrames = floor(v.Duration * v.FrameRate);
+                frameHeight = v.Height;
+                frameWidth = v.Width;
+                estimatedSizeBytes = numFrames * frameHeight * frameWidth * 8; % Assuming double precision (8 bytes per element)
+                if estimatedSizeBytes > 10 * 1e9  % Check if size > 10 GB
+                    actualSizeGB = estimatedSizeBytes / 1e9; % Convert size to GB
+                    proceed = input(sprintf('The video is %.2f GB. Do you want to proceed with loading the video? (y/n): ', actualSizeGB), 's');if lower(proceed) ~= 'y'
+                        disp('Operation aborted by the user.');
+                        return;
+                    end
+                end
+
+                stack = zeros(frameHeight, frameWidth, numFrames, 'double');
+                % Convert RGB to grayscale while maintaining native bit precision
+                bitPrecision = v.BitsPerPixel / 3; % Bits per channel
+                scaleFactor = 2^bitPrecision - 1; % Maximum value for the bit precision
+                frameIdx = 1;
+                while hasFrame(v)
+                    frame = readFrame(v);
+                    grayFrame = rgb2gray(frame / scaleFactor) * scaleFactor; % Convert to grayscale
+                    stack(:, :, frameIdx) = double(grayFrame);
+                    frameIdx = frameIdx + 1;
+                end
             end
             if isempty(path.orig_fpath)
                 path.orig_fpath = pwd;
