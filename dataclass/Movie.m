@@ -4,7 +4,7 @@ classdef Movie
         description string = ""
         detailed_description string = ""
 
-        stack double
+        stack
         path
         timeavg double
         badperiods double = []
@@ -32,7 +32,22 @@ classdef Movie
             end
 
             if nargin>0 && ~isempty(src)
-                [obj.stack, obj.scanimage_meta, obj.path] = readSource(src);
+                [obj.stack, obj.scanimage_meta, obj.path, meta] = readSource(src);
+                % populate properties from meta when present (e.g., AVI case)
+                if ~isempty(meta)
+                    if isfield(meta,'fs') && ~isempty(meta.fs)
+                        obj.fs = meta.fs;
+                        obj.frameperiod = 1/meta.fs;
+                    end
+                    if isfield(meta,'frameperiod') && ~isempty(meta.frameperiod)
+                        obj.frameperiod = meta.frameperiod;
+                        if isempty(obj.fs) || obj.fs==0
+                            obj.fs = 1/meta.frameperiod;
+                        end
+                    end
+
+                    obj.metadata = meta;
+                end
             end
 
             % copy properties from 'scanimage_meta'
@@ -44,24 +59,45 @@ classdef Movie
                 obj.frameperiod = obj.scanimage_meta{1}.SI_hRoiManager_scanFramePeriod;
                 obj.imagingFovUm = obj.scanimage_meta{1}.SI_hRoiManager_imagingFovUm;
             catch
+                % fallback if scanimage_meta is empty or missing fields
                 [obj.h,obj.w,obj.nfr] = size(obj.stack);
             end
         end
 
         % getters
         function value = get.timeavg(obj)
-            value = mean(obj.stack,3,'omitmissing');
+            if (isa(obj.stack,'StackH5') || isa(obj.stack,'StackH5Multi'))
+                if isfield(obj.metadata,'timeavg_image') && ~isempty(obj.metadata.timeavg_image)
+                    value = obj.metadata.timeavg_image;    % O(1): cached
+                    return
+                end
+                value = mean(obj.stack,3,'omitmissing');    % fallback: stream compute
+                return
+            end
+            value = mean(obj.stack,3,'omitmissing');        % in-RAM double
         end
 
         function value = get.h(obj)
-            value = size(obj.stack,1);
+            if isfield(obj.metadata,'h') && ~isempty(obj.metadata.h)
+                value = obj.metadata.h;                     % O(1): cached
+                return
+            end
+            value = size(obj.stack,1);                      % cheap even for proxies
         end
 
         function value = get.w(obj)
+            if isfield(obj.metadata,'w') && ~isempty(obj.metadata.w)
+                value = obj.metadata.w;                     % O(1): cached
+                return
+            end
             value = size(obj.stack,2);
         end
 
         function value = get.nfr(obj)
+            if isfield(obj.metadata,'nfr') && ~isempty(obj.metadata.nfr)
+                value = obj.metadata.nfr;                   % O(1): cached
+                return
+            end
             value = size(obj.stack,3);
         end
 
@@ -100,8 +136,13 @@ classdef Movie
         end
 
         function v = getmaxval(obj)
+            if isfield(obj.metadata,'mean_all') && isfield(obj.metadata,'std_all') ...
+                    && ~isempty(obj.metadata.mean_all) && ~isempty(obj.metadata.std_all)
+                v = obj.metadata.mean_all + 4*obj.metadata.std_all; return
+            end
             v = mean(obj.stack,"all","omitmissing") + 4*std(obj.stack,[],"all","omitmissing");
         end
+
         
         % Method to log operations and their hash address
         function obj = update_log(obj,charv)
@@ -114,50 +155,121 @@ classdef Movie
         % function to play the movie
         function play(obj,framerate_Hz)
             arguments
-                obj 
+                obj
                 framerate_Hz double = obj.fs
             end
-            h = figure;
-            h.Position = [50 50 1500 800];
-            colormap("gray")
+            if isempty(framerate_Hz) || ~isfinite(framerate_Hz) || framerate_Hz<=0
+                framerate_Hz = 16;
+            end
+            dt = 1/framerate_Hz;
 
-            cspan = [0 obj.getmaxval];
-            xspan = [min(obj.stack,[],'all','omitmissing'), obj.getmaxval];
-            if isempty(framerate_Hz); framerate_Hz = 16; end
-            
-            tic % initialize
-            while true % cycle
-                for frame =  1:obj.nfr
-                    % stop if the figure was closed manually
-                    if isempty(findobj(h)); return; end
+            % Fixed display spans (avoid per-frame min/max or autoscale)
+            % If your data are uint8, this is perfect. Otherwise keep getmaxval.
+            if isa(obj.stack,'StackH5') || isa(obj.stack,'StackH5Multi')
+                cspan = [0 255];   % disk-backed path stores uint8
+                xspan = [0 255];
+            else
+                cspan = [0 obj.getmaxval];
+                xspan = [0 obj.getmaxval];
+            end
 
-                    thisframe = obj.stack(:,:,frame);
+            % Figure & layout
+            hfig = figure('Name','Movie','NumberTitle','off','Color','w');
+            setappdata(hfig,'stop',false);
+            hfig.CloseRequestFcn = @(src,evt) setappdata(src,'stop',true);  % mark stop; we'll delete later
+            hfig.Position = [50 50 1500 800];
+            tl = tiledlayout(hfig,1,2,'Padding','compact','TileSpacing','compact');
+            colormap(hfig,"gray")
 
-                    % show
-                    subplot(121)
-                    imagesc(thisframe,cspan);
-                    axis square
-                    title(['frame: ',num2str(frame)])
+            % First frame
+            f = 1;
+            frame = obj.stack(:,:,f);                 % should be uint8 for speed
 
-                    subplot(122)
-                    b = histogram(thisframe(:));
-                    xlim(xspan)
-                    % superimpose color span
-                    hold on
-                    line([cspan(1),cspan(1)],[0,max(b.Values)*2/3],...
-                        'Color','r','LineStyle','--','LineWidth',2);
-                    line([cspan(2),cspan(2)],[0,max(b.Values)*2/3],...
-                        'Color','r','LineStyle','--','LineWidth',2);
-                    hold off
-                    
-                    % wait for the right amount of time to match the
-                    % desired framerate
-                    elapsed = toc;
-                    pause(max([0, 1/framerate_Hz-elapsed]))
-                    tic
+            % Left: image (use image + fixed CLim)
+            ax1 = nexttile(tl,1);
+            him = image(ax1, frame, 'CDataMapping','scaled');
+            ax1.CLim = cspan;
+            axis(ax1,'image','off')
+            % Single text label instead of title (faster)
+            htxt = text(ax1, 10, 20, sprintf('frame: %d',f), 'Color','w', ...
+                'FontWeight','bold', 'FontName','Helvetica', 'FontSize',12);
+
+            % Right: histogram (outline via stairs OR area; here we use area, throttled)
+            ax2 = nexttile(tl,2);
+            nbins = 256;
+            edges = linspace(xspan(1), xspan(2), nbins+1);
+            centers = (edges(1:end-1)+edges(2:end))/2;
+            % imhist is fast for uint8 (IPT), else use histcounts
+            if isa(frame,'uint8')
+                counts = imhist(frame, nbins);
+                % imhist returns 256×1 for uint8; centers must match 1:256 mapping
+                centers = linspace(0,255,nbins);
+            else
+                counts = histcounts(frame(:), edges);
+            end
+            harea = area(ax2, centers, counts);
+            harea.LineWidth = 0.5; harea.EdgeAlpha = 0.5; harea.FaceAlpha = 0.25;
+            xlim(ax2, xspan); ax2.YLimMode = 'auto'; ax2.Box = 'on';
+
+            hold(ax2,'on')
+            l1 = line(ax2,[cspan(1) cspan(1)],[0 1],'Color','r','LineStyle','--','LineWidth',2);
+            l2 = line(ax2,[cspan(2) cspan(2)],[0 1],'Color','r','LineStyle','--','LineWidth',2);
+            hold(ax2,'off')
+
+            % Playback loop with frame skipping + throttled histogram updates
+            HIST_EVERY = 3;                 % update histogram every N frames
+            next_hist  = 1;
+            t0 = tic;
+            frame_start_time = 0;           % target time for frame 1 (sec)
+
+            while isvalid(hfig)
+                for f = 1:obj.nfr
+                    if ~ishghandle(hfig) || getappdata(hfig,'stop'); safe_close(hfig); return; end
+                    if ~isvalid(hfig); return; end
+
+                    % Catch up if we're behind: skip frames
+                    now = toc(t0);
+                    target = frame_start_time + (f-1)*dt;
+                    if now > target + dt
+                        % Skip ahead by however many frames we're behind
+                        behind = floor((now - target)/dt);
+                        f = min(obj.nfr, f + behind);
+                    end
+
+                    % Grab frame (fast path returns 2D uint8)
+                    frame = obj.stack(:,:,f);
+
+                    % Update image + label
+                    set(him,'CData',frame);
+                    set(htxt,'String',sprintf('frame: %d',f));
+
+                    % Throttled histogram update
+                    if mod(f, HIST_EVERY)==next_hist
+                        if isa(frame,'uint8')
+                            counts = imhist(frame, nbins);
+                            centers = linspace(0,255,nbins);
+                        else
+                            counts = histcounts(frame(:), edges);
+                        end
+                        set(harea,'XData',centers,'YData',counts);
+                        ymax = max(counts); if ~isfinite(ymax) || ymax<=0, ymax = 1; end
+                        set(l1,'YData',[0 ymax*2/3]); set(l2,'YData',[0 ymax*2/3]);
+                    end
+
+                    drawnow limitrate
+
+                    % Sleep the remainder to hit target dt (if any)
+                    now = toc(t0);
+                    to_sleep = target + dt - now;
+                    if to_sleep > 0
+                        pause(to_sleep);
+                    end
                 end
+                % loop continuously
+                frame_start_time = toc(t0);
             end
         end
+
 
         function FileOut = save(obj, newpath, type, newfname, auto_overwrite)
             arguments
@@ -229,10 +341,26 @@ classdef Movie
                         b = prompt_overwrite(FileOut);
                     end
         
-                    movie = obj.stack;
                     if b
                         delete(FileOut)
-                        saveastiff(uint16(movie), FileOut)
+                        if isa(obj.stack,'StackH5')
+                            % stream-write HDF5-backed stack to TIFF without loading all frames
+                            t = Tiff(FileOut,'w8');
+                            tag.ImageLength = obj.h; tag.ImageWidth = obj.w;
+                            tag.Compression = Tiff.Compression.None;
+                            tag.Photometric = Tiff.Photometric.MinIsBlack;
+                            tag.BitsPerSample = 16; tag.SamplesPerPixel = 1;
+                            tag.PlanarConfiguration = Tiff.PlanarConfiguration.Chunky;
+                            for frame = 1:obj.nfr
+                                setTag(t,tag);
+                                write(t, uint16(obj.stack(:,:,frame)));
+                                if frame<obj.nfr, writeDirectory(t); end
+                            end
+                            close(t)
+                        else
+                            movie = obj.stack;
+                            saveastiff(uint16(movie), FileOut)
+                        end
                     end
 
                 case 'avi'
@@ -253,6 +381,7 @@ classdef Movie
                             normframe(normframe<0) = 0;
                             writeVideo(v,normframe);
                         end
+                        close(v)
                     end
 
 
@@ -263,10 +392,11 @@ classdef Movie
     end
 end
 
-function [stack,scanimage_meta,path] = readSource(src)
+function [stack,scanimage_meta,path,meta] = readSource(src)
     % initialize
     scanimage_meta = {};
     [stack, path] = deal([]);
+    meta = struct(); % optional non-ScanImage metadata (e.g., AVI info)
 
     % read
     if isnumeric(src)
@@ -281,6 +411,16 @@ function [stack,scanimage_meta,path] = readSource(src)
                 stack = movie.stack;
                 scanimage_meta = movie.scanimage_meta;
                 path = movie.path;
+                try
+                    if isprop(movie,'fs') && ~isempty(movie.fs)
+                        meta.fs = movie.fs;
+                        meta.frameperiod = 1/movie.fs;
+                    end
+                    if isprop(movie,'h') && ~isempty(movie.h), meta.h = movie.h; end
+                    if isprop(movie,'w') && ~isempty(movie.w), meta.w = movie.w; end
+                    if isprop(movie,'nfr') && ~isempty(movie.nfr), meta.nfr = movie.nfr; end
+                catch
+                end
             elseif endsWith(src,'.tif') || endsWith(src,'.tiff')
                 [stack, scanimage_meta] = loadTiffStack(src);
                 stack = double(stack);
@@ -289,32 +429,9 @@ function [stack,scanimage_meta,path] = readSource(src)
                 catch
                 end
                 path = getFileNameSpecs(src);
-            elseif endsWith(src,'.avi')
-                v = VideoReader(src);
-                % Estimate the byte size of the output matrix before computing
-                numFrames = floor(v.Duration * v.FrameRate);
-                frameHeight = v.Height;
-                frameWidth = v.Width;
-                estimatedSizeBytes = numFrames * frameHeight * frameWidth * 8; % Assuming double precision (8 bytes per element)
-                if estimatedSizeBytes > 10 * 1e9  % Check if size > 10 GB
-                    actualSizeGB = estimatedSizeBytes / 1e9; % Convert size to GB
-                    proceed = input(sprintf('The video is %.2f GB. Do you want to proceed with loading the video? (y/n): ', actualSizeGB), 's');if lower(proceed) ~= 'y'
-                        disp('Operation aborted by the user.');
-                        return;
-                    end
-                end
-
-                stack = zeros(frameHeight, frameWidth, numFrames, 'double');
-                % Convert RGB to grayscale while maintaining native bit precision
-                bitPrecision = v.BitsPerPixel / 3; % Bits per channel
-                scaleFactor = 2^bitPrecision - 1; % Maximum value for the bit precision
-                frameIdx = 1;
-                while hasFrame(v)
-                    frame = readFrame(v);
-                    grayFrame = rgb2gray(frame / scaleFactor) * scaleFactor; % Convert to grayscale
-                    stack(:, :, frameIdx) = double(grayFrame);
-                    frameIdx = frameIdx + 1;
-                end
+                        elseif endsWith(src,'.avi')
+                [stack, meta] = ingestAvi(src, 10); % GB limit for double
+                path = getFileNameSpecs(src);
             end
             if isempty(path.orig_fpath)
                 path.orig_fpath = pwd;
@@ -373,5 +490,101 @@ function result = parseToStruct(inputStr)
         % Assign the value to the structure
         paramName = matlab.lang.makeValidName(paramName); % Ensure the field name is a valid MATLAB identifier
         result.(paramName) = paramValue;
+    end
+end
+
+function [stk,meta] = ingestAvi(src,limGB)
+v = VideoReader(src);
+F = floor(v.Duration*v.FrameRate);
+H = v.Height; W = v.Width; fs = v.FrameRate;
+est = F*H*W*8;
+if est > limGB*1e9
+    [files,lens,S,sum1,sum2,N] = avi_shard_write(src,H,W,F);
+    stk = StackH5Multi(files,lens,[H W F]);
+    mu = sum1/N;
+    sd = sqrt(max((sum2 - (sum1^2)/N)/max(N-1,1),0));
+    meta.backend='hdf5_shards';
+    meta.shards=files; meta.shard_len=lens;
+    meta.timeavg_image = S/F; meta.mean_all=mu; meta.std_all=sd;
+    meta.bitdepth='uint8'; meta.colorspace='grayscale';
+else
+    stk = zeros(H,W,F,'double');
+    bp = v.BitsPerPixel/3; sc = 2^bp-1;
+    k=1; while hasFrame(v)
+        f = readFrame(v);
+        g = rgb2gray(f/sc)*sc;
+        stk(:,:,k) = double(g); k=k+1;
+    end
+    meta.backend='memory'; meta.bitdepth='double_from_uint8'; meta.colorspace='grayscale';
+    meta.timeavg_image = mean(stk,3);
+    meta.mean_all = mean(stk(:));
+    meta.std_all  = std(stk(:),0);
+end
+meta.source='avi'; meta.h=H; meta.w=W; meta.nfr=F; meta.fs=fs; meta.frameperiod=1/fs;
+end
+
+function [files,lens,S,sum1,sum2,N] = avi_shard_write(src,H,W,F)
+od = fullfile(tempdir, 'movie_h5_shards');
+if ~exist(od,'dir'), mkdir(od); end
+d = dir(fullfile(od,'shard_*.h5')); for i=1:numel(d), try, delete(fullfile(od,d(i).name)); end, end
+
+p = gcp('nocreate'); n = 1; if ~isempty(p), n = max(1,p.NumWorkers); end
+n = min(n, max(1, ceil(F/256)));
+cuts = round(linspace(1,F+1,n+1));
+rngs = [cuts(1:end-1).' (cuts(2:end)-1).'];
+
+files = strings(size(rngs,1),1);
+lens  = zeros(size(rngs,1),1);
+
+S_cell = cell(size(rngs,1),1);
+s1 = zeros(size(rngs,1),1);
+s2 = zeros(size(rngs,1),1);
+nn = zeros(size(rngs,1),1);
+
+B = 128; % frames per write slab
+
+parfor i = 1:size(rngs,1)
+    a = rngs(i,1); b = rngs(i,2); L = b-a+1;
+    v = VideoReader(src); v.CurrentTime = (a-1)/v.FrameRate;
+
+    hf = fullfile(od,sprintf('shard_%03d.h5',i));
+    h5create(hf,'/stack',[H W L],'Datatype','uint8','Chunksize',[H W min(L,128)],'Deflate',0);
+
+    S_loc = zeros(H,W,'double');
+    s1_loc = 0; s2_loc = 0; n_loc = 0;
+
+    off = 1;
+    while off <= L
+        nwrite = min(B, L - off + 1);
+        buf = zeros(H,W,nwrite,'uint8');
+        for k = 1:nwrite
+            f = readFrame(v);
+            buf(:,:,k) = rgb2gray(f);
+        end
+        h5write(hf,'/stack',buf,[1 1 off],[H W nwrite]);
+
+        bd = double(buf);
+        S_loc = S_loc + sum(bd,3);
+        s1_loc = s1_loc + sum(bd(:));
+        s2_loc = s2_loc + sum(bd(:).^2);
+        n_loc  = n_loc  + numel(bd);
+
+        off = off + nwrite;
+    end
+
+    files(i) = string(hf);
+    lens(i)  = L;
+    S_cell{i} = S_loc;
+    s1(i) = s1_loc; s2(i) = s2_loc; nn(i) = n_loc;
+end
+
+S = zeros(H,W,'double');
+for i=1:numel(S_cell), S = S + S_cell{i}; end
+sum1 = sum(s1); sum2 = sum(s2); N = sum(nn);
+end
+
+function safe_close(h)
+    if ishghandle(h)
+        try, delete(h); end
     end
 end
