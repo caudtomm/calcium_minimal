@@ -52,10 +52,10 @@ classdef Behavior2pPreprocessing
                 ijmFile = 'W:\scratch\gfriedri\caudtomm\code\Fiji.app\macros\random_IJmacro_scripts\batch_tail_movies5.ijm';
             end
             if nargin < 5 || isempty(workers)
-                workers = 6;
+                workers = 4;
             end
             if nargin < 6 || isempty(rankRange)
-                rankRange = [0 1 5];
+                rankRange = [0 1 3];
             end
         
             ks = rois.keys;
@@ -71,11 +71,22 @@ classdef Behavior2pPreprocessing
                 rect = sprintf('%d,%d,%d,%d', round(x0), round(y0), round(w), round(h));
                 roiArgs(i) = upper(k) + "=" + rect;                   % e.g., HEAD=249,486,56,44
             end
-        
+
+            % 
+            doneDir = fullfile(pwd,'fiji_done');    % define directory for "done" files
+            if ~exist(doneDir,'dir'); mkdir(doneDir); end
+            % Clean up any old "done" files from previous runs    
+            rs = rankRange(1):rankRange(2):rankRange(3);
+            for r = rs
+                f = fullfile(doneDir, sprintf('done_rank_%d.ok', r));
+                if exist(f,'file'), delete(f); end
+            end
+            
             macroArgs = strjoin( ...
                 ["workers=" + string(workers), ...
                  "rank=%R", ...
                  "subjectID=" + string(subjectID), ...
+                 "doneDir=" + string(doneDir), ...
                  roiArgs], " ");
         
             % Build the Windows FOR /L command; avoid sprintf to keep '%' literal.
@@ -91,6 +102,17 @@ classdef Behavior2pPreprocessing
             if status ~= 0
                 warning('run_fiji_batch:systemFailed', 'Non-zero exit from system(). Inspect your paths and arguments.');
             end
+
+            % Wait for all Fiji ranks to drop their done files
+            while true
+                present = arrayfun(@(r) exist(fullfile(doneDir, sprintf('done_rank_%d.ok', r)), 'file') == 2, rs);
+                if all(present)
+                    rmdir(doneDir, 's'); % remove done directory
+                    break
+                end
+                pause(2);
+            end
+
         end
 
     end
