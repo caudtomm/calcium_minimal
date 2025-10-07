@@ -11,6 +11,29 @@ classdef Behavior2PTraces
         Breathing
         Tail
     end
+
+    methods (Access = private)
+        function [A,t,fs] = readTraces_csv(obj)
+            files = dir('*.csv');
+            A = [];
+            for ff = 1:numel(files)
+                file = files(ff);
+                fprintf(['Analysing: ', file.name, '...'])
+                
+                a = readtable(file.name); a = a.Mean;
+                A = [A; a-median(a)];
+                
+                fprintf(' DONE!\n')
+            
+            end
+
+            % time axis
+            fs = obj.framerate;
+            t = [0:1/fs:length(A)/fs-1/fs];
+        end
+
+
+    end
     
     methods (Static)
         function plotSpectrogram(trace)
@@ -177,7 +200,7 @@ classdef Behavior2PTraces
             obj.framerate = VideoReader(fullfiletol(fpath,videos(1).name)).FrameRate;
 
             % generate region crops and save to folders
-            obj.cropMovies
+            %obj.cropMovies
 
             % read traces from FiJI output CSVs
             obj.LED = obj.extractTraces(fullfiletol(fpath,'LED_vals'));
@@ -208,26 +231,9 @@ classdef Behavior2PTraces
             disp(fpath);
             currentDir = pwd;
             cd(fpath)
-
-            % convenience
-            fs = obj.framerate;
             
             % get traces
-            files = dir('*.csv');
-            A = [];
-            for ff = 1:numel(files)
-                file = files(ff);
-                fprintf(['Analysing: ', file.name, '...'])
-                
-                a = readtable(file.name); a = a.Mean;
-                A = [A; a-median(a)];
-                
-                fprintf(' DONE!\n')
-            
-            end
-
-            % time axis
-            t = [0:1/fs:length(A)/fs-1/fs];
+            [A,t,fs] = obj.readTraces_csv();
 
             % store to output
             struct_out.t = t; % time axis
