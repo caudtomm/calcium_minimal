@@ -13,9 +13,9 @@ overlap = .3; % [seconds]
 filename = 'odorexp004_IC1_130625.mat';
 
 %
-% experiment = load(filename).a; % Experiment object
+experiment = load(filename).a; % Experiment object
 % or
-experiment = a; clear a
+% experiment = a; clear a
 
 % avoid any spelling mismatches
 for i = 1:numel(experiment.traces)

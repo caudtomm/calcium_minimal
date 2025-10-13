@@ -4,12 +4,14 @@ classdef Behavior2PTraces
         framerate double
         fpath char
         regions = {'LED', 'Lip', 'Tail'}
+        f_range = [] % frame range to analyze [frames]
         ledROI
         lipROI
         tailROI
         LED
         Breathing
         Tail
+        headPCA struct
     end
 
     methods (Access = private)
@@ -32,7 +34,38 @@ classdef Behavior2PTraces
             t = [0:1/fs:length(A)/fs-1/fs];
         end
 
+        function [A,t,fs,frange] = readTraces_mat(obj)
+            files = dir('*avg_intensities.mat');
+            if isempty(files)
+                error('No *avg_intensity.mat files found.');
+            end
+            file = files(1);
+            fprintf(['Loading: ', file.name, '...'])
+            
+            data = load(file.name).avg_intensities;
 
+            frange = obj.f_range;
+            if isfield(data, 'allchecked')
+                A = data.allchecked;
+                frange = 1:length(A);
+            elseif isfield(data, 'all')
+                A = data.all;
+                if ~isempty(frange)
+                    A = A(frange);
+                end
+            else
+                error('The loaded file does not contain the field "all".');
+            end
+
+            A = A-median(A,'omitmissing');                
+            A = fillmissing(A,'linear');
+            
+            fprintf(' DONE!\n')
+
+            % time axis
+            fs = obj.framerate;
+            t = [0:1/fs:length(A)/fs-1/fs];
+        end
     end
     
     methods (Static)
@@ -101,6 +134,11 @@ classdef Behavior2PTraces
             ITI = median(diff(onperiods(:,1))); % [frames]
             onperiods2p = onperiods; % to keep live until storing
 
+            %% inference of camera frame rate from measured ITI vs expected ITI
+            expected_ITI_s = 180; % [s] (assumes 3 min ITI)
+            inferred_framerate = ITI/expected_ITI_s; % [Hz]
+            fprintf('Inferred camera framerate: %.2f Hz\n',inferred_framerate);
+
             %% extract LED-on periods (...)
 
             % get light-on intervals
@@ -122,16 +160,21 @@ classdef Behavior2PTraces
             traceout.trials = trials;
             traceout.ntrials = ntrials;
             traceout.ITI = ITI; % [frames]
+            traceout.fs = inferred_framerate; % update framerate
 
          end
 
-         function trace = resample(trace,trials,T)
+         function [t_resampled, resampledtrace] = resample(trace,trials,T,L)
+            if nargin < 4
+                L = median(1+diff(trials,[],2).frame_start); % median trial length [frames]
+            end
+
             s2 = cell(height(trials), 1);
             for i = 1:height(trials)
                 s2{i} = trace.raw(trials.frame_start(i):trials.frame_end(i));
             end 
 
-            t_common = linspace(0,T,median(1+diff(trials,[],2).frame_start));
+            t_common = linspace(0,T,L);
 
             s2_resampled = cell(height(trials),1);
             for i = 1:height(trials)
@@ -140,8 +183,8 @@ classdef Behavior2PTraces
             end
             s2_resampled = cell2mat(s2_resampled)';
 
-            trace.t_resampled = t_common;
-            trace.resampled = s2_resampled;
+            t_resampled = t_common;
+            resampledtrace = s2_resampled;
          end
 
          function trace = removeBackground(trace,background_freq)
@@ -163,24 +206,27 @@ classdef Behavior2PTraces
 
          end
 
-         function freq = findDominantFrequency(trace)
-            A = trace.resampled(:);
+         function freq = findDominantFrequency(tracemat,fs)
+            A = tracemat(:);
 
             % instantaneous frequency,
             % rolling average over 500 ms
-            x = movmean(instfreq(A,trace.fs,'Method','hilbert'),trace.fs/2);
+            x = movmean(instfreq(A,fs,'Method','hilbert'),fs/2);
 
-            freq = reshape([x; x(end)],size(trace.resampled));
+            freq = reshape([x; x(end)],size(tracemat));
          end
     end
 
     methods
-        function obj = Behavior2PTraces(fpath, ledROI,lipROI,tailROI)
+        function obj = Behavior2PTraces(fpath, ledROI,lipROI,tailROI, varargin)
             arguments
                 fpath char = fullfiletol(pwd,'tail_movies') 
-                ledROI = [823, 470, 119, 106]
-                lipROI = [299, 497, 19, 16]
-                tailROI = [102, 96, 339, 262]
+                ledROI = []
+                lipROI = []
+                tailROI = []
+            end
+            arguments (Repeating)
+                varargin
             end
 
             if isunix
@@ -202,10 +248,24 @@ classdef Behavior2PTraces
             % generate region crops and save to folders
             %obj.cropMovies
 
-            % read traces from FiJI output CSVs
-            obj.LED = obj.extractTraces(fullfiletol(fpath,'LED_vals'));
-            obj.Breathing = obj.extractTraces(fullfiletol(fpath,'Lip_vals'));
-            obj.Tail = obj.extractTraces(fullfiletol(fpath,'Tail_vals'));
+            % extract framestamps from the LED frame
+            obj.LED = obj.extractTraces(fullfiletol(fpath,'rot','LED_vals'));
+            obj.LED = obj.extractLEDframestamps(obj.LED);
+            obj.f_range = obj.LED.f_range; % update frame range to analyze
+            obj.framerate = obj.LED.fs; % update framerate
+
+            % read PCA of head motion (for the moment, this is unused here)
+            fileIn = fullfiletol(fpath,'rot','Head_vals','pca_results.mat');
+            if isfile(fileIn)
+                obj.headPCA = load(fileIn);
+            else
+                warning('PCA results file for head motion not found.');
+                obj.headPCA = struct();
+            end
+
+            % read traces from FiJI output CSVs or summary MATs
+            obj.Breathing = obj.extractTraces(fullfiletol(fpath,'rot','Head_vals'));
+            obj.Tail = obj.extractTraces(fullfiletol(fpath,'rot','Tail_vals'));
 
             % highpass the Breathing trace at 0.5 Hz
             obj.Breathing.raw = highpass(obj.Breathing.raw,.5,obj.framerate);
@@ -215,16 +275,28 @@ classdef Behavior2PTraces
             obj.Breathing = obj.removeBackground(obj.Breathing,MaiTai_freq);
             obj.Tail = obj.removeBackground(obj.Tail,MaiTai_freq);
 
-            % extract framestamps from the LED frame
-            obj.LED = obj.extractLEDframestamps(obj.LED);
 
-            % resample traces
-            obj.LED = obj.resample(obj.LED,obj.LED.trials,170);
-            obj.Breathing = obj.resample(obj.Breathing,obj.LED.trials,170);
-            obj.Tail = obj.resample(obj.Tail,obj.LED.trials,170);
+            % resample traces to common time axis (LED trials)
+            [obj.LED.t_resampled,obj.LED.resampled] = ...
+                obj.resample(obj.LED,obj.LED.trials,170);
+            [obj.Breathing.t_resampled,obj.Breathing.resampled] = ...
+                obj.resample(obj.Breathing,obj.LED.trials,170);
+            [obj.Tail.t_resampled,obj.Tail.resampled] = ...
+                obj.resample(obj.Tail,obj.LED.trials,170);
+
+            % resample traces to 2p framerate
+            [obj.LED.t_resampled2p,obj.LED.resampled2p] = ...
+                obj.resample(obj.LED,obj.LED.trials,170,1300);
+            [obj.Breathing.t_resampled2p,obj.Breathing.resampled2p] = ...
+                obj.resample(obj.Breathing,obj.LED.trials,170,1300);
+            [obj.Tail.t_resampled2p,obj.Tail.resampled2p] = ...
+                obj.resample(obj.Tail,obj.LED.trials,170,1300);
+
 
             % get freq
-            obj.Breathing.freq = obj.findDominantFrequency(obj.Breathing);
+            obj.Breathing.freq = obj.findDominantFrequency(obj.Breathing.resampled,obj.Breathing.fs);
+            obj.Breathing.freq2p = obj.findDominantFrequency(obj.Breathing.resampled2p,MaiTai_freq);
+            
         end
 
         function struct_out = extractTraces(obj,fpath)
@@ -233,12 +305,14 @@ classdef Behavior2PTraces
             cd(fpath)
             
             % get traces
-            [A,t,fs] = obj.readTraces_csv();
+            %[A,t,fs] = obj.readTraces_csv();
+            [A,t,fs,frange] = obj.readTraces_mat();
 
             % store to output
             struct_out.t = t; % time axis
             struct_out.raw = A; % raw intensity trace (median-centered)
             struct_out.fs = fs; % framerate copy
+            struct_out.f_range = frange; % frame range of the trace (empty if not available - unchecked trace)
 
             % return to original directory
             cd(currentDir)

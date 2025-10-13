@@ -55,7 +55,7 @@ classdef Behavior2pPreprocessing
                 workers = 4;
             end
             if nargin < 6 || isempty(rankRange)
-                rankRange = [0 1 3];
+                rankRange = [0 1 workers-1];
             end
         
             ks = rois.keys;
