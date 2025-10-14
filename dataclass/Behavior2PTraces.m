@@ -12,6 +12,7 @@ classdef Behavior2PTraces
         Breathing
         Tail
         headPCA struct
+        respiration_PC % index of the PC used for breathing trace (selected manually)
     end
 
     methods (Access = private)
@@ -164,14 +165,16 @@ classdef Behavior2PTraces
 
          end
 
-         function [t_resampled, resampledtrace] = resample(trace,trials,T,L)
+         function [t_resampled, resampledtrace] = resample(tracemat,trials,T,L)
             if nargin < 4
                 L = median(1+diff(trials,[],2).frame_start); % median trial length [frames]
             end
 
+            rawtrace = tracemat(:);
+
             s2 = cell(height(trials), 1);
             for i = 1:height(trials)
-                s2{i} = trace.raw(trials.frame_start(i):trials.frame_end(i));
+                s2{i} = rawtrace(trials.frame_start(i):trials.frame_end(i));
             end 
 
             t_common = linspace(0,T,L);
@@ -187,33 +190,179 @@ classdef Behavior2PTraces
             resampledtrace = s2_resampled;
          end
 
-         function trace = removeBackground(trace,background_freq)
-             s0 = trace.raw;
-             
-             % s = s0(:);
-             % s1 = background_source(:);
-             % s_denoised = s - (s1 * (s' * s1) / (s1' * s1));
+         function trace = removeBackground(trace,fs,background_freq, method)
+             s0 = trace(:);
 
              n_harmonics = 2;
 
-             s_denoised = s0;
-             for i = 1:n_harmonics+1
-                noise = bandpass(s0,i*background_freq+[-.3 .3],trace.fs);
-                s_denoised = s_denoised-noise;
-             end
+            if nargin < 4
+                method = 'notch';
+            end
 
-             trace.raw = s_denoised;
+            switch method
+                case 'notch'
+                    s_denoised = notch_harmonics(s0, fs, background_freq, 0.25, 0.95);
+                case 'bandpass'
+                    s_denoised = bandpass_harmonics(s0, fs, background_freq, .25, n_harmonics);
+                otherwise
+                    error('Unknown method for background removal.');
+            end
 
+            trace = s_denoised;
+
+
+            function s_denoised = bandpass_harmonics(s0, fs, background_freq, bw, n_harmonics)
+                % iterative bandpass filtering
+                % DEPRECATED: use notch instead
+                % (can generate artifacts from sequential bandpass filtering)
+                % (doesn't care about nyquist - can be bad for low fs)
+                s_denoised = s0;
+                for i = 1:n_harmonics+1
+                    noise = bandpass(s0,i*background_freq+[-bw bw],fs); % zero-phase
+                    s_denoised = s_denoised-noise;
+                end
+            end
+
+            function y = notch_harmonics(x, fs, f0, bw, steep)
+                if nargin<5, steep = 0.95; end
+                y = x;
+                K = floor((fs/2 - 1e-6)/f0);       % harmonics below Nyquist
+                for k = 1:K
+                    f = k*f0;
+                    y = bandstop(y,[max(0,f-bw) min(fs/2-1e-6,f+bw)],fs,'Steepness',steep); % zero-phase
+                end
+            end
          end
 
-         function freq = findDominantFrequency(tracemat,fs)
+         function freq = findDominantFrequency(tracemat,fs, method) % # DEPRECATED
             A = tracemat(:);
 
-            % instantaneous frequency,
-            % rolling average over 500 ms
-            x = movmean(instfreq(A,fs,'Method','hilbert'),fs/2);
+            if nargin < 3
+                method = 'hilbert';
+            end
 
-            freq = reshape([x; x(end)],size(tracemat));
+            % compute the instantaneous frequency
+
+            switch method
+                case 'hilbert'
+                    % Hilbert transform method
+                    x = movmean(instfreq(A,fs,'Method','hilbert'),fs/2); % rolling average over 500 ms
+                    freq = reshape([x; x(end)],size(tracemat));
+                otherwise
+                    error('Unknown method for instantaneous frequency estimation.');
+            end
+            
+         end
+         function visualizeBreathing(traceStruct)
+            % VISUALIZEBREATHING  Quick visual QC for breathing event detection.
+            % Input:
+            %   traceStruct.resampled   - raw respiration trace
+            %   traceStruct.processed   - filtered/processed trace
+            %   traceStruct.eventsRF    - event timestamps (s)
+            %   traceStruct.rateRF      - instantaneous rate (Hz)
+            %   traceStruct.fs          - sampling frequency (Hz)
+
+            raw = traceStruct.resampled(:);
+            proc = traceStruct.processed(:);
+            fs = traceStruct.fs;
+            t = (0:numel(raw)-1)/fs;
+
+            figure('Name','Breathing QC','Color','w','Position',[100 100 1000 500])
+
+            subplot(2,1,1)
+            hold on
+            plot(t,raw,'Color',[0.7 0.7 0.7])
+            plot(t,proc,'b','LineWidth',1)
+            if isfield(traceStruct,'eventsRF') && ~isempty(traceStruct.eventsRF)
+                xline(traceStruct.eventsRF,'r--','LineWidth',1)
+            end
+            xlabel('Time (s)')
+            ylabel('Amplitude')
+            title('Raw and Processed Traces with Detected Events')
+            legend({'Raw','Processed','Events'},'Location','best')
+            axis tight
+
+            subplot(2,1,2)
+            if isfield(traceStruct,'rateRF') && ~isempty(traceStruct.rateRF)
+                plot(traceStruct.rateRF(:,1), traceStruct.rateRF(:,2),'k','LineWidth',1.2)
+                xlabel('Time (s)')
+                ylabel('Rate (Hz)')
+                title('Instantaneous Breathing Rate')
+                axis tight
+            else
+                text(0.5,0.5,'No rate data available','HorizontalAlignment','center')
+                axis off
+            end
+
+            sgtitle('Breathing Signal Overview')
+
+            disp('Press ENTER to continue...')
+            pause
+
+            close(gcf)
+        end
+
+
+         function [events, ipi, rate] = findBreathingEvents(tracemat,fs,method,minD)
+            if nargin < 3
+                method = 'findpeaks';
+            end
+            trace = tracemat(:);
+            if nargin < 4
+                minD = round(0.1*fs); % minimum interpeak distance is statically set to 100 ms (10 Hz max breathing rate)
+            end
+
+            switch method
+                case 'findpeaks'
+                    [~,locs] = findpeaks(trace, ...
+                        'MinPeakProminence',0.8, ...
+                        'MinPeakWidth',round(0.03*fs), ...
+                        'MinPeakDistance',minD); % minimum interpeak distance is statically set to 100 ms (10 Hz max breathing rate)
+                    events = locs;
+                case 'RF'
+                    % use Rainer's favorite function
+                    events = RF_peakdetect(trace);
+                        
+                    events(diff([0;events])<minD) = []; % enforce minimum interpeak distance
+                otherwise
+                    error('Unknown method for breathing event detection.');
+            end
+
+            % ensure events are a sorted column vector and within bounds
+            events = unique(events(:));
+            events(events < 1) = [];
+            events(events > numel(trace)) = [];
+
+            n = numel(trace);
+            rate = NaN(n,1);
+
+            if numel(events) < 2
+                ipi = [];
+                return
+            end
+
+            % compute inter-peak intervals (s) and instantaneous interval rates (Hz)
+            tpk = events ./ fs;
+            ipi = diff(tpk);               % seconds
+            r_intervals = 1 ./ ipi;        % Hz
+
+            % assign interval rate to samples between consecutive peaks
+            for k = 1:numel(r_intervals)
+                istart = events(k);
+                iend = events(k+1)-1;
+                rate(istart:iend) = r_intervals(k);
+            end
+            % assign last interval rate from last peak to end
+            rate(events(end):end) = r_intervals(end);
+
+            % interpolate missing samples over time and smooth (~1 s gaussian)
+            t_samples = (0:n-1)' ./ fs;
+            if any(~isnan(rate))
+                rate = fillmissing(rate,'linear','SamplePoints',t_samples);
+                rate = fillmissing(rate,'nearest'); % fill start/end
+                rate = smoothdata(rate,'gaussian',round(1*fs));
+            end
+
          end
     end
 
@@ -265,38 +414,117 @@ classdef Behavior2PTraces
 
             % read traces from FiJI output CSVs or summary MATs
             obj.Breathing = obj.extractTraces(fullfiletol(fpath,'rot','Head_vals'));
+            [obj.Breathing.raw, obj.Breathing.t] = obj.mergeHeadPCtrace; % use PC trace if available
             obj.Tail = obj.extractTraces(fullfiletol(fpath,'rot','Tail_vals'));
 
-            % highpass the Breathing trace at 0.5 Hz
-            obj.Breathing.raw = highpass(obj.Breathing.raw,.5,obj.framerate);
+            % resample traces to common time axis (LED trials)
+            trial_length = 170; % sec
+            [obj.LED.t_resampled,obj.LED.resampled] = ...
+                obj.resample(obj.LED.raw,obj.LED.trials,170);
+            [obj.Breathing.t_resampled,obj.Breathing.resampled] = ...
+                obj.resample(obj.Breathing.raw,obj.LED.trials,170);
+            [obj.Tail.t_resampled,obj.Tail.resampled] = ...
+                obj.resample(obj.Tail.raw,obj.LED.trials,170);
+
+            % temporarily linearize
+            breath_dims = size(obj.Breathing.resampled);
+            obj.Breathing.resampled = obj.Breathing.resampled(:);
+            tail_dims = size(obj.Tail.resampled);
+            obj.Tail.resampled = obj.Tail.resampled(:);
 
             % clean from scanning background
-            MaiTai_freq = 7.66;                                                 % ### TODO: should be argument (specify from Subject)
-            obj.Breathing = obj.removeBackground(obj.Breathing,MaiTai_freq);
-            obj.Tail = obj.removeBackground(obj.Tail,MaiTai_freq);
+            scanimage_framenum = 1300;
+            MaiTai_freq = scanimage_framenum/trial_length;   % ### TODO: should be argument/-s (specify from Subject)
+            processed = obj.removeBackground(obj.Tail.resampled,obj.Tail.fs,MaiTai_freq);
+            obj.Tail.resampled = reshape(processed,tail_dims); % overwrite resampled with processed for consistency
+            % breathing trace will be cleaned later inside processBreathing
 
-
-            % resample traces to common time axis (LED trials)
-            [obj.LED.t_resampled,obj.LED.resampled] = ...
-                obj.resample(obj.LED,obj.LED.trials,170);
-            [obj.Breathing.t_resampled,obj.Breathing.resampled] = ...
-                obj.resample(obj.Breathing,obj.LED.trials,170);
-            [obj.Tail.t_resampled,obj.Tail.resampled] = ...
-                obj.resample(obj.Tail,obj.LED.trials,170);
+            % detect breathing events
+            processed = obj.processBreathing(obj.Breathing,MaiTai_freq); 
+            obj.Breathing.resampled = reshape(processed,breath_dims); % overwrite resampled with processed for consistency
+            [obj.Breathing.eventsRF,obj.Breathing.ipiRF,obj.Breathing.rateRF] = ...
+                obj.findBreathingEvents(processed,obj.Breathing.fs,'RF');
+            [obj.Breathing.eventsFP,obj.Breathing.ipiFP,obj.Breathing.rateFP] = ...
+                obj.findBreathingEvents(processed,obj.Breathing.fs,'findpeaks');
 
             % resample traces to 2p framerate
             [obj.LED.t_resampled2p,obj.LED.resampled2p] = ...
-                obj.resample(obj.LED,obj.LED.trials,170,1300);
+                obj.resample(obj.LED.raw,obj.LED.trials,170,1300);
             [obj.Breathing.t_resampled2p,obj.Breathing.resampled2p] = ...
-                obj.resample(obj.Breathing,obj.LED.trials,170,1300);
+                obj.resample(obj.Breathing.raw,obj.LED.trials,170,1300);
             [obj.Tail.t_resampled2p,obj.Tail.resampled2p] = ...
-                obj.resample(obj.Tail,obj.LED.trials,170,1300);
-
+                obj.resample(obj.Tail.raw,obj.LED.trials,170,1300);
 
             % get freq
-            obj.Breathing.freq = obj.findDominantFrequency(obj.Breathing.resampled,obj.Breathing.fs);
-            obj.Breathing.freq2p = obj.findDominantFrequency(obj.Breathing.resampled2p,MaiTai_freq);
+            % obj.Breathing.freq = obj.findDominantFrequency( ...
+            %     obj.Breathing.resampled,obj.Breathing.fs, 'hilbert');
+            % obj.Breathing.freq2p = obj.findDominantFrequency( ...
+            %     obj.Breathing.resampled2p,MaiTai_freq, 'hilbert');
+
+            % get freq (RF)
+            tmp = reshape(obj.Breathing.rateRF,[],35);
+            tx = linspace(0,170,height(tmp));
+            [tmp,ty] = resample(tmp,tx,MaiTai_freq);
+            obj.Breathing.rate2p_RF = tmp(2:end,:);
+            obj.Breathing.t_rate2p = ty(2:end);
+
+            % get freq (FP)
+            tmp = reshape(obj.Breathing.rateFP,[],35);
+            tx = linspace(0,170,height(tmp));
+            tmp = resample(tmp,tx,MaiTai_freq);
+            obj.Breathing.rate2p_FP = tmp(2:end,:);
+
+
+        end
+
+        function [rawtrace, t] = mergeHeadPCtrace(obj)
+            rawtrace = obj.Breathing.raw; % default
+            t = obj.Breathing.t; % default
             
+            if ~isempty(obj.respiration_PC) && isfield(obj.headPCA,'V')
+                % send warnings, but merge anyway
+                if obj.respiration_PC < 1 || obj.respiration_PC > size(obj.headPCA.V,2)
+                    warning('respiration_PC index (%d) is out of range for headPCA.V (columns: %d).', ...
+                        obj.respiration_PC, size(obj.headPCA.V,2));
+                else
+                    lenV = size(obj.headPCA.V,1);
+                    lenB = numel(obj.Breathing.raw);
+                    if lenV ~= lenB
+                        warning('Length mismatch between headPCA.V (rows=%d) and Breathing.raw (len=%d). PCA vector will be used; ensure traces are aligned or resampled.', ...
+                            lenV, lenB);
+                    end
+
+                    t = (0:1/obj.framerate:(lenV-1)/obj.framerate);
+                end
+
+                rawtrace = obj.headPCA.V(:,obj.respiration_PC);
+                
+            end
+        end
+
+        function processed = processBreathing(obj,trace,MaiTai_freq)
+            fs = trace.fs;
+            x1 = trace.resampled(:);
+            
+            % preprocess breathing trace
+            processed = highpass(x1,.2,fs); % highpass the Breathing trace at 0.2 Hz (to remove slow drift)
+            processed = obj.removeBackground(processed,fs,MaiTai_freq); % remove 2p scanning background up to 2nd harmonic
+            
+            % bandpass filter to respiration band
+            expected_breathing_freq = [.5 12]; % [Hz] % generous band limits
+            [b2,a2] = butter(4, expected_breathing_freq/(fs/2));      % respiration band
+            processed = filtfilt(b2,a2,processed); % zero-phase
+
+            % detrend and z-score within a sliding window (robust to drifts)
+            processed = (processed - movmedian(processed,round(5*fs))) ./ max(eps, movmad(processed,round(5*fs),1));
+
+            % remove filter edge effects
+            n = numel(processed);
+            m = round(3*fs);                     % discard 3 s from each end
+            mask = true(n,1);
+            mask(1:m) = false; mask(end-m+1:end) = false;
+            processed(~mask) = NaN;
+
         end
 
         function struct_out = extractTraces(obj,fpath)
