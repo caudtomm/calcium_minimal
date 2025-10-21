@@ -289,7 +289,24 @@ classdef Experiment
             
         end
 
-        
+        function obj = updateBehavior2pTraces(obj)
+            disp('')
+            disp('updating behavior 2p traces...')
+            for i = 1:numel(obj.traces)
+                trace = obj.traces{i};
+                sid = trace.subject_locations.subject_ID;
+                disp(sid)
+                fpath = fullfiletol(trace.subject_locations.subject_datapath,'tail_movies');
+                try
+                    trace.behavior2p = Behavior2PTraces(fpath);
+                    disp('done.')
+                catch
+                    trace.behavior2p = [];
+                    disp('failed.')
+                end
+                obj.traces{i} = trace;
+            end
+        end
     end
 end
 

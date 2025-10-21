@@ -13,6 +13,10 @@ classdef DataFilter
         trial_sorting char = 'stim_id' % trial sorting method, options: {'stim_id', 'chronological', 'relative_trial_num'}
         repetitions double = [] % stimulus repetitions to use (empty = all)
         stims_allowed = 'all stimuli' % list of allowed stimuli, type cell or char vector, see accepted inputs to getStimuliByGroup()
+
+        % behavior2p related properties
+        behavior2p_trace char = 'tail_motion_2p' % behavior2p trace type to select{'breathing_events', 'breathing_ipis', ...
+                            % 'breathing_inst_freq', 'tail_motion', 'breathing_inst_freq_2p', 'tail_motion_2p'}
         
         % mode selection (unused here, but passed on to ModeSelector)
         mode_name char = 'native_units' % {'native_units', 'pca', 'nmf', 'dpca'}

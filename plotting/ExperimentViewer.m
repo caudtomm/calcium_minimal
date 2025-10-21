@@ -12,6 +12,25 @@ classdef ExperimentViewer
         plotConfig PlotConfig
     end
 
+    methods (Static)
+        function out = overlayMats(Marray)
+            arguments
+                Marray cell % cell array of 2D matrices to overlay
+            end
+            
+            nrows = cellfun(@(x) size(x,1), Marray);
+            ncols = cellfun(@(x) size(x,2), Marray);
+            dimOut = [max(nrows), max(ncols)];
+            
+            n = numel(Marray);
+            out = zeros(dimOut(1),dimOut(2), n);
+            for i = 1:n
+                thisM = Marray{i};
+                out(1:size(thisM,1), 1:size(thisM,2), i) = thisM;
+            end
+        end
+    end
+
     methods
         function obj = ExperimentViewer(experiment)
             arguments
@@ -37,6 +56,27 @@ classdef ExperimentViewer
             traces = obj.traces(obj.subjects_to_use);
         end
 
+        function [out, t, labs] = getBehavior2PTraces(obj)
+            % get behavior traces for selected subjects
+            nsubjects = numel(obj.filtered_traces);
+            out = cell(nsubjects,1);
+            t = cell(nsubjects,1);
+            for i = 1:nsubjects
+                thistrace = obj.filtered_traces{i};
+                [out{i}, t{i}] = thistrace.getBehavior2PTrace(obj.dataFilter.behavior2p_trace);
+            end
+
+            % check for data
+            hasdata = ~cellfun(@isempty,out);
+            if ~any(hasdata)
+                warning('No behavior 2P traces found for the selected subjects and trace type!')
+                labs = {}; return;
+            end
+            
+            % get trial labels for the available data
+            [~,labs] = obj.dataFilter.filterData(obj);
+        end
+
         %% setters
 
         function obj = setTheme(obj, themeName)
@@ -46,6 +86,19 @@ classdef ExperimentViewer
         %% intermediate-level plotting function headers 
         % (normally call external low level functions that don't rely on custom objects)
         % still output a single plot onto provided axes
+
+
+        function out = plotBehavior2PTracesHead(obj, varargin)
+            arguments
+                obj
+            end
+            arguments (Repeating)
+                varargin
+            end
+
+            [beh_traces, t, labs] = obj.getBehavior2PTraces();
+            out = plotBehavior2PTraces(t, beh_traces, labs, obj.plotConfig, varargin{:});
+        end
 
 
         function out = plotDistancesHead(obj, varargin)        

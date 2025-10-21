@@ -363,6 +363,16 @@ classdef Behavior2PTraces
                 rate = smoothdata(rate,'gaussian',round(1*fs));
             end
 
+            % convert to logical array with length = numel(tracemat)
+            tmp = false(n,1);
+            tmp(events) = true;
+            events = tmp;
+            % to get indices, use find(events)
+
+            % fold back to original shape
+            events = reshape(events,size(tracemat));
+            rate = reshape(rate,size(tracemat));
+
          end
     end
 
@@ -441,7 +451,8 @@ classdef Behavior2PTraces
 
             % detect breathing events
             processed = obj.processBreathing(obj.Breathing,MaiTai_freq); 
-            obj.Breathing.resampled = reshape(processed,breath_dims); % overwrite resampled with processed for consistency
+            processed = reshape(processed,breath_dims);
+            obj.Breathing.resampled = processed; % overwrite resampled with processed for consistency
             [obj.Breathing.eventsRF,obj.Breathing.ipiRF,obj.Breathing.rateRF] = ...
                 obj.findBreathingEvents(processed,obj.Breathing.fs,'RF');
             [obj.Breathing.eventsFP,obj.Breathing.ipiFP,obj.Breathing.rateFP] = ...
