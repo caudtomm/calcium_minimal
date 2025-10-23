@@ -438,7 +438,7 @@ classdef ActivityTraces
             t = [];
 
             if isempty(obj.behavior2p)
-                warning('Behavior2P data not available in this ActivityTraces object: returning empty trace.');
+                 % warning('Behavior2P data not available in this ActivityTraces object: returning empty trace.');
                 return;
             end
 

@@ -56,27 +56,6 @@ classdef ExperimentViewer
             traces = obj.traces(obj.subjects_to_use);
         end
 
-        function [out, t, labs] = getBehavior2PTraces(obj)
-            % get behavior traces for selected subjects
-            nsubjects = numel(obj.filtered_traces);
-            out = cell(nsubjects,1);
-            t = cell(nsubjects,1);
-            for i = 1:nsubjects
-                thistrace = obj.filtered_traces{i};
-                [out{i}, t{i}] = thistrace.getBehavior2PTrace(obj.dataFilter.behavior2p_trace);
-            end
-
-            % check for data
-            hasdata = ~cellfun(@isempty,out);
-            if ~any(hasdata)
-                warning('No behavior 2P traces found for the selected subjects and trace type!')
-                labs = {}; return;
-            end
-            
-            % get trial labels for the available data
-            [~,labs] = obj.dataFilter.filterData(obj);
-        end
-
         %% setters
 
         function obj = setTheme(obj, themeName)
@@ -96,8 +75,11 @@ classdef ExperimentViewer
                 varargin
             end
 
-            [beh_traces, t, labs] = obj.getBehavior2PTraces();
-            out = plotBehavior2PTraces(t, beh_traces, labs, obj.plotConfig, varargin{:});
+            [beh_traces, labs] = obj.dataFilter.filterData(obj);
+            beh_traces = cellfun(@squeeze, beh_traces, 'UniformOutput', false);
+            out = plotBehavior2PTraces(obj.dataFilter.interval, ...
+                    beh_traces, labs, ...
+                    obj.plotConfig, varargin{:});
         end
 
 

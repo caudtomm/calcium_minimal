@@ -27,6 +27,22 @@ classdef DataFilter
     end
 
     methods (Static)
+        function [M, t] = retrieveTraceData(thistrace, traceType)
+            % Static method to retrieve trace data based on traceType
+            if isprop(thistrace, traceType)
+                M = thistrace.(traceType);
+                t = thistrace.t;
+            else
+                try
+                    [M,t] = thistrace.getBehavior2PTrace(traceType); % [t,trials]
+                    % permute so trials are in 3rd dimension
+                    M = permute(M, [1, 3, 2]); % [t,1,trials]
+                catch
+                    error('Trace type "%s" not found in ActivityTraces properties or as behavior2p trace', traceType);
+                end
+            end
+        end
+
         function groups_to_use = parseGroupTag(group)
             % Static method to parse a group tag string
             % Group names can be char vectors, strings or cell arrays of
@@ -183,7 +199,10 @@ classdef DataFilter
                 [~,trial_idx] = TraceViewer(thistrace).sortTrials(trial_sorting);
 
                 % get peri-stimulus data [t,N,trials]
-                M = thistrace.(traceType)(:,:,trial_idx);
+                M = obj.retrieveTraceData(thistrace, traceType);
+                if isempty(M); continue; end
+                M = M(:,:,trial_idx);
+                % M = thistrace.(traceType)(:,:,trial_idx);
                 stim_on_frame = thistrace.stim_series.frame_onset(1);
                 fs = thistrace.framerate;
                 events{i} = TraceViewer.getPeriEventData(M,stim_on_frame,ps_lim,fs);
