@@ -27,6 +27,7 @@ classdef GCMC_Analysis
             nSubjects = numel(labs);
 
             %% data extraction
+            disp('Extracting manifolds for GCMC analysis...');
             manifolds = cell(nSubjects,nStims);
             for i_stim = 1:nStims
                 % only get this stimulus's responses
@@ -50,11 +51,16 @@ classdef GCMC_Analysis
             end
 
             %% save each subject's data to a python-compatible mat file
+            disp(['Saving manifold data to ', outdir, '...']);
             if ~isfolder(outdir); mkdir(outdir); end
+            allSubjIDs = v.dataFilter.getSubjectIDs(v.subjectTab);
             for i_sub = 1:nSubjects
                 data = manifolds(i_sub,:);
-                save(fullfiletol(outdir,['manifolds_subj',num2str(i_sub),'.mat']), "data", "stims");
+                subjID = allSubjIDs{i_sub};
+                save(fullfiletol(outdir,['manifolds_subj',num2str(i_sub),'.mat']), "data", "stims", "subjID");
             end
+
+            disp('Done.');
 
         end
 
