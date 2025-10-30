@@ -40,6 +40,28 @@ v.dataFilter.interval = [1,20];
 v.dataFilter.trial_sorting = 'stim_id';
 dft = v.dataFilter;
 
+%% GCMC: extract manifolds and save to .mat files for Python analysis
+
+outdir = fullfiletol('manifold_data', extractBefore(filename,'.'));
+
+% filter data
+v.dataFilter.traceType = 'pSpike';
+v.dataFilter.subjectIDs = {};
+v.dataFilter.subjectGroup = 'all';
+v.dataFilter.interval = [.5 19.5];
+v.dataFilter.repetitions = [1:5];
+v.dataFilter.stims_allowed = 'all stimuli';
+
+GCMC_Analysis(v).outputDataFiles(outdir); % each manifold: one stimulus, all repetitions, one subject
+
+v.dataFilter = dft; % recover
+
+%% GCMC: load capacity results from .mat files for MATLAB analysis
+
+indir = fullfiletol('manifold_data', extractBefore(filename,'.'), 'capacity_results');
+results = GCMC_Analysis(v).extractResults(indir);
+
+% # TODO some plotting here
 
 %% Plotting average similarity matrices and related metrics for each experimental group.
 
