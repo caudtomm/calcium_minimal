@@ -58,10 +58,14 @@ v.dataFilter = dft; % recover
 
 %% GCMC: load capacity results from .mat files for MATLAB analysis
 
-indir = fullfiletol('manifold_data', extractBefore(filename,'.'), 'capacity_results');
-results = GCMC_Analysis(v).extractResults(indir); % # TODO this doesn't take into account multiple subjects yet
+indir = fullfiletol('manifold_data', extractBefore(filename,'.'), 'results');
+indir = fullfiletol('manifold_data', 'results'); % tempoarily use this folder for the test dataset
+[~, avg_results] = GCMC_Analysis(v).extractResults(indir); % # TODO this doesn't take into account multiple subjects yet
 % # TODO save results to ActivityTraces inside v
 % # TODO some plotting here
+
+GCMC_Analysis.plotBoxplotsForEachMetric(avg_results,cfg);
+GCMC_Analysis.plotMetricStability(results, cfg)
 
 %% Plotting average similarity matrices and related metrics for each experimental group.
 
