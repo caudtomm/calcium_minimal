@@ -128,13 +128,103 @@ classdef GCMC_Analysis
     methods (Static)
         %% plotting
 
+        function hf = coverageFigure(cfg)
+            arguments
+                cfg PlotConfig = PlotConfig()
+            end
+
+            manifold_size_range = [400 1000]; % from this study, after taking out nans
+            Bo_manifold_size = 113; % 5s * 7.5 Hz * 3 trials/odor
+
+            n_points_range = [1:10:151];
+
+            minCvg = GCMC_Analysis.estimateManifoldCoverage(manifold_size_range(2), n_points_range);
+            maxCvg = GCMC_Analysis.estimateManifoldCoverage(manifold_size_range(1), n_points_range);
+            BoCvg = GCMC_Analysis.estimateManifoldCoverage(Bo_manifold_size, n_points_range);
+
+            estCvg = minCvg; % arbitrary
+
+            hf = figure;
+            imagesc(estCvg.X,estCvg.Y,maxCvg.expectedCoverage-minCvg.expectedCoverage)
+            hold on
+
+            scatter(minCvg.full_coverage,estCvg.Y,50,'g','filled')
+            scatter(maxCvg.full_coverage,estCvg.Y,50,'r','filled')
+            scatter(BoCvg.full_coverage,estCvg.Y,50,'k','filled')
+            
+            b(1) = plot(minCvg.full_coverage,estCvg.Y,'g-','LineWidth',1.5);
+            b(2) = plot(maxCvg.full_coverage,estCvg.Y,'r-','LineWidth',1.5);
+            b(3) = plot(BoCvg.full_coverage,estCvg.Y,'k-','LineWidth',1.5);
+
+            axis equal tight
+            xlabel(estCvg.X_label); ylabel(estCvg.Y_label)
+            title('expected point cloud coverage (max - min)')
+            legend(b,{'min','max','Hu et al. 2024'},'BackgroundAlpha',0,'Box','off','TextColor',cfg.bgcol)
+            
+            colormap(cfg.colormapName)
+            set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol, 'ZColor', cfg.axcol);
+            set(gcf, 'color', cfg.bgcol);
+
+        end
+
+        function results = estimateManifoldCoverage(manifold_size,n_points)
+            arguments
+                manifold_size double {mustBePositive}
+                n_points double {mustBePositive}
+            end
+
+            % analytical estimate of manifold coverage based on number of points sampled
+            max_repetitions = 300;
+            n_random_samples = 100;
+            bin_size = 10; % 10 repetitions increments
+            nBins = floor(max_repetitions / bin_size);
+
+            bins = bin_size * (1:nBins);
+            n_n_points = numel(n_points);
+            avg_curve = zeros(n_n_points,nBins);
+            for i_points = 1:n_n_points
+                this_n_points = n_points(i_points);
+                fprintf('Estimating coverage for samples of %s points\n',num2str(this_n_points));
+                for i_bin = 1:nBins
+                    n_reps = bins(i_bin);
+                    coverage_vals = zeros(1,n_random_samples); % 100 random samples
+                    for i_sample = 1:n_random_samples
+                        % simulate point sampling
+                        points = randi(manifold_size, this_n_points, n_reps);
+                        coverage_vals(i_sample) = numel(unique(points)) / manifold_size;
+                    end
+                    avg_curve(i_points,i_bin) = mean(coverage_vals);
+    
+                end
+            end
+
+            % find first x-index (num of repetitions) that reach full
+            % coverage for each point cloud size
+            full_coverage = nBins*ones(n_n_points,1);
+            for i = 1:n_n_points
+                val = find(avg_curve(i,:)>=0.99,1,'first');
+                if ~isempty(val); full_coverage(i) = val; end
+            end
+
+            results.expectedCoverage = avg_curve;
+            results.X = bins;
+            results.X_label = 'repetition number';
+            results.Y = n_points;
+            results.Y_label = 'size of point cloud';
+            results.manifold_size = manifold_size;
+            results.n_points = n_points;
+            results.n_random_samples = n_random_samples;
+            results.full_coverage = bins(full_coverage);
+
+        end
+
         function plotBoxplotsForEachMetric(avg_results, cfg)
             arguments
                 avg_results table
                 cfg PlotConfig = PlotConfig()
             end
 
-            metrics = avg_results.Properties.VariableNames(6:end-2); % exclude grouping variables and stimulus names
+            metrics = avg_results.Properties.VariableNames(5:end-2); % exclude grouping variables and stimulus names
 
             % separate data and shuffle conditions
             y_data = avg_results{avg_results.shuffle==false, metrics};

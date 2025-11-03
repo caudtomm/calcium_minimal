@@ -59,7 +59,7 @@ v.dataFilter = dft; % recover
 %% GCMC: load capacity results from .mat files for MATLAB analysis
 
 indir = fullfiletol('manifold_data', extractBefore(filename,'.'), 'results');
-indir = fullfiletol('manifold_data', 'results'); % tempoarily use this folder for the test dataset
+indir = fullfiletol('manifold_data', 'odorexp004_IC1_130625\manifolds_subj9'); % tempoarily use this folder for the test dataset
 [~, avg_results] = GCMC_Analysis(v).extractResults(indir); % # TODO this doesn't take into account multiple subjects yet
 % # TODO save results to ActivityTraces inside v
 % # TODO some plotting here
