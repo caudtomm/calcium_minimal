@@ -123,6 +123,76 @@ classdef GCMC_Analysis
             disp(['Saved GCMC results table to ', outfname]);
         end
 
+        function [all_results] = extractResultsFromMultipleSubjects(obj, indir)
+            arguments
+                obj GCMC_Analysis
+                indir char = pwd
+            end
+
+            files = dir(fullfiletol(indir,'manifolds_subj*.mat'));
+            nSubjects = numel(files);
+
+            all_results = struct();
+            counter = 0;
+            for i_sub = 1:nSubjects
+                subj_name = ['manifolds_subj',num2str(i_sub)];
+                subdir = fullfiletol(indir,subj_name);
+                if exist(subdir,'dir')==0
+                    disp(['Skipping subject ', num2str(i_sub), ': folder not found - ', subdir]);
+                    continue;
+                end
+                counter = counter+1;
+                disp(['Extracting results for subject ', num2str(i_sub), ' from ', subdir]);
+
+                [results, avg_results] = obj.extractResults(subdir);
+                all_results(counter).name = subj_name;
+                all_results(counter).num_id = i_sub;
+                all_results(counter).results = results;
+                all_results(counter).avg_results = avg_results;
+
+            end
+        end
+
+        function plotInterGroupComparison(obj, all_results, cfg)
+            arguments
+                obj GCMC_Analysis
+                all_results struct
+                cfg PlotConfig = PlotConfig()
+            end
+            
+            metrics = all_results(1).avg_results.Properties.VariableNames(5:end-2); % exclude grouping variables and stimulus names
+            subjectTab = obj.viewer.subjectTab;
+            nResults = numel(all_results);
+            
+            % select subjectTab rows (subjects) according to the results'
+            % ordinal ID
+            res_ids = [];
+            for i = 1:nResults
+                this_id = all_results(i).num_id;
+                res_ids = [res_ids; this_id];
+            end
+            subjectTab = subjectTab(res_ids,:);
+
+            % separate data by subject group
+            groups = unique(subjectTab.group);
+            nGroups = numel(groups);
+            group_data = struct();
+            for i = 1:nGroups
+                idx = ismember(subjectTab.group,groups{i});
+                this_res = all_results(idx);
+                group_data(i).group_name = groups{i};
+                group_data(i).data = table();
+
+                for i_subj = 1:numel(this_res)
+                    this_data = this_res(i_subj).avg_results;
+                    group_data(i).data = [group_data(i).data; this_data]
+                end
+
+            end
+
+
+        end
+
     end
 
     methods (Static)
@@ -347,7 +417,6 @@ classdef GCMC_Analysis
             set(gcf, 'color', cfg.bgcol);
 
         end
-
 
     end
 
