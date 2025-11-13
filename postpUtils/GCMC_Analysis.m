@@ -10,54 +10,63 @@ classdef GCMC_Analysis
             obj.viewer = viewer;
         end
 
-        function manifolds = outputDataFiles(obj, outdir) % assumption: manifolds are 1 per stimulus per subject
+        function manifolds = outputDataFiles(obj, mode, outdir) % assumption: manifolds are 1 per stimulus per subject
             arguments
                 obj GCMC_Analysis
+                mode char {mustBeMember(mode,{'odor','repetition','trial'})} = 'odor'
                 outdir char = 'manifold_data';
             end
             % prepare data for GCMC analysis
-            % single fish
             % 
-            v = obj.viewer;
 
-            %% getting a list of the stimuli
+            v = obj.viewer;
+            
+            %% preparations (they assume all subjects have the same stimuli and trials)
             [~,labs] = v.dataFilter.filterData(v);
             stims = unique(labs{1});
-            nStims = numel(stims);
+            nTrials = numel(labs{1});
+            reps = v.dataFilter.repetitions;
+            if isempty(reps); reps = 1:sum(ismember(labs{1},stims(1))); end
             nSubjects = numel(labs);
 
             %% data extraction
             disp('Extracting manifolds for GCMC analysis...');
-            manifolds = cell(nSubjects,nStims);
-            for i_stim = 1:nStims
-                % only get this stimulus's responses
-                v.dataFilter.stims_allowed = stims(i_stim);
-                thispoints = v.dataFilter.filterData(v);
-
-                % concatenate all repetitions (one stimulus = one manifold)
-                thispoints = cellfun(@ActivityTraces.format, thispoints, 'UniformOutput',false);
-
-                % eliminate any NaN
-                idx_tokeep = cellfun(@(x) sum(isnan(x),2)==0, thispoints, 'UniformOutput',false);
-                for i_sub = 1:nSubjects
-                    thispoints{i_sub} = thispoints{i_sub}(idx_tokeep{i_sub},:);
-                end
-
-                % [t,N] -> [N,t]
-                thispoints = cellfun(@transpose, thispoints, 'UniformOutput',false);
-
-                % store to manifolds
-                manifolds(:,i_stim) = thispoints;
+        
+            % pick parameters based on mode
+            switch mode
+                case 'odor'
+                    % all repetitions of this odor
+                    % only get this stimulus's responses
+                    filter_name = 'stims_allowed';
+                    filter_vals = stims;
+                case 'repetition'
+                    % manifolds are repetitions across stimuli
+                    filter_name = 'repetitions';
+                    filter_vals = reps;
+                case 'trial'
+                    % manifolds are trials across stimuli (P = #trials * #stimuli)
+                    filter_name = 'trial';
+                    filter_vals = 1:nTrials;
             end
+
+            manifolds = getManifolds(v, nSubjects, filter_name, filter_vals);
 
             %% save each subject's data to a python-compatible mat file
             disp(['Saving manifold data to ', outdir, '...']);
             if ~isfolder(outdir); mkdir(outdir); end
-            allSubjIDs = v.dataFilter.getSubjectIDs(v.subjectTab);
+            [allSubjIDs, isinlist] = v.dataFilter.getSubjectIDs(v.subjectTab);
+            subj_ordID = find(isinlist);
             for i_sub = 1:nSubjects
                 data = manifolds(i_sub,:);
                 subjID = allSubjIDs{i_sub};
-                save(fullfiletol(outdir,['manifolds_subj',num2str(i_sub),'.mat']), "data", "stims", "subjID");
+                this_ordid = subj_ordID(i_sub);
+                
+                % for trial manifolds, store the whole stimulus id vector (one name per manifold!)
+                if strcmp(mode,'trial')
+                    stims = labs{i_sub};
+                end
+                
+                save(fullfiletol(outdir,['manifolds_subj',num2str(this_ordid),'.mat']), "data", "stims", "subjID");
             end
 
             disp('Done.');
@@ -72,7 +81,24 @@ classdef GCMC_Analysis
 
             v = obj.viewer;
 
-            %% prepare output file
+            %% preparations
+            
+            % initialize outputs
+            results = table;
+            avg_results = table;
+
+            % check that indir exists and contains mat files
+            if ~isfolder(indir)
+                warning(['Input directory does not exist: ', indir]);
+                return;
+            end
+            files = dir(fullfiletol(indir,'*.mat'));
+            if isempty(files)
+                warning(['No .mat files found in input directory: ', indir]);
+                return;
+            end
+
+            % prepare output file
             outfname = fullfiletol(indir, 'GCMC_results_table.mat');
             if isfile(outfname)
                 disp(['Existing GCMC results table found: ', outfname,'. Overwriting...']);
@@ -86,7 +112,7 @@ classdef GCMC_Analysis
             v.dataFilter.subjectIDs = {'TC_240104_TC0028_240101beh1b3_sxpDp_odorexp004_RPB3144501500AG'};
             v.dataFilter.stims_allowed = 'all stimuli';
             [~,labs] = v.dataFilter.filterData(v);
-            stims = unique(labs{1});
+            oldstims = unique(labs{1}); % initialize
 
             files = dir(fullfiletol(indir,'*.mat'));
 
@@ -106,6 +132,13 @@ classdef GCMC_Analysis
             %% combine into a table
             results = table;
             for i = 1:numel(allresults)
+                try
+                    thisstims = allresults{i}.stims_i;
+                    stims = thisstims(:);
+                    oldstims = stims;
+                catch
+                    stims = oldstims;
+                end
                 t = parseMetrics2table(allresults{i});
                 
                 % add the stimulus names
@@ -153,11 +186,10 @@ classdef GCMC_Analysis
             end
         end
 
-        function plotInterGroupComparison(obj, all_results, cfg)
+        function group_data = clusterByGroup(obj, all_results)
             arguments
                 obj GCMC_Analysis
                 all_results struct
-                cfg PlotConfig = PlotConfig()
             end
             
             metrics = all_results(1).avg_results.Properties.VariableNames(5:end-2); % exclude grouping variables and stimulus names
@@ -184,13 +216,13 @@ classdef GCMC_Analysis
                 group_data(i).data = table();
 
                 for i_subj = 1:numel(this_res)
+                    this_subj_id = this_res(i_subj).num_id;
                     this_data = this_res(i_subj).avg_results;
-                    group_data(i).data = [group_data(i).data; this_data]
+                    if isempty(this_data); continue; end % escape
+                    this_data.subj_id = repmat(this_subj_id, height(this_data),1);
+                    group_data(i).data = [group_data(i).data; this_data];
                 end
-
             end
-
-
         end
 
     end
@@ -235,6 +267,40 @@ classdef GCMC_Analysis
             set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol, 'ZColor', cfg.axcol);
             set(gcf, 'color', cfg.bgcol);
 
+        end
+
+        function params = manifold_size2params_Map(size_range, min_N)
+            % knobs
+
+            % point num sampling
+            points_stepsz = 10; % step size
+            points_lim = [1 101]; 
+            % arbitrarily add 40 repetitions, to ensure full coverage. empirically,
+            % metric error curves saturate (go sublinear in loglog space) fairly late compared to
+            % the full coverage frontier, so we want to be generous. oversampling is not an issue
+            % here, except for computational demands. offset will scale compute requirements linearly.
+            frontier_offset = 40;
+
+            % usefuls
+            n_sizes = numel(size_range);
+            max_points = floor(min_N/2)-5; % the 5 is an arbitrary offset
+            points_range = points_lim(1):points_stepsz:points_lim(2);
+
+            % for each size, find optima parameters
+            params = zeros(n_sizes,3);
+            for i = 1:n_sizes
+                this_size = size_range(i);
+                estCov = GCMC_Analysis.estimateManifoldCoverage(this_size,points_range);
+                
+                frontier = estCov.full_coverage;
+
+                size_tolerance = floor(.3 * this_size);
+                best_npoints = min([max_points, this_size-size_tolerance]);
+                [~,idx] = min(abs(points_range-best_npoints));
+                best_repnum = frontier_offset + frontier(idx);
+
+                params(i,:) = [this_size, best_npoints, best_repnum];
+            end
         end
 
         function results = estimateManifoldCoverage(manifold_size,n_points)
@@ -286,6 +352,69 @@ classdef GCMC_Analysis
             results.n_random_samples = n_random_samples;
             results.full_coverage = bins(full_coverage);
 
+        end
+        
+        function plotBoxplotsByGroup(group_data, cfg, shuffle)
+            arguments
+                group_data struct
+                cfg PlotConfig = PlotConfig()
+                shuffle logical = false;
+            end
+
+            nGroups = numel(group_data);
+            metrics = group_data(1).data.Properties.VariableNames(5:end-3); % exclude grouping variables and stimulus names
+            nMetrics = numel(metrics);
+
+            for i_metric = 1:7%nMetrics
+                figure;
+                hold on;
+
+                disp(['Metric: ', metrics{i_metric}])
+
+                % Collect data for each group
+                group_labels = {};
+                box_data = [];
+                for i_group = 1:nGroups
+                    this_data = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle, metrics{i_metric}};
+                    box_data = [box_data; this_data];
+                    group_labels = [group_labels; repelem(string(group_data(i_group).group_name), size(this_data, 1), 1)];
+                end
+
+                % Mann-Whitney U-test (non-parametric test)
+                for i_group = 1:nGroups
+                    this_data = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle, metrics{i_metric}};
+                    for j_group = i_group+1:nGroups
+                        other_data = group_data(j_group).data{shuffle==group_data(j_group).data.shuffle, metrics{i_metric}};
+                        p = ranksum(this_data, other_data); % Mann-Whitney U-test
+                        disp(['Mann-Whitney U-test between ', group_data(i_group).group_name, ...
+                              ' and ', group_data(j_group).group_name, ...
+                              ' for metric ', metrics{i_metric}, ': p = ', num2str(p)]);
+                    end
+                end
+
+                % Create boxplot
+                boxplot(box_data, group_labels, 'Notch', 'on', 'Labels', unique(group_labels, 'stable'));
+                % Superimpose scatter plot for each group
+                for i_group = 1:nGroups
+                    this_data = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle, metrics{i_metric}};
+                    this_subj_ids = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle,'subj_id'};
+                    scatter(repelem(i_group, numel(this_data)), ...
+                            this_data, 40, 'filled', 'CData', cfg.c(this_subj_ids,:), 'MarkerFaceAlpha', 0.7, ...
+                            'jitter', 'on', 'jitterAmount', 0.15);
+                end
+                title(['Metric: ', metrics{i_metric}]);
+                ylabel(metrics{i_metric});
+
+                % Customize plot appearance
+                box off;
+                axis tight
+                xlim([.5 max(xticks)+.5])
+                set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol, 'ZColor', cfg.axcol);
+                set(gcf, 'color', cfg.bgcol);
+                set(gcf, 'Position', [100, 10, 600, 1400]);
+                hold off;
+            end
+            
         end
 
         function plotBoxplotsForEachMetric(avg_results, cfg)
@@ -489,4 +618,69 @@ function out = parseFileName(fname)
     tokens = tokens{1};
     out.manifold_idx_1 = str2double(tokens{1});
     out.manifold_idx_2 = str2double(tokens{2});
+end
+
+function manifolds = getManifolds(v, nSubjects, filter_name, filter_vals) % this could be a method of ExperimentViewer
+    % get manifolds grouped by repetition number (irrespective of stimulus identity)
+    nVals = numel(filter_vals);
+
+    % initialize output
+    manifolds = cell(nSubjects,nVals);
+
+    switch filter_name
+    case 'trial'
+        [~, thispoints] = ModeSelector(v).extract;
+
+        % loop over each individual trial number and subject
+        for i_subj = 1:nSubjects
+            subj_points = thispoints{i_subj};
+            if isempty(subj_points); continue; end
+            for i_val = 1:nVals
+                % extract this trial's points for this subject
+                trial_points = {subj_points(:,:,i_val)}; % {[t,N] double}
+
+                % store to manifolds
+                manifolds(i_subj,i_val) = formatManifold(trial_points);
+            end
+        end
+        
+    otherwise
+        for i_val = 1:nVals
+            v.dataFilter.(filter_name) = filter_vals(i_val);
+            
+            [~, thispoints] = ModeSelector(v).extract;
+
+            % store to manifolds
+            manifolds(:,i_val) = formatManifold(thispoints);
+        end
+    end
+end
+
+function manifold = formatManifold(points)
+    % points : cell array of size nSubjects x 1, each cell is [t,N] double
+    nSubjects = numel(points);
+
+    % initialize output
+    manifold = {};
+
+    % check for empty input
+    if isempty(points); return; end
+
+    % concatenate all observations (one filter value = one manifold)
+    try
+        points = cellfun(@ActivityTraces.format, points, 'UniformOutput',false);
+    catch
+    end
+
+    % eliminate any NaN
+    idx_tokeep = cellfun(@(x) sum(isnan(x),2)==0, points, 'UniformOutput',false);
+    for i_sub = 1:nSubjects
+        points{i_sub} = points{i_sub}(idx_tokeep{i_sub},:);
+    end
+
+    % [t,N] -> [N,t]
+    points = cellfun(@transpose, points, 'UniformOutput',false);
+
+    % return
+    manifold = points;
 end

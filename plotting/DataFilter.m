@@ -13,6 +13,7 @@ classdef DataFilter
         trial_sorting char = 'stim_id' % trial sorting method, options: {'stim_id', 'chronological', 'relative_trial_num'}
         repetitions double = [] % stimulus repetitions to use (empty = all)
         stims_allowed = 'all stimuli' % list of allowed stimuli, type cell or char vector, see accepted inputs to getStimuliByGroup()
+        trial_nums double = [] % specific trial numbers to use (empty = all)
 
         % behavior2p related properties
         behavior2p_trace char = 'tail_motion_2p' % behavior2p trace type to select{'breathing_events', 'breathing_ipis', ...
@@ -187,6 +188,7 @@ classdef DataFilter
             reps_touse = obj.repetitions;
             stim_allowed = obj.stims_allowed;
             trial_sorting = obj.trial_sorting;
+            trial_nums = obj.trial_nums;
 
             % Filter data based on the properties of this DataFilter object
             nsubjects = numel(v.filtered_traces);
@@ -198,11 +200,15 @@ classdef DataFilter
                 % Trial sorting
                 [~,trial_idx] = TraceViewer(thistrace).sortTrials(trial_sorting);
 
+                % Trial number filtering
+                if isempty(trial_nums); trial_nums = 1:numel(trial_idx); end
+                idx = ismember(trial_idx, trial_nums);
+                trial_idx = trial_idx(idx);
+
                 % get peri-stimulus data [t,N,trials]
                 M = obj.retrieveTraceData(thistrace, traceType);
                 if isempty(M); continue; end
                 M = M(:,:,trial_idx);
-                % M = thistrace.(traceType)(:,:,trial_idx);
                 stim_on_frame = thistrace.stim_series.frame_onset(1);
                 fs = thistrace.framerate;
                 events{i} = TraceViewer.getPeriEventData(M,stim_on_frame,ps_lim,fs);

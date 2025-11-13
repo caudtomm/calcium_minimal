@@ -21,6 +21,7 @@ classdef ModeSelector
             for i = 1:length(data)
                 thisdata = data{i};
                 [nTime, nUnits, nTrials] = size(thisdata);
+                if nTrials==1; values{i}=thisdata; continue; end
                 thisdata = ActivityTraces.format(thisdata); % [time*trials, units]
                 if isempty(thisdata); continue; end
                 thisvalues = thisdata * coeffs{i};

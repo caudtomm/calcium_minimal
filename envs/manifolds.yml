@@ -13,4 +13,4 @@ dependencies:
   - pip:
       - mat73
       - hdf5storage
-      - git+https://github.com/chung-neuroai-lab/gcmc.git
+      - git+ssh://git@github.com/chung-neuroai-lab/gcmc.gitcd

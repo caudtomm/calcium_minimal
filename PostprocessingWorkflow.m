@@ -42,30 +42,49 @@ dft = v.dataFilter;
 
 %% GCMC: extract manifolds and save to .mat files for Python analysis
 
-outdir = fullfiletol('manifold_data', extractBefore(filename,'.'));
+outdir = fullfiletol('manifold_data','odors_man_windows','0_5-25s', extractBefore(filename,'.'));
 
 % filter data
 v.dataFilter.traceType = 'pSpike';
 v.dataFilter.subjectIDs = {};
 v.dataFilter.subjectGroup = 'all';
-v.dataFilter.interval = [.5 19.5];
+v.dataFilter.interval = [.5 25];
 v.dataFilter.repetitions = [1:5];
 v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.mode_name = 'native_units';
+v.dataFilter.mode_method = 'mode_values';
+v.dataFilter.mode_OI = 'all';
+v.dataFilter.mode_file = '';
 
-GCMC_Analysis(v).outputDataFiles(outdir); % each manifold: one stimulus, all repetitions, one subject
+GCMC_Analysis(v).outputDataFiles('odor',outdir); % each manifold: one stimulus, all repetitions, one subject
 
 v.dataFilter = dft; % recover
 
 %% GCMC: load capacity results from .mat files for MATLAB analysis
 
 indir = fullfiletol('manifold_data', extractBefore(filename,'.'), 'results');
-indir = fullfiletol('manifold_data', 'odorexp004_IC1_130625\manifolds_subj9'); % tempoarily use this folder for the test dataset
+indir = fullfiletol('manifold_data_odors', 'odorexp004_IC1_130625'); % tempoarily use this folder for the test dataset
 [~, avg_results] = GCMC_Analysis(v).extractResults(indir); % # TODO this doesn't take into account multiple subjects yet
 % # TODO save results to ActivityTraces inside v
 % # TODO some plotting here
 
 GCMC_Analysis.plotBoxplotsForEachMetric(avg_results,cfg);
 GCMC_Analysis.plotMetricStability(results, cfg)
+
+all_results = GCMC_Analysis(v).extractResultsFromMultipleSubjects(indir);
+group_data = GCMC_Analysis(v).clusterByGroup(all_results);
+
+% concat trained groups (TEMPORARY)
+new_group_data = struct;
+new_group_data(1).group_name = group_data(1).group_name;
+new_group_data(1).data = group_data(1).data;
+new_group_data(2).group_name = 'trained';
+new_group_data(2).data = [group_data(2).data;group_data(3).data;group_data(4).data];
+new_group_data(3).data = group_data(5).data;
+new_group_data(3).group_name = group_data(5).group_name;
+
+% plotting
+GCMC_Analysis.plotBoxplotsByGroup(new_group_data, cfg, false)
 
 %% Plotting average similarity matrices and related metrics for each experimental group.
 

@@ -238,9 +238,13 @@ def process_input_path(in_path,
 
     print("manifolds:", len(mf))
     pairs = list(itertools.combinations(range(len(mf)), 2))
+    for i_f in mf:
+        print("mf sz:", i_f.shape, flush=True)        
 
     for k, (ii, jj) in enumerate(tqdm(pairs, desc="pairs")):
         mfs = [mf[ii], mf[jj]]
+        if any(m.shape[0] == 0 for m in mfs) or any(m.shape[1] < n_points for m in mfs):
+            continue
         res = []
         outm_list = []
         for i_rep in range(n_repetitions):
