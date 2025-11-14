@@ -374,9 +374,11 @@ classdef GCMC_Analysis
                 % Collect data for each group
                 group_labels = {};
                 box_data = [];
+                datacells = cell(1,nGroups);
                 for i_group = 1:nGroups
                     this_data = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle, metrics{i_metric}};
                     box_data = [box_data; this_data];
+                    datacells{i_group} = this_data(:);
                     group_labels = [group_labels; repelem(string(group_data(i_group).group_name), size(this_data, 1), 1)];
                 end
 
@@ -393,7 +395,9 @@ classdef GCMC_Analysis
                 end
 
                 % Create boxplot
-                boxplot(box_data, group_labels, 'Notch', 'on', 'Labels', unique(group_labels, 'stable'));
+                %boxplot(box_data, group_labels, 'Notch', 'on', 'Labels', unique(group_labels, 'stable'));
+                RF_mkBoxPlot3(datacells,[],[],.5,1,2,15,[]);
+                xticks([1:nGroups]); xticklabels({group_data(:).group_name})
                 % Superimpose scatter plot for each group
                 for i_group = 1:nGroups
                     this_data = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle, metrics{i_metric}};
@@ -411,7 +415,7 @@ classdef GCMC_Analysis
                 xlim([.5 max(xticks)+.5])
                 set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol, 'ZColor', cfg.axcol);
                 set(gcf, 'color', cfg.bgcol);
-                set(gcf, 'Position', [100, 10, 600, 1400]);
+                set(gcf, 'Position', [100, 100, 200, 500]);
                 hold off;
             end
             
