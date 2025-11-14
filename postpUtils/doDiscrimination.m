@@ -220,3 +220,22 @@ function out = template_matching(trainData, trainlabs, testData, stims, method)
             (distances(existing_data,2) - distances(existing_data,1)) ./ (distances(existing_data,2));
     end
 end
+
+function out = qda(trainData, trainlabs, testData, stims)
+    % quadratic discriminant analysis
+
+end
+
+function out = train_RNN(trainData, trainlabs, testData, stims)
+
+end
+
+function out = lda(trainData, trainlabs, testData, stims)
+    % linear discriminant analysis
+
+end
+
+function out = dbd(trainData, trainlabs, testData, stims)
+    % direct basis decoder
+
+end
