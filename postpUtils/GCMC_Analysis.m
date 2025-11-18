@@ -289,6 +289,19 @@ classdef GCMC_Analysis
         end
 
     end
+
+    methods (Static)
+        function new_group_data = catTrainedGroups(group_data)
+            % concat trained groups (brittle, but I don't really need more..)
+            new_group_data = struct;
+            new_group_data(1).group_name = group_data(1).group_name;
+            new_group_data(1).data = group_data(1).data;
+            new_group_data(2).group_name = 'trained';
+            new_group_data(2).data = [group_data(2).data;group_data(3).data;group_data(4).data];
+            new_group_data(3).data = group_data(5).data;
+            new_group_data(3).group_name = group_data(5).group_name;
+        end
+    end
 end
 
 %% helper functions

@@ -1,5 +1,7 @@
 classdef GCMC_Plotting
 methods (Static)
+    %% no data required
+    
     function hf = coverageFigure(cfg)
         arguments
             cfg PlotConfig = PlotConfig()
@@ -124,6 +126,10 @@ methods (Static)
 
     end
     
+    %% yes data required
+
+    function 
+
     function plotBoxplotsByGroup(group_data, cfg, shuffle)
         arguments
             group_data struct
@@ -193,7 +199,7 @@ methods (Static)
 
     function plotBoxplotsForEachMetric(avg_results, cfg)
         arguments
-            avg_results table
+            avg_results table % from a single subj
             cfg PlotConfig = PlotConfig()
         end
 

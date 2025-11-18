@@ -42,7 +42,7 @@ dft = v.dataFilter;
 
 %% GCMC: extract manifolds and save to .mat files for Python analysis
 
-outdir = fullfiletol('manifold_data','odors_man_windows','0_5-25s', extractBefore(filename,'.'));
+outdir = fullfiletol('manifold_data','trial_slide_windows', extractBefore(filename,'.'));
 
 % filter data
 v.dataFilter.traceType = 'pSpike';
@@ -56,14 +56,16 @@ v.dataFilter.mode_method = 'mode_values';
 v.dataFilter.mode_OI = 'all';
 v.dataFilter.mode_file = '';
 
-GCMC_Analysis(v).outputDataFiles('odor',outdir); % each manifold: one stimulus, all repetitions, one subject
+% GCMC_Analysis(v).outputDataFiles('odor',outdir); % each manifold: one stimulus, all repetitions, one subject
+
+[pathlist, manifolds] = GCMC_Analysis(v).outputDataFiles_SlidingWindow('trial',outdir,[-6,36],4,2); % each manifold: one stimulus, all repetitions, one subject
 
 v.dataFilter = dft; % recover
 
 %% GCMC: load capacity results from .mat files for MATLAB analysis
 
 indir = fullfiletol('manifold_data', extractBefore(filename,'.'), 'results');
-indir = fullfiletol('manifold_data_odors', 'odorexp004_IC1_130625'); % tempoarily use this folder for the test dataset
+indir = fullfiletol('manifold_data','odors_man_windows'); % tempoarily use this folder for the test dataset
 [~, avg_results] = GCMC_Analysis(v).extractResults(indir); % # TODO this doesn't take into account multiple subjects yet
 % # TODO save results to ActivityTraces inside v
 % # TODO some plotting here
@@ -74,17 +76,11 @@ GCMC_Analysis.plotMetricStability(results, cfg)
 all_results = GCMC_Analysis(v).extractResultsFromMultipleSubjects(indir);
 group_data = GCMC_Analysis(v).clusterByGroup(all_results);
 
-% concat trained groups (TEMPORARY)
-new_group_data = struct;
-new_group_data(1).group_name = group_data(1).group_name;
-new_group_data(1).data = group_data(1).data;
-new_group_data(2).group_name = 'trained';
-new_group_data(2).data = [group_data(2).data;group_data(3).data;group_data(4).data];
-new_group_data(3).data = group_data(5).data;
-new_group_data(3).group_name = group_data(5).group_name;
-
 % plotting
 GCMC_Analysis.plotBoxplotsByGroup(new_group_data, cfg, false)
+
+%
+all_results = GCMC_Analysis(v).extractResults_SlidingWindow(indir,'odorexp004_IC1_130625');
 
 %% Plotting average similarity matrices and related metrics for each experimental group.
 
