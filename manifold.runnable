@@ -1,0 +1,98 @@
+#!/bin/bash
+#SBATCH --account=fri-contom
+#SBATCH --job-name=manifolds
+#SBATCH --array=0-41
+#SBATCH --cpus-per-task=8
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --time=24:00:00
+#SBATCH --ntasks-per-node=1
+#SBATCH --partition=several
+#SBATCH --mem=300M
+#SBATCH --output=logs/%x_%A_%a.out
+
+set -e
+
+function display_memory_usage() {
+        set +eu
+        echo -n "[INFO] [$(date -Iseconds)] [$$] Max memory usage in bytes: "
+        cat /sys/fs/cgroup/memory/slurm/uid_$(id -u)/job_${SLURM_JOB_ID}/memory.max_usage_in_bytes
+        echo
+}
+
+trap display_memory_usage EXIT
+
+START=$(date +%s)
+STARTDATE=$(date -Iseconds)
+echo "[INFO] [$STARTDATE] [$$] Starting SLURM job $SLURM_JOB_ID"
+echo "[INFO] [$STARTDATE] [$$] Running in $(hostname -s)"
+echo "[INFO] [$STARTDATE] [$$] Working directory: $(pwd)"
+
+### MY CODE HERE
+
+module purge
+
+source "$HOME/.bashrc"
+micromamba activate manifolds
+
+# control threading for BLAS/OpenMP
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+export MKL_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+export OPENBLAS_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+
+# ODOR MANIFOLDS
+
+# paths
+FPATH="/tachyon/scratch/gfriedri/processed-data/250129_TC_invivoCaIMG_odorexp004_005/manifold_data/odors/odorexp004_IC1_130625"
+INPUT=$(sed -n "$((SLURM_ARRAY_TASK_ID+1))p" inputs.txt)
+OUTDIR="${INPUT%.mat}"
+
+echo "[INFO] [$(date -Iseconds)] Using input file: $FPATH/$INPUT"
+echo "[INFO] [$(date -Iseconds)] Output directory: $OUTDIR"
+
+python ./manifold_wrap.py --input "$FPATH/$INPUT" --outdir "$FPATH/$OUTDIR" --reps 100 --n_points 70
+
+
+# ODOR-rep1 MANIFOLDS
+
+# paths
+FPATH="/tachyon/scratch/gfriedri/processed-data/250129_TC_invivoCaIMG_odorexp004_005/manifold_data/odors-rep1/odorexp004_IC1_130625"
+INPUT=$(sed -n "$((SLURM_ARRAY_TASK_ID+1))p" inputs.txt)
+OUTDIR="${INPUT%.mat}"
+
+echo "[INFO] [$(date -Iseconds)] Using input file: $FPATH/$INPUT"
+echo "[INFO] [$(date -Iseconds)] Output directory: $OUTDIR"
+
+python ./manifold_wrap.py --input "$FPATH/$INPUT" --outdir "$FPATH/$OUTDIR" --reps 100 --n_points 70
+
+
+# ODOR subtract-novelty MANIFOLDS
+
+# paths
+FPATH="/tachyon/scratch/gfriedri/processed-data/250129_TC_invivoCaIMG_odorexp004_005/manifold_data/odors-subtract-novelty/odorexp004_IC1_130625"
+INPUT=$(sed -n "$((SLURM_ARRAY_TASK_ID+1))p" inputs.txt)
+OUTDIR="${INPUT%.mat}"
+
+echo "[INFO] [$(date -Iseconds)] Using input file: $FPATH/$INPUT"
+echo "[INFO] [$(date -Iseconds)] Output directory: $OUTDIR"
+
+python ./manifold_wrap.py --input "$FPATH/$INPUT" --outdir "$FPATH/$OUTDIR" --reps 100 --n_points 70
+
+
+# REPETITION MANIFOLDS
+
+# paths
+FPATH="/tachyon/scratch/gfriedri/processed-data/250129_TC_invivoCaIMG_odorexp004_005/manifold_data/repetitions/odorexp004_IC1_130625"
+INPUT=$(sed -n "$((SLURM_ARRAY_TASK_ID+1))p" inputs.txt)
+OUTDIR="${INPUT%.mat}"
+
+echo "[INFO] [$(date -Iseconds)] Using input file: $FPATH/$INPUT"
+echo "[INFO] [$(date -Iseconds)] Output directory: $OUTDIR"
+
+python ./manifold_wrap.py --input "$FPATH/$INPUT" --outdir "$FPATH/$OUTDIR" --reps 100 --n_points 70
+
+### END OF CODE
+
+END=$(date +%s)
+ENDDATE=$(date -Iseconds)
+echo "[INFO] [$ENDDATE] [$$] Workflow execution time \(seconds\) : $(( $END-$START ))"
