@@ -399,6 +399,14 @@ classdef ActivityTraces
             obj = assignROIs(obj,subject);
         end
 
+        function val = get.N(obj)
+            try
+                val = width(obj.dFoverF_good);
+            catch
+                val = obj.N;
+            end
+        end
+
         function obj = setBadtrials(obj,value)
             arguments
                 obj 

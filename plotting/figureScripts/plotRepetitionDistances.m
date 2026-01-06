@@ -85,6 +85,7 @@ function [hf, out, groups, odor_sets] = plotRepetitionDistances(v, method)
         if isempty(out{i}); continue; end
 
         thismat = 1 - out{i}.distMat3d; % convert distance to similarity
+        nslices = size(thismat,3);
         
         % knobs # TODO : tunable param
         repetitions = 1:5;
@@ -93,15 +94,21 @@ function [hf, out, groups, odor_sets] = plotRepetitionDistances(v, method)
         % matrix
         thismat = thismat(repetitions,repetitions,:);
         idx = triu(true(numel(repetitions)), 1); % only upper triangle idx
-        idx = repmat(idx,1,1,size(thismat,3));
-        thismat = thismat(idx); % column vector
+
+        out{i}.data = nan(sum(idx,"all"),nslices);
+        for j = 1:nslices
+            thisslice = thismat(:,:,j);            
+            % return
+            out{i}.data(:,j) = thisslice(idx); % column vector
+        end
+        
+        % idx = repmat(idx,1,1,size(thismat,3));
+        thisdata = out{i}.data(:);
 
         % store
-        plot_idx = i * ones(numel(thismat),1);
-        data = [data; plot_idx, thismat];
+        plot_idx = i * ones(size(thisdata));
+        data = [data; plot_idx, thisdata];
 
-        % return
-        out{i}.data = thismat; % column vector
     end
     
     % plot

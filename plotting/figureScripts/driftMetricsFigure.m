@@ -81,7 +81,7 @@ end
 isd = zeros(nsj*(ns*(ns-1)/2), nr);
 for r = 1:nr
     dat = cellfun(@(x) x(:,:,r), out, 'UniformOutput', false);           % [units x stims]
-    thismat = cell2mat(cellfun(@(x) pdist(x',"euclidean"), dat, ...
+    thismat = cell2mat(cellfun(@(x) 1-pdist(x',"correlation"), dat, ...
                                 'UniformOutput', false));                % pairwise across stims
     isd(:,r) = thismat(:);
 end
@@ -119,7 +119,8 @@ R.out            = out;
 R.scalingf       = sf;
 R.driftv         = dv;
 R.corrMat        = cm;
-R.driftStrength  = reshape(ds3,[],nr_d);   % [units*stims x rep-steps]
+R.driftStrength3d = ds3;
+R.driftStrength  = reshape(ds3,[],nr_d);   % [units x stims x rep-steps]
 R.interStimdist  = isd;
 R.interRepAngle  = ira;
 R.anglecorr      = ac;
@@ -200,7 +201,7 @@ for r = 1:k
     c = histcounts(ds(:,r),edges);
     y = cumsum(c);
     if ~isempty(y) && y(end) > 0, y = y./y(end); end
-    H(r) = plot(edges(1:end-1), y, 'LineWidth',1.5);
+    H(r) = plot(edges(1:end-1), y, 'LineWidth',1.5, 'Color', cfg.c(r,:));
 end
 lbl = arrayfun(@(i) sprintf('%d-%d',i,i+1), 1:k, 'UniformOutput', false);
 legend(H, lbl, 'Location','best');

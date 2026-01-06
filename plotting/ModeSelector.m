@@ -266,9 +266,8 @@ classdef ModeSelector
                 case 'non-stimulus'
                     idx = ~stimulus_marginalizations;
                 case 'novelty'
-                    idx = stimulus_marginalizations;
-                    idx(find(idx,1)) = false; % eliminate the highest variant one
-                    idx = ~idx; % keep only the highest variant stimulus mode ("novelty")
+                    idx = ~idx; % all false
+                    idx(find(stimulus_marginalizations,1)) = true; % eliminate the highest variant one
                 otherwise
                     warning('Unknown mode_OI: %s. Returning all modes.', moistr);
             end

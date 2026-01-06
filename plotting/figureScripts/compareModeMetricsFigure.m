@@ -10,37 +10,38 @@ function hf = compareModeMetricsFigure(v)
     nsubjects = numel(m.data);
     nsubjects2use = 5;
     idx = randi(nsubjects,nsubjects2use,1);
-    
-    hf = SJwiseCorrelations();
-    hf = ExamplesFigure(idx);
-    
-    % NMF
-    v.dataFilter.mode_name = 'nmf';
-    v.dataFilter.mode_params.nfactors = 15;
-    m = ModeSelector(v).extract; % extract modes
-    [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
-    hf = ScatterFigure();
-    hf = SJwiseCorrelations();
-    hf = ExamplesFigure(idx);
-    
-    % PCA
-    v.dataFilter.mode_name = 'pca';
-    v.dataFilter.mode_params.nfactors = 15;
-    m = ModeSelector(v).extract; % extract modes
-    [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
-    hf = ScatterFigure();
-    hf = SJwiseCorrelations();
-    hf = ExamplesFigure(idx);
 
-    % dPCA
-    v.dataFilter.mode_name = 'dpca';
-    v.dataFilter.mode_OI = 'stimulus';
-    v.dataFilter.mode_method = 'mode_values';
-    m = ModeSelector(v).extract; % extract modes
-    [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
-    hf = ScatterFigure();
-    hf = SJwiseCorrelations();
+    % spearman instead iof pearson corr, because we cannot assume normal distributions
+    hf = SJwiseCorrelations('spearman'); 
     hf = ExamplesFigure(idx);
+    
+    % % NMF
+    % v.dataFilter.mode_name = 'nmf';
+    % v.dataFilter.mode_params.nfactors = 15;
+    % m = ModeSelector(v).extract; % extract modes
+    % [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
+    % hf = ScatterFigure();
+    % hf = SJwiseCorrelations();
+    % hf = ExamplesFigure(idx);
+    % 
+    % % PCA
+    % v.dataFilter.mode_name = 'pca';
+    % v.dataFilter.mode_params.nfactors = 15;
+    % m = ModeSelector(v).extract; % extract modes
+    % [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
+    % hf = ScatterFigure();
+    % hf = SJwiseCorrelations();
+    % hf = ExamplesFigure(idx);
+
+    % % dPCA
+    % v.dataFilter.mode_name = 'dpca';
+    % v.dataFilter.mode_OI = 'stimulus';
+    % v.dataFilter.mode_method = 'mode_values';
+    % m = ModeSelector(v).extract; % extract modes
+    % [GSS, SeT, StT, Tuning] = getSelectedMetrics(m);
+    % hf = ScatterFigure();
+    % hf = SJwiseCorrelations();
+    % hf = ExamplesFigure(idx);
 
     %% functions
 
@@ -64,21 +65,46 @@ function hf = compareModeMetricsFigure(v)
         metric3 = mean(metric3,[2 3],'omitmissing');
         
         subplot(131)
-        plotScatter(StT,GSS,cfg,'subject')
+        metric1 = StT; metric2 = GSS;
+        plotScatter(metric1,metric2,cfg,'subject')
+        plotHeatmapAndIsoclines(cell2mat(metric1),cell2mat(metric2),20,1,0,0);
+        crange = clim;
+        plotHeatmapAndIsoclines(cell2mat(metric1),cell2mat(metric2),10,0,1,0);
+        clim(crange);
+        xlim([-1 1]);
+        ylim([-3 3])
+        colormap(cfg.colormapName)
         box off
         axis square
         xlabel('Stability of Tuning')
         ylabel('g. Suppression')
         
         subplot(132)
-        plotScatter(SeT,GSS,cfg,'subject')
+        metric1 = SeT; metric2 = GSS;
+        plotScatter(metric1,metric2,cfg,'subject')
+        plotHeatmapAndIsoclines(cell2mat(metric1),cell2mat(metric2),20,1,0,0);
+        crange = clim;
+        plotHeatmapAndIsoclines(cell2mat(metric1),cell2mat(metric2),10,0,1,0);
+        xlim([0 1]);
+        ylim([-3 3])
+        clim(crange);
+        colormap(cfg.colormapName)
         box off
         axis square
         xlabel('Selectivity of Tuning')
         ylabel('g. Suppression')
         
         subplot(133)
-        plotScatter(StT,SeT,cfg,'subject', metric3)
+        % plotScatter(StT,SeT,cfg,'subject', metric3)
+        metric1 = StT; metric2 = SeT;
+        plotScatter(metric1,metric2,cfg,'subject')
+        plotHeatmapAndIsoclines(cell2mat(metric1),cell2mat(metric2),20,1,0,0);
+        crange = clim;
+        plotHeatmapAndIsoclines(cell2mat(metric1),cell2mat(metric2),10,0,1,0);
+        xlim([-1 1]);
+        ylim([0 1])
+        clim(crange);
+        colormap(cfg.colormapName)
         box off
         axis square
         xlabel('Stability of Tuning')
@@ -92,7 +118,7 @@ function hf = compareModeMetricsFigure(v)
         set(gcf, 'color', cfg.bgcol);
     end
 
-    function hf = SJwiseCorrelations()
+    function hf = SJwiseCorrelations(method)
         hf = figure;
 
         GSS_StT_corr = zeros(nsubjects,1);
@@ -100,9 +126,9 @@ function hf = compareModeMetricsFigure(v)
         SeT_StT_corr = zeros(nsubjects,1);
 
         for i = 1:nsubjects
-            GSS_StT_corr(i) = 1-pdist([GSS{i},StT{i}]', 'correlation');
-            GSS_SeT_corr(i) = 1-pdist([GSS{i},SeT{i}]', 'correlation');
-            SeT_StT_corr(i) = 1-pdist([SeT{i},StT{i}]', 'correlation');
+            GSS_StT_corr(i) = 1-pdist([GSS{i},StT{i}]', method);
+            GSS_SeT_corr(i) = 1-pdist([GSS{i},SeT{i}]', method);
+            SeT_StT_corr(i) = 1-pdist([SeT{i},StT{i}]', method);
         end
 
         y = [GSS_StT_corr,GSS_SeT_corr,SeT_StT_corr];
@@ -121,6 +147,39 @@ function hf = compareModeMetricsFigure(v)
         set(gcf, 'color', cfg.bgcol);
         set(gcf, "Position", [0 200 200 500])
 
+        % stats over full dataset
+        [rho,pval] = corr([cell2mat(GSS),cell2mat(StT)],'Type','Spearman','Rows','pairwise');
+        disp(['GSS vs StT: corr=',num2str(rho(2)),', p=',num2str(pval(2))])
+        [rho,pval] = corr([cell2mat(GSS),cell2mat(SeT)],'Type','Spearman','Rows','pairwise');
+        disp(['GSS vs SeT: corr=',num2str(rho(2)),', p=',num2str(pval(2))])
+        [rho,pval] = corr([cell2mat(SeT),cell2mat(StT)],'Type','Spearman','Rows','pairwise');
+        disp(['SeT vs StT: corr=',num2str(rho(2)),', p=',num2str(pval(2))])
+
+        % linear mixed-effects model
+        [~,r_rm,pVal] = doLMEfit(GSS,StT);
+        fprintf('Repeated Measures Correlation (%s-%s): r = %.3f, p = %.4f\n','GSS','StT', r_rm, pVal);
+        [~,r_rm,pVal] = doLMEfit(GSS,SeT);
+        fprintf('Repeated Measures Correlation (%s-%s): r = %.3f, p = %.4f\n','GSS','SeT', r_rm, pVal);
+        [~,r_rm,pVal] = doLMEfit(SeT,StT);
+        fprintf('Repeated Measures Correlation (%s-%s): r = %.3f, p = %.4f\n','SeT','StT', r_rm, pVal);
+
+    end
+
+    function [lme,r_rm,pVal] = doLMEfit(metric1,metric2)
+        subjectID = [];
+        for i=1:nsubjects
+            insert = i .* ones(numel(metric1{i}),1);
+            subjectID = [subjectID; insert];
+        end
+        metric1 = cell2mat(metric1); metric2 = cell2mat(metric2);
+        data = table(subjectID,metric1,metric2);
+        lme = fitlme(data, 'metric2 ~ 1 + metric1 + (1|subjectID)');
+        % disp(lme);
+        pVal = lme.Coefficients.pValue(2); 
+        % estimate the within-subject correlation coefficient (r_rm) by looking at the t-statistic of the fixed effect 'metric1'
+        tStat = lme.Coefficients.tStat(2);
+        dfError = lme.DFE;
+        r_rm = sign(tStat) * sqrt(tStat^2 / (tStat^2 + dfError));
     end
     
     function hf = ExamplesFigure(idx)
@@ -129,12 +188,12 @@ function hf = compareModeMetricsFigure(v)
         nsubjects2use = 5;
         
         % ids of extreme cells by metric value
-        [~, unselective] = cellfun(@min, SeT(idx));
-        [~, selective] = cellfun(@max, SeT(idx));
-        [~, unstable] = cellfun(@min, StT(idx));
-        [~, stable] = cellfun(@max, StT(idx));
-        [~, enhanced] = cellfun(@min, GSS(idx));
-        [~, suppressed] = cellfun(@max, GSS(idx));
+        [vals.unselective, unselective] = cellfun(@min, SeT(idx));
+        [vals.selective, selective] = cellfun(@max, SeT(idx));
+        [vals.unstable, unstable] = cellfun(@min, StT(idx));
+        [vals.stable, stable] = cellfun(@max, StT(idx));
+        [vals.enhanced, enhanced] = cellfun(@min, GSS(idx));
+        [vals.suppressed, suppressed] = cellfun(@max, GSS(idx));
         
         params.nsubjects2use = nsubjects2use;
         params.idx = idx;
@@ -173,6 +232,8 @@ function hf = compareModeMetricsFigure(v)
         ylabel('suppressed')
         
         set(gcf, 'color', cfg.bgcol);
+
+        vals
     end
 
 end

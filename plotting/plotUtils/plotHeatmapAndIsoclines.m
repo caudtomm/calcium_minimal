@@ -1,4 +1,4 @@
-function plotHeatmapAndIsoclines(x, y, gridSize, do_heatmap, do_isoclines, do_log)
+function density = plotHeatmapAndIsoclines(x, y, gridSize, do_heatmap, do_isoclines, do_log)
     % % Create a grid for the heatmap
     xEdges = linspace(min(x), max(x), gridSize);
     yEdges = linspace(min(y), max(y), gridSize);
