@@ -1,6 +1,6 @@
 %%
 baseline_tag = {'noodor', 'baseline', 'spont.'};
-this_group = {'naive';'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'};
+this_group = {'naïve';'naive';'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'};
 cat.traces = [];
 todo_fish = [];
 for i_fish = 1:numel(experiment.series)

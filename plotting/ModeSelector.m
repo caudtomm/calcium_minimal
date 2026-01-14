@@ -314,6 +314,11 @@ classdef ModeSelector
                 if isfield(fileIn, 'dpca')
                     obj.fullout = fileIn.dpca;
                     coeffs = cellfun(@(x) x.W, fileIn.dpca, 'UniformOutput', false);
+                    
+                    % select coeffs for pre-selected subjects only
+                    idx = obj.getIDXtouse;
+                    coeffs = coeffs(idx);
+
                     obj.coeffs = coeffs;
                     disp('Weights successfully loaded and assigned.');
                 else
@@ -329,6 +334,27 @@ classdef ModeSelector
             else
             disp('Coefficients are already initialized. Skipping file import.');
             end
+        end
+
+        function idx = getIDXtouse(obj)
+            dpca_group = '';
+            if contains(obj.mode_file,'naive')
+                dpca_group = 'naïve';
+            elseif contains(obj.mode_file,'trained')
+                dpca_group = 'trained';
+            elseif contains(obj.mode_file,'uncoupled')
+                dpca_group = 'uncoupled';
+            else
+                error('dpca group not recognized')
+            end
+
+            dft = obj.v.dataFilter;
+            [~,idx_subj] = dft.getSubjectIDs(obj.v.subjectTab);
+            dft.subjectIDs = {};
+            dft.subjectGroup = dpca_group;
+            [~,idx_group] = dft.getSubjectIDs(obj.v.subjectTab);
+
+            idx = idx_subj(idx_group);
         end
         
         function obj = wipeResults(obj)

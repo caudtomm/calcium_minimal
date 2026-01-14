@@ -355,14 +355,3 @@ function checkexists(var, name)
         error('Expected %s to be provided.', name);
     end
 end
-
-% intermediate level plotter : dynamics
-% 
-% mode 'curve' : loop processor over a sliding window and plot values on a curve
-% mode 'windows_size' : loop processor over a sliding window and over window sizes, plot imagesc onto provided axes
-% mode 'repetitions' : loop processor over a sliding window and over repetitions, plot imagesc onto provided axes
-
-% high level plotter : dynamics
-% 
-% compare across subject groups and stimulus groups, plot imagesc
-% use colorbar, standard clim, log c?

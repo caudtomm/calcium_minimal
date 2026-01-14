@@ -146,12 +146,12 @@ classdef DataFilter
 
         function [ids, match] = getSubjectIDs(obj, subjectTab) 
             % Return list of subject IDs based on filter criteria
+            allIDs = subjectTab.name;
             if ~isempty(obj.subjectIDs)
                 ids = obj.subjectIDs;
-                match = true(numel(ids),1);
+                match = ismember(subjectTab.name, ids);
             elseif ~isempty(obj.subjectGroup) && ...
                     ismember('group', subjectTab.Properties.VariableNames)
-                allIDs = subjectTab.name;
                 match = ismember(subjectTab.group, obj.subjectGroup);
                 ids = allIDs(match);
             else

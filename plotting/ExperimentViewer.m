@@ -61,6 +61,113 @@ classdef ExperimentViewer
         function obj = setTheme(obj, themeName)
             obj.plotConfig.theme = themeName;
         end
+
+        %% quick plotters
+
+        function [hf, out] = plotAvgResponseTrace(obj,varargin)
+            arguments
+                obj
+            end
+            arguments (Repeating)
+                varargin
+            end
+
+            cfg = obj.plotConfig;
+            dft = obj.dataFilter;
+
+            T = diff(dft.interval);
+            baseline_trange = 120 + [-T 0];
+
+            events = extractData();
+
+            obj.dataFilter.interval = baseline_trange;
+            baseline = extractData();
+            obj.dataFilter = dft;
+
+            out.events = events;
+            out.baseline = baseline;
+
+            [N,L] = size(events);
+            t = linspace(dft.interval(1),dft.interval(2),L);
+            hf = figure;
+            mu = mean(baseline,'omitmissing')'; % baseline
+            err = std(baseline,[],1,'omitmissing')';%./sqrt(N);
+            b(1) = plotLineNShade(mu, err, 'g');
+            mu = mean(events,'omitmissing')'; % odor
+            err = std(events,[],1,'omitmissing')';%./sqrt(N);
+            b(2) = plotLineNShade(mu, err, 'b');
+            
+            xlabel('time from stimulus onset [s]')
+            ylabel('iFR [Hz]')
+            axis tight; box off
+            legend(b,{'baseline', 'odor'})
+            set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+            set(gcf, 'color', cfg.bgcol);
+            set(gcf, 'Position', [50 50 400 280]);
+
+            function y = extractData()
+                [~,y] = ModeSelector(obj).extract;
+                y = cellfun(@(x) mean(x,[2,3],'omitmissing')', y,'UniformOutput',false); % avg over cellS and trials
+                y = cell2mat(y); % [fish x T]
+            end
+            
+            function y = plotLineNShade(mu, err, c)
+                fill([t fliplr(t)], [mu - err; flipud(mu + err)]', ...
+                 c, 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+                hold on
+                y = plot(t,mu,[c,'-'],'LineWidth',1);
+            end
+
+        end
+
+        function [hf, out] = plotExampleTraces(obj,idx_in,varargin)
+            arguments
+                obj
+                idx_in = {}
+            end
+            arguments (Repeating)
+                varargin
+            end
+
+            out = [];
+
+            trange = obj.dataFilter.interval;
+            cfg = obj.plotConfig;
+
+            [~,events] = ModeSelector(obj).extract;
+            nsubjects = numel(events);
+            out.events = events;
+            out.idx = cell(size(events));
+            hf = figure;
+
+            for i = 1:nsubjects
+                M = events{i};
+
+                [L, N, ntrials] = size(M);
+                t = linspace(trange(1),trange(2),L);
+
+                % sorting indices
+                if isempty(idx_in)
+                    [~,idx] = sort(mean(M(:,:,1),1,'omitmissing'),'descend');
+                else
+                    idx = idx_in{i};
+                end
+                out.idx{i} = idx;
+
+                for i_trial = 1:ntrials
+                    subplot(nsubjects,ntrials,(i-1)*ntrials+i_trial)
+                    imagesc(t, 1:N, M(:,idx,i_trial)')
+
+                    colormap(flipud(gray)); clim([0 1]);
+                    
+                    xlabel('Time from stim. onset [s]'); ylabel('cell #')
+                    set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+                end
+                
+            end            
+            set(gcf, 'color', cfg.bgcol); 
+            
+        end
         
         %% intermediate-level plotting function headers 
         % (normally call external low level functions that don't rely on custom objects)

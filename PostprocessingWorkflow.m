@@ -336,6 +336,98 @@ v.dataFilter.mode_file = 'dpca_uncoupled.mat';
 [h, C, Cvals] = plotTuningCorrelationsOverReps(v, metric);
 
 
+%% FIGURE 1
+
+% naive average response trace
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.interval = [-5 40];
+v.plotAvgResponseTrace;
+v.dataFilter = dft;
+
+% naive individual response traces (pooled imagesc)
+Nshow = 1000; % n of cells to randomly subsample for visualization
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.interval  = [.5 20]; % get intensity during odor window
+iFR_odor = v.plotUnitActivityMetricHead('method','avg intensity');
+N = cellfun(@height,iFR_odor); N = cumsum(N);
+iFR_odor = cell2mat(iFR_odor);
+v.dataFilter.interval = []; % get cellwise mean and std from all data
+iFR_var = v.plotUnitActivityMetricHead('method','variance');
+iFR_var = cell2mat(iFR_var);
+iFR_std = sqrt(iFR_var); % variance to std
+iFR_mu = v.plotUnitActivityMetricHead('method','avg intensity');
+iFR_mu = cell2mat(iFR_mu);
+iFR_odor = mean(iFR_odor,2,'omitmissing'); % avg over trials
+iFR_std = mean(iFR_std,2,'omitmissing'); % avg over trials
+iFR_mu = mean(iFR_mu,2,'omitmissing'); % avg over trials
+resp = (iFR_odor-iFR_mu)./iFR_std; % responsiveness score
+% plot responsiveness distributions
+nsubjects = numel(N);
+resp_all = cell(nsubjects,1);
+N = [1;N];
+figure; 
+for i = 1:nsubjects
+    resp_all{i} = resp(N(i):N(i+1),:,:);
+    cdfplot(resp_all{i}); hold on
+end
+xlabel('Responsiveness [STD]')
+ylabel('CDF'); title('')
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+axis square tight; box off; grid off
+%
+[resp, idx] = sort(resp,'descend');
+v.dataFilter.interval = [-5 35]; % visualization windows
+[~, events] = ModeSelector(v).extract;
+events = cellfun(@(x) permute(x,[2 1 3]), events, 'UniformOutput', false);
+events = cell2mat(events); % [N, T, trials]
+[N, L, ntrials] = size(events);
+t = linspace(v.dataFilter.interval(1),v.dataFilter.interval(2),L);
+events = events(idx,:,:); % sort by responsiveness
+idx = false(N,1); idx(randperm(N,Nshow)) = true; % random subsample
+y = mean(events(idx,:,:),3,'omitmissing')-mean(events(idx,1:38,:),[2,3],'omitmissing');
+figure; imagesc(t,1:Nshow,y)
+colormap('jet')
+clim([-0.2 .5])
+xlabel('Time from stim. onset [s]')
+ylabel('Cell #')
+a = colorbar('Color',cfg.axcol);
+a.Label.String = 'delta iFR [Hz]';
+a.Label.FontSize= gca().FontSize;
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+axis tight; box off
+figure; plot(resp(idx));
+v.dataFilter = dft;
+
+% firing rate distributions
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.traceType = 'pSpike';
+v.dataFilter.interval  = []; % all data
+[~,iFR_odor] = ModeSelector(v).extract;
+iFR_odor = cellfun(@(x) permute(x,[2,1,3]),iFR_odor,'UniformOutput',false);
+nsubjects = numel(iFR_odor);
+edges = linspace(0,10,101);
+Y = [];
+for i = 1:nsubjects
+    n = numel(iFR_odor{i});
+    y = histcounts(iFR_odor{i},edges);
+    Y = [Y; y(:)'./n];
+end
+figure;
+hold on
+plot(edges(1:end-1),Y,'k-','LineWidth',1)
+xscale log; yscale log
+xlabel('iFR [Hz]')
+ylabel('Portion of frames')
+axis tight square; box off
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+
+
 %% FIGURE 2
 
 % plot for naive fish
@@ -378,6 +470,81 @@ disp(['2-sample KS test for ''same'' vs ''diff.'' stimuli - pval: ',num2str(p)])
 disp(['2-sample KS test for ''no FTE'' vs ''FTE'' (same stimulus) - pval: ',num2str(p)])
 v.dataFilter = dft;
 
+% example traces for naive fish #6 (Trp and Leu)
+% sort by avg intensity of native units on rep 1
+v.dataFilter = dft;
+sid = v.subjectTab.name(v.subjectTab.group=="naïve"); sid = sid(6);
+odors = {'Trp','Leu'};
+v.dataFilter.repetitions = [1 3 5];
+v.dataFilter.interval = [-5 35];
+v.dataFilter.subjectIDs = sid;
+for i=1:numel(odors)
+    thisodor = odors{i};
+    v.dataFilter.stims_allowed = {thisodor};
+    
+    % native units
+    v.dataFilter.mode_name = 'native_units';
+    v.dataFilter.mode_method = 'mode_values';
+    v.dataFilter.mode_OI = 'all';
+    v.dataFilter.mode_file = '';
+    [~,out] = v.plotExampleTraces;
+    idx = out.idx(1);
+    title([thisodor,' - ','units'])
+
+    % isolate stimulus dPCs
+    v.dataFilter.mode_name = 'dpca';
+    v.dataFilter.mode_OI = 'stimulus';
+    v.dataFilter.mode_method = 'isolate';
+    v.dataFilter.mode_file = 'dpca_naive.mat';
+    v.plotExampleTraces(idx);
+    title([thisodor,' - ','isolate stim dPCs'])
+
+    % subtract stimulus dPCs
+    v.dataFilter.mode_method = 'subtract';
+    v.plotExampleTraces(idx);
+    title([thisodor,' - ','subtract stim dPCs'])
+
+end
+
+
+% dPCA decomposition
+v.dataFilter = dft;
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'all';
+v.dataFilter.mode_method = 'mode_values';
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = 'dpca_naive.mat';
+hf = figure;
+outMat_dn = v.plotDistancesHead;
+v.dataFilter.mode_OI = 'all_stimulus';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+v.dataFilter.mode_OI = 'non-stimulus';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+v.dataFilter.mode_OI = 'novelty';
+v.dataFilter.interval = [0 3];
+hf = figure;
+c = v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions');
+%
+v.dataFilter = dft;
+
+
+% stimulus dPCs except #1
+v.dataFilter = dft;
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'stimulus';
+v.dataFilter.mode_method = 'subtract';
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = 'dpca_naive.mat';
+hf = figure;
+outMat_dn = v.plotDistancesHead;
+v.dataFilter.mode_method = 'isolate';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+%
+v.dataFilter = dft;
+
 % stimulus dPCs except #1 (lower triangle = subtract, upper triangle = isolate)
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
@@ -417,6 +584,7 @@ hold off
 %
 v.dataFilter = dft;
 
+
 % stimulus dPC weights
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
@@ -428,15 +596,52 @@ m = ModeSelector(v).extract;
 c = []; % [w1 N; w2 N; ...]
 for i= 1:numel(m.coeffs)
     thisdata = m.coeffs{i}(:,m.parseModeOI(i));
+    thisdata = sum(thisdata);
+    c = [c; thisdata(:)];
+end
+%histogram
+figure; histogram(c, 100, 'FaceColor','k','EdgeAlpha',0);
+box off; axis square
+axis tight
+xlabel('sum of weights'); ylabel('histogram')
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+
+
+% stimulus dPC weights
+v.dataFilter = dft;
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'stimulus';
+v.dataFilter.mode_method = 'mode_values';
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = 'dpca_naive.mat';
+m = ModeSelector(v).extract;
+c = [];
+for i= 1:numel(m.coeffs)
+    thisdata = m.coeffs{i}(:,m.parseModeOI(i));
+    thisdata = sum(thisdata);
+    c = [c; thisdata(:)];
+end
+%histogram
+figure; histogram(c, 100, 'FaceColor','k','EdgeAlpha',0);
+box off; axis square
+axis tight
+xlabel('sum of weights'); ylabel('histogram')
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+% 
+c = []; % [w1 N; w2 N; ...]
+for i= 1:numel(m.coeffs)
+    thisdata = m.coeffs{i}(:,m.parseModeOI(i));
     c = [c; thisdata(:), ones(numel(thisdata),1)*v.filtered_traces{i}.N];
 end
 %histogram
-figure; histogram(abs(c(:,1))./c(:,2), 100, 'FaceColor','k','EdgeAlpha',0);
+figure; histogram(abs(c(:,1)).*c(:,2), 100, 'FaceColor','k','EdgeAlpha',0);
 box off; axis square
 yscale log
 xscale log
 axis tight
-xlabel('|w|/N'); ylabel('histogram')
+xlabel('|w|*N'); ylabel('histogram')
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
 % shower plot
@@ -965,7 +1170,7 @@ v.dataFilter.subjectGroup = 'naïve';
 [~, units3d, units_vals] = plotTuningCorrelationsOverReps(v, metric); % native units
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'stimulus';
-v.dataFilter.mode_method = 'isolate';
+v.dataFilter.mode_method = 'remove';
 v.dataFilter.mode_file = 'dpca_naive.mat';
 [~, dPC3d, dPC_vals] = plotTuningCorrelationsOverReps(v, metric); % stimulus dPCs
 % multicolor histogram
@@ -986,6 +1191,44 @@ disp(['2-sample KS test for unit vs dPC intertrial corrs - pval: ',num2str(p)])
 
 
 %% FIGURE 3
+
+
+% stimulus dPCs except #1 (trained)
+v.dataFilter = dft;
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'stimulus';
+v.dataFilter.mode_method = 'subtract';
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.mode_file = 'dpca_trained.mat';
+hf = figure;
+outMat_dn = v.plotDistancesHead;
+v.dataFilter.mode_method = 'isolate';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+v.dataFilter.mode_method = 'mode_values';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+%
+v.dataFilter = dft;
+
+
+% stimulus dPCs except #1 (uncoupled)
+v.dataFilter = dft;
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'stimulus';
+v.dataFilter.mode_method = 'subtract';
+v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.mode_file = 'dpca_uncoupled.mat';
+hf = figure;
+outMat_dn = v.plotDistancesHead;
+v.dataFilter.mode_method = 'isolate';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+v.dataFilter.mode_method = 'mode_values';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+%
+v.dataFilter = dft;
 
 % plot interrep correlations and delta for trained fish
 v.dataFilter = dft;
