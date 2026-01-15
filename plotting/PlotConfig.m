@@ -4,8 +4,8 @@ classdef PlotConfig
         % Data handling
 
         % Visual appearance
-        theme char = 'dark'          % plotting theme ('light', 'dark', etc.)
-        colormapName char = 'jet'    % MATLAB colormap name
+        theme char = 'light'         % plotting theme ('light', 'dark', etc.)
+        colormapName char = 'batlow' % MATLAB colormap name
         showGrid logical = false     % display grid in internal plots
         axWidth double = 0.5         % default axis line width
         lineWidth double = 1         % default line width
@@ -32,6 +32,7 @@ classdef PlotConfig
         figDPI double = 600          % figure resolution in DPI
         figVectFormat char = 'svg'   % vector figure format for saving ('svg', 'pdf', etc.)
         figRasterFormat char = 'png' % raster figure format for saving ('png', 'jpg', etc.)
+        savePath char = ''            % path to save figures
 
         % Technical settings
         renderingFactor = 72/96    % factor to convert line widths from screen (96 dpi) to print (72 dpi)
@@ -122,9 +123,29 @@ classdef PlotConfig
                     jitter = 0.05 * randn(size(colors)); % small variation
                     colors = min(max(colors + jitter, 0), 1); % clamp between 0 and 1
                 case 'light'
-                    colors = lines(100); % MATLAB default
+                    % Nature standard (colorblind friendly)
+                    rgb_vals = [
+                        0 0 0; % black
+                        182 219 255; % light blue
+                        123 176 223; % mid blue
+                        25 100 176; % dark blue
+                        0 201 146; % light teal
+                        0 138 105; % teal
+                        56 99 80; % dark teal
+                        233 220 109; % yellow
+                        244 166 55; % orange
+                        219 88 41; % vermillion
+                        137 75 69; % maroon
+                        210 187 215; % light purple
+                        174 117 162; % purple
+                        136 45 113; % dark purple
+                        222 222 222; % grey
+                    ];
+                    colors = rgb_vals / 255; % normalize to [0, 1]
                 otherwise
                     colors = colorcube(100); % fallback
+                    % or
+                    % colors = lines(100); % MATLAB default
             end
         end
 
@@ -190,6 +211,12 @@ classdef PlotConfig
                 format char {mustBeMember(format, {'both', 'vector', 'raster'})} = 'both'
             end
 
+            if ~isempty(obj.savePath) && ~isfolder(obj.savePath)
+                mkdir(obj.savePath);
+            end
+
+            filenameBase = fullfiletol(obj.savePath, filenameBase);
+
             if strcmp(format, 'vector') || strcmp(format, 'both')
                 % Save vector format
                 print(figHandle, [filenameBase '.' obj.figVectFormat], ...
@@ -238,7 +265,7 @@ classdef PlotConfig
                     'FontName', obj.fontType, ...   
                     'TitleFontWeight','normal', ...
                     'ticklength',Ticklengthvec, ...
-                    'LineWidth',obj.lineWidth, ...
+                    'LineWidth',obj.axWidth, ...
                     'box','off', ...
                     'XGrid', obj.showGrid, 'YGrid', obj.showGrid, 'ZGrid', obj.showGrid, ...
                     'XLimitMethod', 'tight', 'YLimitMethod', 'tight', 'ZLimitMethod', 'tight', ...
@@ -249,6 +276,33 @@ classdef PlotConfig
             set(findobj(axHandle, 'Type', 'Line'), ...
                     'LineWidth', obj.lineWidth, ...
                     'LineStyle', obj.lineStyle); % set default line properties
+
+            if ~isempty(findobj(axHandle, 'Type', 'Image'))
+                colormap(axHandle, obj.getColormap()); % set colormap if images are present
+            end
+
+            textHandles = obj.getTextinAxis(axHandle);
+            set(textHandles, 'FontSize', obj.fontSize, 'FontName', obj.fontType); % set text properties
+        end
+
+        function allHandles = getTextinAxis(~, axHandle)
+            textHandles = findall(axHandle, 'Type', 'text', '-or', ...
+                                 'Type', 'xlabel', '-or', ...
+                                 'Type', 'ylabel', '-or', ...
+                                 'Type', 'zlabel', '-or', ...
+                                 'Type', 'title', '-or', ...
+                                 'Type', 'legend', '-or', ...
+                                 'Type', 'annotation');
+
+            cbHandles = findall(ancestor(axHandle, 'figure'), 'Type', 'colorbar');
+
+            cbLabelHandles = [];
+            if ~isempty(cbHandles) && all(isgraphics(cbHandles))
+                % Use [cbHandles.Label] to get the text objects for the labels
+                cbLabelHandles = [cbHandles.Label]'; 
+            end
+
+            allHandles = [textHandles; cbLabelHandles; cbHandles];
         end
     end
 end

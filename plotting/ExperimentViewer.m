@@ -92,13 +92,13 @@ classdef ExperimentViewer
             hf = figure;
             mu = mean(baseline,'omitmissing')'; % baseline
             err = std(baseline,[],1,'omitmissing')';%./sqrt(N);
-            b(1) = plotLineNShade(mu, err, 'g');
+            b(1) = plotLineNShade(mu, err, cfg.c(3,:));
             mu = mean(events,'omitmissing')'; % odor
             err = std(events,[],1,'omitmissing')';%./sqrt(N);
-            b(2) = plotLineNShade(mu, err, 'b');
+            b(2) = plotLineNShade(mu, err, cfg.c(4,:));
             
-            xlabel('time from stimulus onset [s]')
-            ylabel('iFR [Hz]')
+            xlabel('Time from stimulus onset (s)')
+            ylabel('iFR (Hz)')
             axis tight; box off
             legend(b,{'baseline', 'odor'})
             set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
@@ -113,9 +113,9 @@ classdef ExperimentViewer
             
             function y = plotLineNShade(mu, err, c)
                 fill([t fliplr(t)], [mu - err; flipud(mu + err)]', ...
-                 c, 'FaceAlpha', 0.2, 'EdgeColor', 'none');
+                 c, 'FaceAlpha', 0.4, 'EdgeColor', 'none');
                 hold on
-                y = plot(t,mu,[c,'-'],'LineWidth',1);
+                y = plot(t,mu,'Color',c,'LineStyle',cfg.lineStyle,'LineWidth',cfg.lineWidth);
             end
 
         end
@@ -160,7 +160,7 @@ classdef ExperimentViewer
 
                     colormap(flipud(gray)); clim([0 1]);
                     
-                    xlabel('Time from stim. onset [s]'); ylabel('cell #')
+                    xlabel('Time from stim. onset (s)'); ylabel('Cell #')
                     set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
                 end
                 
