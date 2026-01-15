@@ -25,7 +25,7 @@ end
 
 
 %% initialize output figure saving
-cfg = PlotConfig;
+cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73]); % (test1, test2, ctrl)
 cfg.savePath = savepath;
 
 v = ExperimentViewer(experiment);
