@@ -95,7 +95,7 @@ classdef ExperimentViewer
             b(1) = plotLineNShade(mu, err, cfg.c(3,:));
             mu = mean(events,'omitmissing')'; % odor
             err = std(events,[],1,'omitmissing')';%./sqrt(N);
-            b(2) = plotLineNShade(mu, err, cfg.c(4,:));
+            b(2) = plotLineNShade(mu, err, cfg.c(1,:));
             
             xlabel('Time from stimulus onset (s)')
             ylabel('iFR (Hz)')

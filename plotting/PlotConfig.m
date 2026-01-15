@@ -5,12 +5,13 @@ classdef PlotConfig
 
         % Visual appearance
         theme char = 'light'         % plotting theme ('light', 'dark', etc.)
-        colormapName char = 'batlow' % MATLAB colormap name
+        colormapName char = 'lapaz'  % MATLAB colormap name
         showGrid logical = false     % display grid in internal plots
         axWidth double = 0.5         % default axis line width
         lineWidth double = 1         % default line width
         lineStyle char = '-'         % default line type
         c double = lines(100)        % default plot colors
+        favouriteColors double = 1:10 % indices of favorite colors from colormap
         axcol double = [0 0 0]       % default axis color
         bgcol = [1 1 1]              % default figure background color
         textcol double = [0 0 0]     % default text color
@@ -101,10 +102,52 @@ classdef PlotConfig
                     c = [0.2 0.2 0.2];  % fallback dark gray
             end
         end
+
+        function cmap = getColormap(obj, mode)
+            arguments
+                obj PlotConfig
+                mode char {mustBeMember(mode, {'categorical', ...
+                                                'discrete10', ...
+                                                'discrete25', ...
+                                                'discrete50', ...
+                                                'discrete100', ...
+                                                'continuous'})} = 'continuous'
+            end
+
+            % Return the colormap based on the theme and colormapName
+            switch mode
+                case 'categorical'
+                    suffix = 'S';
+                case 'discrete10'
+                    suffix = '10';
+                case 'discrete25'
+                    suffix = '25';
+                case 'discrete50'
+                    suffix = '50';
+                case 'discrete100'
+                    suffix = '100';
+                case 'continuous'
+                    suffix = '';
+                otherwise
+                    suffix = '';
+            end
+
+            thisname = [obj.colormapName,suffix];
+
+            cmap = feval(thisname);
+        end
         
         function colors = get.c(obj)
-            % Returns 10 well-visible line/scatter colors adapted to theme
+            % Some well-visible line/scatter colors adapted to theme
         
+            try
+                colors = obj.getColormap('categorical');
+                colors = colors(obj.favouriteColors, :);
+                return
+            catch
+            end
+
+            % the following functions as a catch
             switch obj.theme
                 case 'dark'
                     base_colors = [
@@ -146,16 +189,6 @@ classdef PlotConfig
                     colors = colorcube(100); % fallback
                     % or
                     % colors = lines(100); % MATLAB default
-            end
-        end
-
-        function cmap = getColormap(obj)
-            % Return the specified colormap
-            try
-                cmap = feval(obj.colormapName);
-            catch
-                warning('Unknown colormap "%s". Falling back to "parula".', obj.colormapName);
-                cmap = parula;
             end
         end
 
