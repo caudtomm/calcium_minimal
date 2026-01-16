@@ -39,6 +39,76 @@ dft = v.dataFilter;
 
 %% FIGURE 3
 
+
+% unit firing distributions
+baseline_interval = [-22 -2];
+odor_interval = dft.interval;
+yrange = [-.2 .3];
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.trial_sorting = 'chronological';
+% over trials
+v.dataFilter.stims_allowed = 'all trials';
+out = v.plotUnitActivityMetricHead('method','avg intensity');
+v.dataFilter.interval = baseline_interval;
+outbase = v.plotUnitActivityMetricHead('method','avg intensity');
+data = cell2mat(out) - cell2mat(outbase);
+[~,~, labs] = ModeSelector(v).extract; labs = labs{1};
+hf = figure; b = prettyBoxplot(data,labs,'scatterSize',5,'plotLine',true);
+ylabel('Cellwise delta iFR (Hz)')
+ylim(yrange)
+cfg.figSize = "large";
+cfg.aspRatioType = "wide";
+cfg.lineWidth = .5;
+cfg.setFigure
+cfg.saveFigure(gcf,'unit delta firing distribution', saveType)
+cfg = v.plotConfig;
+
+% unit firing distributions
+baseline_interval = [-22 -2];
+odor_interval = dft.interval;
+yrange = [0 .2];
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.trial_sorting = 'chronological';
+% over trials
+v.dataFilter.stims_allowed = 'all trials';
+hf = figure;
+out = v.plotTrialActivityMetricHead('method','avg intensity');
+ylim(yrange)
+% over repetitions
+v.dataFilter.stims_allowed = 'all stimuli';
+hf = figure;
+v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
+ylim(yrange)
+% over repetitions (Leu)
+v.dataFilter.stims_allowed = {'Leu'};
+hf = figure;
+v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
+ylim(yrange)
+
+% unit firing distributions (baseline)
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.trial_sorting = 'chronological';
+v.dataFilter.interval = [-22 -2];
+% over trials
+v.dataFilter.stims_allowed = 'all trials';
+hf = figure;
+v.plotTrialActivityMetricHead('method','avg intensity')
+ylim(yrange)
+% over repetitions
+v.dataFilter.stims_allowed = 'all stimuli';
+hf = figure;
+v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
+ylim(yrange)
+% over repetitions (Leu)
+v.dataFilter.stims_allowed = {'Leu'};
+hf = figure;
+v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
+ylim(yrange)
+
+
 % general suppression score
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'naïve';
@@ -124,47 +194,4 @@ xlim([-1 1])
 xlabel('tuning stability [a.u]'); ylabel('histogram')
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
-
-
-% unit firing distributions
-yrange = [0 .2];
-v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
-v.dataFilter.trial_sorting = 'chronological';
-% over trials
-v.dataFilter.stims_allowed = 'all trials';
-hf = figure;
-v.plotTrialActivityMetricHead('method','avg intensity')
-ylim(yrange)
-% over repetitions
-v.dataFilter.stims_allowed = 'all stimuli';
-hf = figure;
-v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
-ylim(yrange)
-% over repetitions (Leu)
-v.dataFilter.stims_allowed = {'Leu'};
-hf = figure;
-v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
-ylim(yrange)
-
-% unit firing distributions (baseline)
-v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
-v.dataFilter.trial_sorting = 'chronological';
-v.dataFilter.interval = [-22 -2];
-% over trials
-v.dataFilter.stims_allowed = 'all trials';
-hf = figure;
-v.plotTrialActivityMetricHead('method','avg intensity')
-ylim(yrange)
-% over repetitions
-v.dataFilter.stims_allowed = 'all stimuli';
-hf = figure;
-v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
-ylim(yrange)
-% over repetitions (Leu)
-v.dataFilter.stims_allowed = {'Leu'};
-hf = figure;
-v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
-ylim(yrange)
 
