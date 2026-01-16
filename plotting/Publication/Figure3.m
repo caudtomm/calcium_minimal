@@ -1,7 +1,7 @@
 dbstop if error
 
 s = true; % save figures to files?
-savepath = 'bin2';
+savepath = 'bin3';
 saveType = 'vector'; % 'vector' or 'raster'
 
 % for sliding windows
@@ -24,7 +24,7 @@ end
 
 
 %% initialize output figure saving
-cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73]); % (test1, test2, ctrl)
+cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73,86:99]); % (test1, test2, ctrl)
 cfg.savePath = savepath;
 
 v = ExperimentViewer(experiment);
@@ -40,12 +40,12 @@ dft = v.dataFilter;
 %% FIGURE 3
 
 
-% unit firing distributions
+%% unit firing distributions
 baseline_interval = [-22 -2];
 odor_interval = dft.interval;
 yrange = [-.2 .3];
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.trial_sorting = 'chronological';
 % over trials
 v.dataFilter.stims_allowed = 'all trials';
@@ -61,55 +61,76 @@ cfg.figSize = "large";
 cfg.aspRatioType = "wide";
 cfg.lineWidth = .5;
 cfg.setFigure
-cfg.saveFigure(gcf,'unit delta firing distribution', saveType)
+cfg.saveFigure(gcf,'trained unit delta firing distribution', saveType)
 cfg = v.plotConfig;
 
-% unit firing distributions
+% unit firing distributions (repetitions)
 baseline_interval = [-22 -2];
 odor_interval = dft.interval;
-yrange = [0 .2];
+yrange = [-.2 .3];
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.trial_sorting = 'chronological';
-% over trials
-v.dataFilter.stims_allowed = 'all trials';
-hf = figure;
-out = v.plotTrialActivityMetricHead('method','avg intensity');
-ylim(yrange)
-% over repetitions
 v.dataFilter.stims_allowed = 'all stimuli';
+[~,~, labs] = ModeSelector(v).extract; labs = labs{1};
+% over reps
+stims = unique(labs); nstims = numel(stims);
+data = [];
+for i = 1:nstims
+    v.dataFilter.stims_allowed = stims(i);
+    v.dataFilter.interval = odor_interval;
+    out = v.plotUnitActivityMetricHead('method','avg intensity');
+    v.dataFilter.interval = baseline_interval;
+    outbase = v.plotUnitActivityMetricHead('method','avg intensity');
+    data = [data; cell2mat(out) - cell2mat(outbase)];
+end
 hf = figure;
-v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
+subplot(121); b = prettyBoxplot(data,{'1','2','3','4','5'},'scatterSize',5,'plotLine',true);
+ylabel('Cellwise delta iFR (Hz)')
 ylim(yrange)
-% over repetitions (Leu)
+% Leu
 v.dataFilter.stims_allowed = {'Leu'};
-hf = figure;
-v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
+v.dataFilter.interval = odor_interval;
+out = v.plotUnitActivityMetricHead('method','avg intensity');
+v.dataFilter.interval = baseline_interval;
+outbase = v.plotUnitActivityMetricHead('method','avg intensity');
+data = cell2mat(out) - cell2mat(outbase);
+subplot(122); b = prettyBoxplot(data,{'1','2','3','4','5'},'scatterSize',5,'plotLine',true);
 ylim(yrange)
+ylabel('Cellwise delta iFR (Hz)')
+cfg.figSize = "medium";
+cfg.aspRatioType = "square";
+cfg.lineWidth = .5;
+cfg.setFigure
+cfg.saveFigure(gcf,'trained unit delta firing distribution repetitions', saveType)
+cfg = v.plotConfig;
 
-% unit firing distributions (baseline)
-v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
-v.dataFilter.trial_sorting = 'chronological';
-v.dataFilter.interval = [-22 -2];
-% over trials
-v.dataFilter.stims_allowed = 'all trials';
-hf = figure;
-v.plotTrialActivityMetricHead('method','avg intensity')
-ylim(yrange)
-% over repetitions
-v.dataFilter.stims_allowed = 'all stimuli';
-hf = figure;
-v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
-ylim(yrange)
-% over repetitions (Leu)
-v.dataFilter.stims_allowed = {'Leu'};
-hf = figure;
-v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
-ylim(yrange)
+% 
+% % unit firing distributions
+% baseline_interval = [-22 -2];
+% odor_interval = dft.interval;
+% yrange = [0 .2];
+% v.dataFilter = dft;
+% v.dataFilter.subjectGroup = 'naïve';
+% v.dataFilter.trial_sorting = 'chronological';
+% % over trials
+% v.dataFilter.stims_allowed = 'all trials';
+% hf = figure;
+% out = v.plotTrialActivityMetricHead('method','avg intensity');
+% ylim(yrange)
+% % over repetitions
+% v.dataFilter.stims_allowed = 'all stimuli';
+% hf = figure;
+% v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
+% ylim(yrange)
+% % over repetitions (Leu)
+% v.dataFilter.stims_allowed = {'Leu'};
+% hf = figure;
+% v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions')
+% ylim(yrange)
+% 
 
-
-% general suppression score
+%% general suppression score histogram
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'naïve';
 c = v.plotUnitActivityMetricHead('method','general suppression score');
@@ -120,7 +141,7 @@ xlabel('suppression [a.u]'); ylabel('histogram')
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
 
-% selectivity of tuning
+%% selectivity of tuning histogram
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'naïve';
 c = v.plotUnitActivityMetricHead('method','selectivity of tuning');
@@ -132,58 +153,7 @@ xlabel('tuning selectivity [a.u]'); ylabel('histogram')
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
 
-% drift strength vs activity
-v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
-R = driftMetricsFigure(v,'plot',false);
-drift = R.driftStrength3d;
-% vs stimulus-specific activity on the first trial of the pair
-hf = figure; 
-v.dataFilter.repetitions = 1;
-out = v.plotUnitActivityMetricHead('metric','avg intensity');
-firing = cell2mat(out);
-thisdrift = drift(:,:,1);
-subplot(211); plotHeatmapAndIsoclines(firing(:),thisdrift(:),50,1,0,1);
-xlim([0 1])
-ylim([-15 15])
-colormap(cfg.colormapName)
-title('rep 1->2')
-xlabel('iFR on rep 1 [Hz]'); ylabel('drift modulus')
-set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
-v.dataFilter.repetitions = 4;
-out = v.plotUnitActivityMetricHead('metric','avg intensity');
-firing = cell2mat(out);
-thisdrift = drift(:,:,v.dataFilter.repetitions);
-subplot(212); plotHeatmapAndIsoclines(firing(:),thisdrift(:),50,1,0,1);
-xlim([0 1])
-ylim([-15 15])
-colormap(cfg.colormapName)
-title('rep 4->5')
-xlabel('iFR on rep 4 [Hz]'); ylabel('drift modulus')
-set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
-% vs averaged activity across stimuli and reps
-hf = figure;
-v.dataFilter.repetitions = 1:5;
-out = v.plotUnitActivityMetricHead('metric','avg intensity');
-firing = cell2mat(out); firing = mean(firing,[2,3],'omitmissing');
-thisdrift = drift(:,:,1); thisdrift = mean(thisdrift,2,'omitmissing');
-subplot(211); plotHeatmapAndIsoclines(firing(:),thisdrift(:),50,1,0,1);
-xlim([0 .4])
-ylim([-2.5 2.5])
-colormap(cfg.colormapName)
-title('rep 1->2')
-xlabel('average iFR [Hz]'); ylabel('average drift modulus')
-set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
-thisdrift = drift(:,:,4); thisdrift = mean(thisdrift,2,'omitmissing');
-subplot(212); plotHeatmapAndIsoclines(firing(:),thisdrift(:),50,1,0,1);
-xlim([0 .4])
-ylim([-2.5 2.5])
-colormap(cfg.colormapName)
-title('rep 4->5')
-xlabel('average iFR [Hz]'); ylabel('average drift modulus')
-set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
-
-% stability of tuning
+%% stability of tuning histogram
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'naïve';
 c = v.plotUnitActivityMetricHead('method','stability of tuning');
@@ -194,4 +164,62 @@ xlim([-1 1])
 xlabel('tuning stability [a.u]'); ylabel('histogram')
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
+
+
+%% drift strength vs activity
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+R = driftMetricsFigure(v,'plot',true);
+drift = R.driftStrength3d;
+driftAx = R.figures.drift_cdf.Axes(1);
+hf = figure;
+% vs averaged activity across stimuli and reps
+v.dataFilter.repetitions = 1:5;
+out = v.plotUnitActivityMetricHead('metric','avg intensity');
+firing = cell2mat(out); firing = mean(firing,[2,3],'omitmissing');
+thisdrift = drift(:,:,1); thisdrift = mean(thisdrift,2,'omitmissing');
+subplot(323); plotHeatmapAndIsoclines(firing(:),thisdrift(:),50,1,0,1);
+xlim([0 .4])
+ylim([-2.5 2.5])
+colormap(cfg.colormapName)
+title('rep 1->2')
+xlabel('average iFR [Hz]'); ylabel('average drift modulus')
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+thisdrift = drift(:,:,4); thisdrift = mean(thisdrift,2,'omitmissing');
+subplot(324); plotHeatmapAndIsoclines(firing(:),thisdrift(:),50,1,0,1);
+xlim([0 .4])
+ylim([-2.5 2.5])
+colormap(cfg.colormapName)
+title('rep 4->5')
+xlabel('average iFR [Hz]'); ylabel('average drift modulus')
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+% vs stimulus-specific activity on the first trial of the pair
+v.dataFilter.repetitions = 1;
+out = v.plotUnitActivityMetricHead('metric','avg intensity');
+firing = cell2mat(out);
+thisdrift = drift(:,:,1);
+subplot(325); plotHeatmapAndIsoclines(firing(:),thisdrift(:),50,1,0,1);
+xlim([0 1])
+ylim([-15 15])
+colormap(cfg.colormapName)
+title('rep 1->2')
+xlabel('iFR on rep 1 [Hz]'); ylabel('drift modulus')
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+v.dataFilter.repetitions = 4;
+out = v.plotUnitActivityMetricHead('metric','avg intensity');
+firing = cell2mat(out);
+thisdrift = drift(:,:,v.dataFilter.repetitions);
+subplot(326); plotHeatmapAndIsoclines(firing(:),thisdrift(:),50,1,0,1);
+xlim([0 1])
+ylim([-15 15])
+colormap(cfg.colormapName)
+title('rep 4->5')
+xlabel('iFR on rep 4 [Hz]'); ylabel('drift modulus')
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+
+cfg.figSize = "large";
+cfg.aspRatioType = "square";
+cfg.setFigure;
+cfg.saveFigure(gcf,'naive drift vs activity', saveType)
+cfg = v.plotConfig;
 

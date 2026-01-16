@@ -27,7 +27,7 @@ classdef PlotConfig
         fontSize double = 6          % base font size
 
         % Figure formatting for publication
-        figSize char {mustBeMember(figSize, {'small', 'medium', 'large'})} = 'small' % panel size preset
+        figSize char {mustBeMember(figSize, {'tiny', 'small', 'medium', 'large'})} = 'small' % panel size preset
         aspRatioType char {mustBeMember(aspRatioType, {'square', ...
                                                 'tall', ...
                                                 'wide'})} = 'square' % panel type determines aspect ratio
@@ -213,7 +213,7 @@ classdef PlotConfig
                 case 'small'
                     val = obj.baseSize;
                 case 'medium'
-                    val = obj.baseSize * 2;
+                    val = obj.baseSize * 1.5;
                 case 'large'
                     val = obj.baseSize * 3;
                 otherwise
@@ -307,7 +307,6 @@ classdef PlotConfig
             Ticklengthvec=[AbsTickLength*tickfactor AbsTickLength*tickfactor];
             
             set(axHandle,'tickdir','out', ...
-                    'Position', obj.axPos, ...
                     'fontsize',obj.fontSize, ...
                     'FontName', obj.fontType, ...   
                     'TitleFontWeight','normal', ...
