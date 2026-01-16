@@ -108,6 +108,8 @@ classdef ExperimentViewer
             function y = extractData()
                 [~,y] = ModeSelector(obj).extract;
                 y = cellfun(@(x) mean(x,[2,3],'omitmissing')', y,'UniformOutput',false); % avg over cellS and trials
+                
+                
                 y = cell2mat(y); % [fish x T]
             end
             

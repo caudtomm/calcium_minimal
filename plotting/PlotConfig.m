@@ -18,6 +18,8 @@ classdef PlotConfig
 
         % Panel formatting for publication
         units char = 'centimeters'   % figure units
+        axPos double = [.2, .2, .7, .7] % axis position within figure [left bottom width height]
+        baseSize double = 3          % base panel size in centimeters
         panelWidth double = 8        % panel width in centimeters
         panelHeight double = 6       % panel height in centimeters
         tickLength double = 0.032    % tick length
@@ -204,10 +206,22 @@ classdef PlotConfig
             val = obj.fontSize * obj.renderingFactor;
         end
         
-        function pos = get.figPos(obj)
-            % Return the axis position within the figure
-            pos = obj.figPos;
-
+        function val = get.panelWidth(obj)
+            switch obj.figSize
+                case 'tiny'
+                    val = obj.baseSize/2;
+                case 'small'
+                    val = obj.baseSize;
+                case 'medium'
+                    val = obj.baseSize * 2;
+                case 'large'
+                    val = obj.baseSize * 3;
+                otherwise
+                    % default to preset
+            end
+        end
+        
+        function val = get.panelHeight(obj)
             switch obj.aspRatioType
                 case 'square'
                     aspRatio = 1;
@@ -219,20 +233,16 @@ classdef PlotConfig
                     aspRatio = 1; % default to square
             end
 
-            switch obj.figSize
-                case 'small'
-                    obj.panelWidth = 3.5;
-                case 'medium'
-                    obj.panelWidth = 3.5 * 2;
-                case 'large'
-                    obj.panelWidth = 3.5 * 3;
-                otherwise
-                    % default to preset
-            end
+            val = obj.panelWidth * aspRatio;
+        end
+
+        function pos = get.figPos(obj)
+            % Return the axis position within the figure
+            pos = obj.figPos;
 
             pos = [pos(1), pos(2), ...
-                   obj.panelWidth * obj.renderingFactor * 0.8, ... % width
-                   (obj.panelWidth * aspRatio) * obj.renderingFactor * 0.8]; % height
+                   obj.panelWidth * obj.renderingFactor, ... % width
+                   obj.panelHeight * obj.renderingFactor]; % height
         end
 
         function saveFigure(obj, figHandle, filenameBase, format)
@@ -266,15 +276,18 @@ classdef PlotConfig
         function setFigure(obj)
             % Apply figure settings to current figure
             fig = gcf;
+
+
             set(fig, 'Color', obj.bgcol, ...
-                     'Units', obj.units, ...
-                     'Position', obj.figPos, ...
-                     'PaperPositionMode', 'auto');
+                     'PaperUnits', obj.units, ...
+                     'PaperPosition', obj.figPos, ...
+                     'PaperPositionMode', 'manual');
 
             % set axes for each axis (subplot) in the figure
             axesHandles = findall(fig, 'Type', 'axes');
             for i = 1:length(axesHandles)
                 obj.setAxes(axesHandles(i));
+                obj.setAxes(axesHandles(i)); % for some reason needs to be called twice to apply properly
             end
         end
 
@@ -294,6 +307,7 @@ classdef PlotConfig
             Ticklengthvec=[AbsTickLength*tickfactor AbsTickLength*tickfactor];
             
             set(axHandle,'tickdir','out', ...
+                    'Position', obj.axPos, ...
                     'fontsize',obj.fontSize, ...
                     'FontName', obj.fontType, ...   
                     'TitleFontWeight','normal', ...

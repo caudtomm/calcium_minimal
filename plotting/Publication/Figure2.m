@@ -96,4 +96,59 @@ xticklabels({'before surgery','after surgery'});
 cfg.setFigure
 cfg.saveFigure(gcf,'ablation learning index', saveType)
 
-%% 
+%% N over groups
+
+%% trained and uncoupled response traces
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.interval = [-5 40];
+v.plotAvgResponseTrace;
+ylim([0 .2])
+v.dataFilter = dft;
+cfg.setFigure
+cfg.saveFigure(gcf,'trained average response trace', saveType)
+cfg = v.plotConfig;
+
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.interval = [-5 40];
+v.plotAvgResponseTrace;
+ylim([0 .2])
+v.dataFilter = dft;
+cfg.setFigure
+cfg.saveFigure(gcf,'uncoupled average response trace', saveType)
+cfg = v.plotConfig;
+
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained1';
+v.dataFilter.interval = [-5 40];
+v.plotAvgResponseTrace;
+ylim([0 .2])
+v.dataFilter = dft;
+cfg.setFigure
+cfg.saveFigure(gcf,'trained1 average response trace', saveType)
+cfg = v.plotConfig;
+
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained2';
+v.dataFilter.interval = [-5 40];
+v.plotAvgResponseTrace;
+ylim([0 .2])
+v.dataFilter = dft;
+cfg.setFigure
+cfg.saveFigure(gcf,'trained2 average response trace', saveType)
+cfg = v.plotConfig;
+
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained1 (T-R-S-H-A-ACSF/L)';
+v.dataFilter.interval = [-5 40];
+v.plotAvgResponseTrace;
+ylim([0 .2])
+v.dataFilter = dft;
+cfg.setFigure
+cfg.saveFigure(gcf,'trained3 average response trace', saveType)
+cfg = v.plotConfig;

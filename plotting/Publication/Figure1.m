@@ -47,6 +47,7 @@ v.dataFilter.interval = [-5 40];
 v.plotAvgResponseTrace;
 v.dataFilter = dft;
 cfg.setFigure
+ylim([0 .2])
 cfg.saveFigure(gcf,'naive average response trace', saveType)
 cfg = v.plotConfig;
 
