@@ -72,18 +72,23 @@ end
 
 %% plot all familiar in trained vs all novel in trained vs all novel in naive
 
+mode = 'exponential';
+
 t = mean(windows,2);
 [~,tstart] = min(abs(t)); % t0 = stim onset
 % tstart = tstart + 1; % <- actually, the immediately following frame
 
-idx = find(idx_by_stimgroup==6 & idx_by_subjectgroup==2); % all familiar & trained
-p1 = getFitParams(out, idx, t, tstart);
+% idx = find(idx_by_stimgroup==6 & idx_by_subjectgroup==2); % all familiar & trained
+idx = find(idx_by_stimgroup==2 & idx_by_subjectgroup==2); % all familiar & trained
+p1 = getFitParams(out, idx, t, tstart, mode);
 
-idx = find(idx_by_stimgroup==7 & idx_by_subjectgroup==2); % all novel & trained
-p2 = getFitParams(out, idx, t, tstart);
+% idx = find(idx_by_stimgroup==7 & idx_by_subjectgroup==2); % all novel & trained
+idx = find(idx_by_stimgroup==2 & idx_by_subjectgroup==3); % all familiar & uncoupled
+p2 = getFitParams(out, idx, t, tstart, mode);
 
-idx = find(idx_by_stimgroup==7 & idx_by_subjectgroup==1); % all novel & naive
-p3 = getFitParams(out, idx, t, tstart);
+% idx = find(idx_by_stimgroup==7 & idx_by_subjectgroup==1); % all novel & naive
+idx = find(idx_by_stimgroup==2 & idx_by_subjectgroup==1); % all familiar & naive
+p3 = getFitParams(out, idx, t, tstart, mode);
 
 hf = figure;
 set(gcf, 'color', cfg.bgcol); 
@@ -109,12 +114,15 @@ plot(p3.avgfit.t, p3.avgfit.vals,'g--')
 
 % naive and novel
 axis tight
-legend(b,{'familiar/trained','novel/trained','novel/naive'})
+% legend(b,{'familiar/trained','novel/trained','novel/naive'})
+legend(b,{'trained','uncoupled','naive'})
 xlabel('Time from stim. onset [s]');
 ylabel('Avg. intertrial similarity (same odor) + SEM');
+xlim([-1 3])
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
 % # ----------------------
 data = [];
+clear p
 for i = 1:3
     thisp = sprintf('p%s',num2str(i));
     p.amp{i} = cellfun(@(x) x.p(1), eval([thisp,'.win_fits']));
@@ -124,11 +132,13 @@ for i = 1:3
     p.t2max{i} = cellfun(@(x) x.t2max, eval([thisp,'.win_fits']));
 
     data = [data ; [p.amp{i},p.tau{i},p.offset{i},p.half_t{i},p.t2max{i}]];
+    % data = [data ; [p.amp{i},p.tau{i},p.half_t{i},p.t2max{i}]];
 end
 g = [repmat({'trained-familiar'},numel(p.amp{1}),1) ; ...
     repmat({'trained-novel'},numel(p.amp{2}),1) ; ...
     repmat({'naive'},numel(p.amp{3}),1)];
 labs = {'amplitude','tau','offset','half t','T'};
+% labs = {'g','offset','half t','T'};
 grouplabs = {'trained-familiar','trained-novel','naive'};
 
 avg_dt = [[p1.avgfit.p,p1.avgfit.half_t];
@@ -143,6 +153,9 @@ for i = 2:5
     box off
     ylabel(labs{i-1});
     set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+
+    % figure; [~,~,stats] = kruskalwallis(data(:,i-1),g,"off");
+    % multcompare(stats,'display','on')
 end
 % 
 % subplot(162)
@@ -181,8 +194,6 @@ ylabel(labs{5});
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
 
 
-
-
 end
 
 function b = plotCurves(data,windows,cfg)
@@ -216,7 +227,7 @@ set(gcf, 'color', cfg.bgcol);
 end
 
 
-function params = getFitParams(out, idx, t, tstart)
+function params = getFitParams(out, idx, t, tstart, mode)
 
 % -----------------
 nwindows = numel(out);
@@ -235,21 +246,29 @@ data_t = t(tstart:tend);
 
 win_fits = cell(ndatapoints,1);
 for i = 1:ndatapoints
-    [win_fits{i},model] = fitModel(data_t,g(:,i),t,tstart,tend);
+    [win_fits{i},model] = fitModel(data_t,g(:,i),t,tstart,tend,mode);
 end
 
 params.y_avg = y_avg;
 params.err = err;
 params.model = model;
 params.t = data_t;
-params.avgfit = fitModel(data_t,y_avg,t,tstart,tend);
+params.avgfit = fitModel(data_t,y_avg,t,tstart,tend,mode);
 params.win_fits = win_fits;
 
 end
 
 
-function [fit,model] = fitModel(data_t,y,t,tstart,tend)
-[p, ~, model] = fitExpSaturation(data_t, y(tstart:tend), 0);
+function [fit,model] = fitModel(data_t,y,t,tstart,tend,mode)
+switch mode
+    case 'exponential'
+        [p, ~, model] = fitExpSaturation(data_t, y(tstart:tend), 0);
+    case '2-point line'
+        [p, ~, model] = lineThrough2Points(data_t, y(tstart:tend));
+    otherwise
+        error('Model class not recognized.')
+end
+
 t_fit = t(tstart):.01:t(tend);
 yfit = model(p,t_fit);
 [~,half_t] = min(abs(yfit-(min(yfit)+(max(yfit)-min(yfit))/2))); half_t = t_fit(half_t);
@@ -260,5 +279,21 @@ fit.t = t_fit;
 fit.vals = yfit;
 fit.half_t = half_t;
 fit.t2max = t2max;
+
+end
+
+function [params, y_fit, model] = lineThrough2Points(t, y)
+% Fit a line through the first and last points of the data
+
+% linear model
+model = @(p, x) p(1) * x + p(2);
+
+% slope and intercept can be calculated directly
+p1 = (y(end) - y(1)) / (t(end) - t(1)); % slope
+p2 = y(1) - p1 * t(1);                  % intercept
+params = [p1, p2];
+
+% fitted values
+y_fit = model(params, t);
 
 end

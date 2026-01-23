@@ -3,6 +3,8 @@
 dbstop if error
 
 s = false; % save figures to files?
+savepath = 'bin4';
+saveType = 'vector'; % 'vector' or 'raster'
 
 % for sliding windows
 window_duration = .3; % [seconds]
@@ -24,7 +26,9 @@ end
 
 
 %% initialize output figure saving
-cfg = PlotConfig('theme', 'light');
+cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73,86:99]); % (test1, test2, ctrl)
+cfg.custom.crange = [.3 .7];
+cfg.savePath = savepath;
 
 figs = FigureSaver;
 figs.outputfolder = fullfiletol('figures',extractBefore(filename,'.'));
@@ -335,3 +339,11 @@ v.dataFilter.subjectGroup = 'uncoupled';
 v.dataFilter.mode_file = 'dpca_uncoupled.mat';
 [h, C, Cvals] = plotTuningCorrelationsOverReps(v, metric);
 
+%% Homeless figure panels
+
+v.dataFilter = dft;
+v.dataFilter.traceType = 'dFoverF';
+v.dataFilter.interval = [1 20];
+v.dataFilter.trial_sorting = 'chronological';
+hf = figure;
+out = v.plotTrialActivityMetricHead('method','participation ratio');

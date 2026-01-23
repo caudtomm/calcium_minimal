@@ -2,7 +2,7 @@
 dbstop if error
 
 s = true; % save figures to files?
-savepath = 'bin2';
+savepath = 'bin1';
 saveType = 'vector'; % 'vector' or 'raster'
 
 % for sliding windows
@@ -39,6 +39,184 @@ dft = v.dataFilter;
  
 
 %% FIGURE 1
+
+
+%% naive intertrial baseline correlation
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.interval = [-22 -2];
+v.dataFilter.trial_sorting = 'chronological';
+hf = figure;
+subplot(121)
+C = v.plotDistancesHead;
+C= 1-C.distMat3d;
+[~,ntrials,nsubjects] = size(C);
+y = [];
+for i = 1:ntrials-1
+    idx = triu(true(ntrials),i)-triu(true(ntrials),i+1);
+    idx = logical(repmat(idx,1,1,nsubjects));
+    y_avg = mean(C(idx),'omitmissing');
+    y_std = std(C(idx),[],'omitmissing');
+    y = [y; y_avg y_std];
+end
+subplot(122)
+plotLineNShade(1:ntrials-1,y(:,1),y(:,2),'k',cfg)
+ylim([0 1])
+xlabel('Distance (trials)'); ylabel('r')
+cfg.figSize = 'large';
+cfg.aspRatioType = 'wide';
+cfg.setFigure;
+cfg.saveFigure(gcf,'naive base intertrial corr', saveType)
+cfg = v.plotConfig;
+v.dataFilter = dft;
+
+
+
+%% naive corr with prestimulus in time
+windows = defineTimeWindows(window_duration,t_lim_sec,overlap);
+nwindows = height(windows);
+edges = -1:.05:1;
+results = zeros(nwindows,numel(edges)-1);
+avg_corr = zeros(nwindows,1);
+tic
+for n = 1:nwindows
+    disp(['Window #',num2str(n),'/',num2str(nwindows)]);
+    thiswindow = windows(n,:);
+    v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.trial_sorting = 'chronological';
+v.dataFilter.interval = [-22 -2];
+[~,base_activity,labs] = ModeSelector(v).extract;
+base_activity = cellfun(@(x) squeeze(mean(x,1,'omitmissing')),base_activity,'UniformOutput',false);
+v.dataFilter.interval = thiswindow;
+[~,odor_activity] = ModeSelector(v).extract;
+odor_activity = cellfun(@(x) squeeze(mean(x,1,'omitmissing')),odor_activity,'UniformOutput',false);
+labs = labs{1};
+nsubjects = numel(base_activity);
+ntrials = numel(labs);
+y = zeros(ntrials,nsubjects);
+for i = 1:nsubjects
+    for j = 1:ntrials
+        basepattern = base_activity{i}(:,j);
+        odorpattern = odor_activity{i}(:,j);
+        
+        c = corrcoef(basepattern,odorpattern);
+        y(j,i) = c(2);
+    end
+end
+% t = 1:ntrials;
+% mu = mean(y,2,'omitmissing');
+% err = std(y,[],2,'omitmissing');
+% figure;
+% subplot(121)
+% plotLineNShade(t,mu,err,'k',cfg);
+% xticks(1:ntrials); xticklabels(labs)
+% subplot(122)
+% histogram(y(:),50,'FaceColor','k','EdgeAlpha',0)
+% xlabel('r')
+thisres = histcounts(y(:),edges);
+results(n,:) = thisres(:);
+avg_corr(n) = mean(y(:),'omitmissing');
+end
+toc
+
+figure; imagesc(edges(1:end-1), windows(:,1),results)
+hold on; plot(avg_corr,windows(:,1),'r-','LineWidth',cfg.lineWidth);
+ylabel('Time from stim.onset (s)')
+xlabel('r')
+axis square; view([-90 90])
+a = colorbar('Color',cfg.axcol);
+a.Label.String = 'Count';
+a.Label.FontSize= cfg.fontSize;
+cfg.figSize = 'medium';
+cfg.setFigure
+cfg.saveFigure(gcf,'naive corr with prestimulus', saveType)
+cfg = v.plotConfig;
+
+
+%% naive corr with prestimulus in time
+windows = defineTimeWindows(3,t_lim_sec,overlap);
+nwindows = height(windows);
+avg_corr = zeros(nwindows,nwindows,2);
+tic
+for n1 = 1:nwindows
+for n2 = 1:nwindows
+    disp(['Window #',num2str(n1),' vs #',num2str(n2),'/',num2str(nwindows)]);
+    thiswindow1 = windows(n1,:);
+    thiswindow2 = windows(n2,:);
+    v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.trial_sorting = 'chronological';
+v.dataFilter.interval = thiswindow2;
+[~,base_activity,labs] = ModeSelector(v).extract;
+base_activity = cellfun(@(x) squeeze(mean(x,1,'omitmissing')),base_activity,'UniformOutput',false);
+v.dataFilter.interval = thiswindow1;
+[~,odor_activity] = ModeSelector(v).extract;
+odor_activity = cellfun(@(x) squeeze(mean(x,1,'omitmissing')),odor_activity,'UniformOutput',false);
+labs = labs{1};
+nsubjects = numel(base_activity);
+ntrials = numel(labs);
+y = zeros(ntrials,nsubjects);
+for i = 1:nsubjects
+    for j = 1:ntrials
+        basepattern = base_activity{i}(:,j);
+        odorpattern = odor_activity{i}(:,j);
+        
+        c = corrcoef(basepattern,odorpattern);
+        y(j,i) = c(2);
+    end
+end
+avg_corr(n1,n2,1) = mean(y(:),'omitmissing');
+avg_corr(n1,n2,2) = std(y(:),'omitmissing');
+end
+end
+toc
+
+figure; imagesc(windows(:,1),windows(:,1),avg_corr(:,:,1))
+xlabel('Time from stim.onset (s)')
+ylabel('Time from stim.onset (s)')
+axis square
+a = colorbar('Color',cfg.axcol);
+a.Label.String = 'r';
+a.Label.FontSize= cfg.fontSize;
+cfg.figSize = 'medium';
+cfg.setFigure
+cfg.saveFigure(gcf,'naive corr with prestimulus', saveType)
+cfg = v.plotConfig;
+
+
+%%
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.interval = [-5 35];
+v.dataFilter.repetitions = [1:5];
+[~,events,all_labs] = ModeSelector(v).extract;
+% events = cellfun(@(x) movmean(x,3,1,'omitmissing'),events,'UniformOutput',false);
+events = cellfun(@(x) permute(x,[3,2,1]),events,'UniformOutput',false);
+events = separateTrials(events);
+T = size(events{1},3);
+figure; C = plotDistances(events,'full','correlation',1:T,cfg);
+clim([0 1])
+xlabel('Time from stim.onset (s)')
+ylabel('Time from stim.onset (s)')
+
+function out = separateTrials(data)
+n = numel(data);
+out = {};
+for i = 1:n
+    ntrials = size(data{i},1);
+    for j = 1:ntrials
+        out{end+1} = data{i}(j,:,:);
+    end
+end
+out = out(:);
+end
+
+
 
 %% naive average response trace
 v.dataFilter = dft;

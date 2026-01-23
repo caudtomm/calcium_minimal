@@ -92,10 +92,10 @@ classdef ExperimentViewer
             hf = figure;
             mu = mean(baseline,'omitmissing')'; % baseline
             err = std(baseline,[],1,'omitmissing')';%./sqrt(N);
-            b(1) = plotLineNShade(mu, err, cfg.c(3,:));
+            b(1) = plotLineNShade(t, mu, err, cfg.c(3,:), cfg);
             mu = mean(events,'omitmissing')'; % odor
             err = std(events,[],1,'omitmissing')';%./sqrt(N);
-            b(2) = plotLineNShade(mu, err, cfg.c(1,:));
+            b(2) = plotLineNShade(t, mu, err, cfg.c(1,:), cfg);
             
             xlabel('Time from stimulus onset (s)')
             ylabel('iFR (Hz)')
@@ -113,13 +113,6 @@ classdef ExperimentViewer
                 y = cell2mat(y); % [fish x T]
             end
             
-            function y = plotLineNShade(mu, err, c)
-                fill([t fliplr(t)], [mu - err; flipud(mu + err)]', ...
-                 c, 'FaceAlpha', 0.4, 'EdgeColor', 'none');
-                hold on
-                y = plot(t,mu,'Color',c,'LineStyle',cfg.lineStyle,'LineWidth',cfg.lineWidth);
-            end
-
         end
 
         function [hf, out] = plotExampleTraces(obj,idx_in,varargin)

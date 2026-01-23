@@ -1,7 +1,7 @@
 dbstop if error
 
 s = true; % save figures to files?
-savepath = 'bin2';
+savepath = 'bin6';
 saveType = 'vector'; % 'vector' or 'raster'
 
 % for sliding windows
@@ -24,7 +24,8 @@ end
 
 
 %% initialize output figure saving
-cfg = PlotConfig;
+cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73,86:99]); % (test1, test2, ctrl)
+cfg.custom.crange = [.3 .7];
 cfg.savePath = savepath;
 
 v = ExperimentViewer(experiment);
