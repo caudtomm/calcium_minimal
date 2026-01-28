@@ -22,7 +22,7 @@ classdef PlotConfig
         baseSize double = 3          % base panel size in centimeters
         panelWidth double = 8        % panel width in centimeters
         panelHeight double = 6       % panel height in centimeters
-        tickLength double = 0.032    % tick length
+        tickLength double = 0.18    % tick length
         fontType char = 'Arial'      % font type
         fontSize double = 6          % base font size
 
@@ -196,6 +196,10 @@ classdef PlotConfig
 
         function val = get.axWidth(obj)
             val = obj.axWidth * obj.renderingFactor;
+        end
+
+        function val = get.tickLength(obj)
+            val = obj.tickLength * obj.renderingFactor;
         end
 
         function val = get.lineWidth(obj)
