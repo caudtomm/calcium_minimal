@@ -190,7 +190,7 @@ cfg = v.plotConfig;
 
 %%
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.interval = [-5 35];
 v.dataFilter.repetitions = [1:5];
