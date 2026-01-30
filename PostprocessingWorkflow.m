@@ -6,7 +6,7 @@ s = false; % save figures to files?
 savepath = 'bin4';
 saveType = 'vector'; % 'vector' or 'raster'
 
-% for sliding windows
+% for sliding windows 
 window_duration = .3; % [seconds]
 t_lim_sec = [-5 35]; % from 5 sec before to 35 seconds after stimulus onset
 overlap = .1; % [seconds]
@@ -69,7 +69,7 @@ v.dataFilter = dft; % recover
 %% GCMC: load capacity results from .mat files for MATLAB analysis
 
 indir = fullfiletol('manifold_data', extractBefore(filename,'.'), 'results');
-indir = fullfiletol('manifold_data','odors_man_windows'); % tempoarily use this folder for the test dataset
+indir = fullfiletol('manifold_data','odors'); % tempoarily use this folder for the test dataset
 [~, avg_results] = GCMC_Analysis(v).extractResults(indir); % # TODO this doesn't take into account multiple subjects yet
 % # TODO save results to ActivityTraces inside v
 % # TODO some plotting here
@@ -77,11 +77,19 @@ indir = fullfiletol('manifold_data','odors_man_windows'); % tempoarily use this 
 GCMC_Analysis.plotBoxplotsForEachMetric(avg_results,cfg);
 GCMC_Analysis.plotMetricStability(results, cfg)
 
-all_results = GCMC_Analysis(v).extractResultsFromMultipleSubjects(indir);
+all_results = GCMC_Analysis(v).extractResultsFromMultipleSubjects(fullfiletol(indir,'odorexp004_IC1_130625'));
 group_data = GCMC_Analysis(v).clusterByGroup(all_results);
 
+% merge trained groups
+new_group_data(1) = group_data(1);
+new_group_data(2) = group_data(5);
+new_group_data(3).group_name = 'trained';
+new_group_data(3).data = group_data(2).data;
+new_group_data(3).data = [new_group_data(3).data; group_data(3).data];
+new_group_data(3).data = [new_group_data(3).data; group_data(4).data];
+
 % plotting
-GCMC_Analysis.plotBoxplotsByGroup(new_group_data, cfg, false)
+GCMC_Plotting.plotBoxplotsByGroup(new_group_data, cfg, false)
 
 %
 all_results = GCMC_Analysis(v).extractResults_SlidingWindow(indir,'odorexp004_IC1_130625');

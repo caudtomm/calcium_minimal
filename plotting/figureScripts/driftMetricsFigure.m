@@ -81,10 +81,20 @@ end
 isd = zeros(nsj*(ns*(ns-1)/2), nr);
 for r = 1:nr
     dat = cellfun(@(x) x(:,:,r), out, 'UniformOutput', false);           % [units x stims]
-    thismat = cell2mat(cellfun(@(x) 1-pdist(x',"correlation"), dat, ...
+    thismat = cell2mat(cellfun(@(x) pdist(x',"euclidean"), dat, ...
                                 'UniformOutput', false));                % pairwise across stims
     isd(:,r) = thismat(:);
 end
+
+% -------- inter-stimulus similarity per repetition (Correlation)
+isc = zeros(nsj*(ns*(ns-1)/2), nr);
+for r = 1:nr
+    dat = cellfun(@(x) x(:,:,r), out, 'UniformOutput', false);           % [units x stims]
+    thismat = cell2mat(cellfun(@(x) 1-pdist(x',"correlation"), dat, ...
+                                'UniformOutput', false));                % pairwise across stims
+    isc(:,r) = thismat(:);
+end
+
 
 % -------- inter-repetition angles for each stim (per subject)
 ira = [];
@@ -131,7 +141,9 @@ R.signrank_p     = pval;
 if o.plot
     F.angle_box      = plot_interRepAngle_box(ira,cfg);
     F.anglecorr_hist = plot_anglecorr_hist(ac,dft.stims_allowed,cfg);
-    F.interstim_box  = plot_interStimdist_box(isd,dft.stims_allowed,cfg);
+    F.anglecorr_box  = plot_anglecorr_box(ac,dft.stims_allowed,cfg);
+    F.interstimE_box = plot_interStimdist_box(isd,dft.stims_allowed,cfg);
+    F.interstimC_box = plot_interStimdist_box(isc,dft.stims_allowed,cfg);
     F.drift_hists    = plot_driftStrength_hists(R.driftStrength,cfg);
     F.drift_cdf      = plot_driftStrength_cdf(R.driftStrength,edges,nr_d,dft.stims_allowed,cfg);
     F.corr_box       = plot_corrMat_box(cm,nr,dft.stims_allowed,cfg);
@@ -165,8 +177,9 @@ K = size(ira,2);
 lbl = arrayfun(@(a,b) sprintf('%d-%d',a,b), 1:K, (1:K)+2, 'uni', false);
 
 % Boxplot of inter-repetition angles (in units of pi)
-f = figure; boxplot(ira./pi, 'Labels',lbl);
-ylabel('inter-repetition angle (units of pi)');
+f = figure; boxplot(ira./pi, 'Labels',lbl, ...
+    'BoxStyle','filled', 'Colors','k','Widths',.5);
+ylabel('Inter-repetition angle (pi)');
 axis square; box off; tcol(f,cfg);
 end
 
@@ -177,9 +190,19 @@ xlabel('cosine similarity btw drift trajectories across stimuli');
 ylabel(''); axis square; box off; title(ttl); tcol(f,cfg);
 end
 
+function f = plot_anglecorr_box(ac,ttl,cfg)
+% Boxplot of cosine similarity between angle sequences across stimuli
+f = figure; boxplot(ac(:), ...
+    'BoxStyle','filled', 'Colors','k','Widths',.5);
+xticks([])
+ylabel('cosine similarity btw drift trajectories across stimuli');
+xlabel(''); axis square; box off; title(ttl); tcol(f,cfg);
+end
+
 function f = plot_interStimdist_box(isd,ttl,cfg)
 % Boxplot of inter-stimulus Euclidean distances across repetitions
-f = figure; boxplot(isd);
+f = figure; boxplot(isd, ...
+    'BoxStyle','filled', 'Colors','k','Widths',.5);
 xlabel('repetitions'); ylabel('interstimulus eucl. distance');
 box off; title(ttl); tcol(f,cfg);
 end
@@ -215,8 +238,9 @@ k   = min(size(cm,2), nr-1);
 lbl = arrayfun(@(i) sprintf('%d-%d',i,i+1), 1:k, 'UniformOutput', false);
 
 f = figure;
-boxplot(cm(:,1:k), 'Labels', lbl);
-xlabel('repetitions'); ylabel('drift vector correlation (btw. stimuli)');
+boxplot(cm(:,1:k), 'Labels', lbl, ...
+    'BoxStyle','filled', 'Colors','k','Widths',.5);
+xlabel('Repetitions'); ylabel('Drift vector correlation (btw. stimuli)');
 box off; title(ttl); tcol(f,cfg);
 end
 

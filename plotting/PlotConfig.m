@@ -10,6 +10,7 @@ classdef PlotConfig
         axWidth double = 0.5         % default axis line width
         lineWidth double = 1         % default line width
         lineStyle char = '-'         % default line type
+        setLines logical = true      % whether to set line properties in setAxes
         c double = lines(100)        % default plot colors
         favouriteColors double = 1:10 % indices of favorite colors from colormap
         axcol double = [0 0 0]       % default axis color
@@ -79,7 +80,7 @@ classdef PlotConfig
                 case 'light'
                     c = [0 0 0];  % black
                 otherwise
-                    c = [0.5 0.5 0.5];  % fallback gray
+                    c = [0 0 0];  % fallback black
             end
         end
         
@@ -90,7 +91,7 @@ classdef PlotConfig
                 case 'light'
                     c = [1 1 1];        % white
                 otherwise
-                    c = [0.95 0.95 0.95];  % light fallback
+                    c = [1 1 1];  % fallback white
             end
         end
         
@@ -101,7 +102,7 @@ classdef PlotConfig
                 case 'light'
                     c = [0 0 0];  % black
                 otherwise
-                    c = [0.2 0.2 0.2];  % fallback dark gray
+                    c = [0 0 0];  % fallback black
             end
         end
 
@@ -144,7 +145,9 @@ classdef PlotConfig
         
             try
                 colors = obj.getColormap('categorical');
-                colors = colors(obj.favouriteColors, :);
+                if ~strcmp(obj.theme, 'many colors')
+                    colors = colors(obj.favouriteColors, :);
+                end
                 return
             catch
             end
@@ -187,10 +190,10 @@ classdef PlotConfig
                         222 222 222; % grey
                     ];
                     colors = rgb_vals / 255; % normalize to [0, 1]
-                otherwise
+                case 'many colors'
                     colors = colorcube(100); % fallback
-                    % or
-                    % colors = lines(100); % MATLAB default
+                otherwise
+                    colors = lines(100); % MATLAB default
             end
         end
 
@@ -323,9 +326,11 @@ classdef PlotConfig
                     'TitleFontSizeMultiplier',1,'TitleFontWeight','normal','LabelFontSizeMultiplier',1, ...
                     'XColor',obj.axcol,'YColor',obj.axcol,'ZColor',obj.axcol, 'Color',obj.bgcol);
 
-            set(findobj(axHandle, 'Type', 'Line'), ...
-                    'LineWidth', obj.lineWidth, ...
-                    'LineStyle', obj.lineStyle); % set default line properties
+            if obj.setLines
+                set(findobj(axHandle, 'Type', 'Line'), ...
+                        'LineWidth', obj.lineWidth, ...
+                        'LineStyle', obj.lineStyle); % set default line properties
+            end
 
             if ~isempty(findobj(axHandle, 'Type', 'Image'))
                 colormap(axHandle, obj.getColormap()); % set colormap if images are present

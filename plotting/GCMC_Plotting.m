@@ -128,9 +128,7 @@ methods (Static)
     
     %% yes data required
 
-    function 
-
-    function plotBoxplotsByGroup(group_data, cfg, shuffle)
+    function hf = plotBoxplotsByGroup(group_data, cfg, shuffle)
         arguments
             group_data struct
             cfg PlotConfig = PlotConfig()
@@ -139,10 +137,12 @@ methods (Static)
 
         nGroups = numel(group_data);
         metrics = group_data(1).data.Properties.VariableNames(5:end-3); % exclude grouping variables and stimulus names
-        nMetrics = numel(metrics);
+        nMetrics = 7; %numel(metrics);
 
-        for i_metric = 1:7%nMetrics
-            figure;
+        hf = gobjects(nMetrics,1);
+
+        for i_metric = 1:nMetrics
+            hf(i_metric) = figure;
             hold on;
 
             disp(['Metric: ', metrics{i_metric}])
@@ -172,15 +172,15 @@ methods (Static)
 
             % Create boxplot
             %boxplot(box_data, group_labels, 'Notch', 'on', 'Labels', unique(group_labels, 'stable'));
-            RF_mkBoxPlot3(datacells,[],[],.5,1,2,15,[]);
+            RF_mkBoxPlot3(datacells,[],[],.1,.5,.5,2,[]);
             xticks([1:nGroups]); xticklabels({group_data(:).group_name})
             % Superimpose scatter plot for each group
             for i_group = 1:nGroups
                 this_data = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle, metrics{i_metric}};
                 this_subj_ids = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle,'subj_id'};
-                scatter(repelem(i_group, numel(this_data)), ...
-                        this_data, 40, 'filled', 'CData', cfg.c(this_subj_ids,:), 'MarkerFaceAlpha', 0.7, ...
-                        'jitter', 'on', 'jitterAmount', 0.15);
+                %scatter(repelem(i_group, numel(this_data)), ...
+                %        this_data, 40, 'filled', 'CData', cfg.c(this_subj_ids,:), 'MarkerFaceAlpha', 0.7, ...
+                %        'jitter', 'on', 'jitterAmount', 0.15);
             end
             title(['Metric: ', metrics{i_metric}]);
             ylabel(metrics{i_metric});
