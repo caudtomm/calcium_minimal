@@ -73,6 +73,7 @@ xlim([min(xlim) out.maxPC+100])
 cfg.setFigure;
 cfg.saveFigure(gcf,'allgroups PC variance explained', saveType)
 
+
 %% plot PCA lines
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'naïve';
@@ -90,12 +91,11 @@ cfg.setFigure;
 cfg.saveFigure(gcf,'naive PCA 2d', saveType)
 
 
-
 %% plot UMAP lines
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.subjectGroup = 'uncoupled';
 v.dataFilter.stims_allowed = 'all stimuli';
-v.dataFilter.interval = [.5, 4];
+v.dataFilter.interval = [.5, 20];
 v.dataFilter.repetitions = 1:5;
 
 [~,events,labs] = ModeSelector(v).extract;
@@ -106,7 +106,7 @@ xlabel('UMAP 1'); ylabel('UMAP 2');
 cfg.setLines = false;
 cfg.figSize = 'medium';
 cfg.setFigure;
-cfg.saveFigure(gcf,'naive UMAP 2d', saveType)
+cfg.saveFigure(gcf,'uncoupled UMAP 2d', saveType)
 
 
 %%
@@ -194,3 +194,30 @@ function new_group_data = mergeTrainedGroups(group_data)
     new_group_data(3).data = [new_group_data(3).data; group_data(3).data];
     new_group_data(3).data = [new_group_data(3).data; group_data(4).data];
 end
+
+
+%% template matching
+
+v.dataFilter = dft;
+grouptag = 'uncoupled';
+stimtag = 'allstims';
+v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.interval = [.5, 20];
+v.dataFilter.repetitions = 1:5;
+method = 'correlation';
+focus_stims = 'all stimuli';
+do_zscore = false;
+
+hf = figure;
+out = v.plotDiscriminationHead(...
+    'plotType', 'performance_mat', ...
+    'method',method, ...
+    'focus_stims', focus_stims, ...
+    'zscore',do_zscore);
+clim(cfg.custom.crange)
+xticks([]); yticks([])
+cfg.figSize = "small";
+cfg.aspRatioType = "square";
+cfg.setFigure;
+cfg.saveFigure(gcf,['template ',grouptag, ' ',stimtag,' mat'], saveType)
