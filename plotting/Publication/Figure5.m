@@ -1,7 +1,7 @@
 dbstop if error
 
 s = true; % save figures to files?
-savepath = 'bin2';
+savepath = 'bin5';
 saveType = 'vector'; % 'vector' or 'raster'
 
 % for sliding windows
@@ -24,7 +24,8 @@ end
 
 
 %% initialize output figure saving
-cfg = PlotConfig;
+cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73,86:99]); % (test1, test2, ctrl)
+cfg.custom.crange = [.3 .7];
 cfg.savePath = savepath;
 
 v = ExperimentViewer(experiment);
@@ -40,7 +41,7 @@ dft = v.dataFilter;
 
 %% FIGURE 5
 
-% dPCA decomposition
+%% dPCA decomposition
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'all';
@@ -63,7 +64,7 @@ c = v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot
 v.dataFilter = dft;
 
 
-% stimulus dPC weights
+%% stimulus dPC weights
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'stimulus';
@@ -86,7 +87,7 @@ set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cf
 set(gcf, 'color', cfg.bgcol);
 
 
-% stimulus dPC weights
+%% stimulus dPC weights
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'stimulus';
@@ -118,6 +119,7 @@ figure; histogram(abs(c(:,1)).*c(:,2), 100, 'FaceColor','k','EdgeAlpha',0);
 box off; axis square
 yscale log
 xscale log
+hold on; plot([1 1],[min(ylim) max(ylim)],"Color",'k') % null hypothesis: all |weights| equal
 axis tight
 xlabel('|w|*N'); ylabel('histogram')
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
@@ -202,14 +204,71 @@ for i= 1:nsubjects
     c = [c; thisdata];
 end
 figure; histogram(c,100,'FaceColor','k','EdgeAlpha',0);
-box off; axis square
+box off; axis square tight
 xlim([-1 1])
-axis tight
 xlabel('w similarity'); ylabel('histogram')
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
 
-% variance explained by each PC/dPC
+
+v.dataFilter = dft;
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'stimulus';
+v.dataFilter.mode_method = 'mode_values';
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = 'dpca_naive.mat';
+m = ModeSelector(v).extract;
+v.dataFilter.mode_OI = 'novelty';
+n = ModeSelector(v).extract;
+c = [];
+for i= 1:nsubjects
+    thisstimw = m.coeffs{i}(:,m.parseModeOI(i));
+    thisnovw = n.coeffs{i}(:,n.parseModeOI(i));
+    for j = 1:width(thisstimw)
+        thisdata = [1-pdist([thisstimw(:,j), thisnovw]','cosine')];
+        c = [c; thisdata];
+    end
+end
+figure;
+subplot(211); histogram(c,100,'FaceColor','k','EdgeAlpha',0);
+box off; axis square tight
+xlim([-1 1])
+xlabel('w similarity'); ylabel('histogram')
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+v.dataFilter = dft;
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'novelty';
+v.dataFilter.mode_method = 'mode_values';
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = 'dpca_naive.mat';
+m = ModeSelector(v).extract;
+c = []; % [w1 N; w2 N; ...]
+for i= 1:numel(m.coeffs)
+    thisdata = m.coeffs{i}(:,m.parseModeOI(i));
+    c = [c; thisdata(:), ones(numel(thisdata),1)*v.filtered_traces{i}.N];
+end
+%histogram
+y = abs(c(:,1)).*c(:,2);
+subplot(212); histogram(y, 100, 'FaceColor','k','EdgeAlpha',0);
+[~,p,~] = kstest(y-1);
+disp(['1-sample KS test - p-val: ',num2str(p)])
+box off; axis square
+yscale log
+xscale log
+hold on; plot([1 1],[min(ylim) max(ylim)],"Color",'k') % null hypothesis: all |weights| equal
+plot(mean(y)*[1 1],[min(ylim) max(ylim)],"Color",'r') % average norm w
+axis tight
+xlabel('|w|*N'); ylabel('histogram')
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+cfg.figSize = 'small';
+cfg.aspRatioType = 'tall';
+cfg.setFigure;
+cfg.saveFigure(gcf,'naive novelty weights', saveType)
+
+
+%% variance explained by each PC/dPC
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'all_stimulus';
@@ -258,10 +317,7 @@ set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cf
 set(gcf, 'color', cfg.bgcol);
 
 
-
-% only novelty dPC
-%
-% mode weights
+%% novelty mode weights
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'novelty';
@@ -289,7 +345,7 @@ xlabel('N')
 ylabel('|w|')
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
-% correlation with general suppression
+%% novelty w correlation with general suppression
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'naïve';
 supp = v.plotUnitActivityMetricHead('method','general suppression score');
@@ -314,7 +370,7 @@ disp('')
 p = polyfit(c(:,1),supp, 1); % trend line
 x = mean(c(:,1),'omitmissing') + std(c(:,1),'omitmissing') .* [-1 1];
 hold on; plot(x,polyval(p,x),'r','LineWidth',2)
-% correlation with odor-specific suppression
+%% novelty w correlation with odor-specific suppression
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'naïve';
 supp = v.plotUnitActivityMetricHead('method','stimulus specific suppression score');
@@ -339,7 +395,7 @@ disp('')
 p = polyfit(c(:,1),supp, 1); % trend line
 x = mean(c(:,1),'omitmissing') + std(c(:,1),'omitmissing') .* [-1 1];
 hold on; plot(x,polyval(p,x),'r','LineWidth',2)
-% correlation with population intensity
+%% novelty w correlation with population intensity
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'naïve';
 v.dataFilter.repetitions = 1;
