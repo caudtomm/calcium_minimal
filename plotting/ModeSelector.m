@@ -147,6 +147,7 @@ classdef ModeSelector
                     for i = 1:length(obj.data)
                         nReps = obj.params.nReps;
                         framerate = obj.params.framerate;
+                        randomizeLabels = obj.params.randomizeLabels;
 
                         % prepare data for dpca
                         thisdata = obj.data{i}; % [time, units, trials]
@@ -156,7 +157,14 @@ classdef ModeSelector
                         thisdata = fillmissing(thisdata,"constant",0);
                         thisdata = ActivityTraces.format(thisdata,nTrials);
                         thislabels = obj.labels{i};
-                        [thislabels, idx] = sort(thislabels); % sort labels
+
+                        if randomizeLabels % this is for control analyses
+                            idx = randperm(size(thislabels,1));
+                            thislabels = thislabels(idx, :);
+                        else
+                            [thislabels, idx] = sort(thislabels); % sort labels
+                        end
+                        
                         thisdata = thisdata(:,:,idx); % sort data accordingly
                         uniqueLabels = unique(thislabels, 'rows');
                         nLabels = size(uniqueLabels, 1);
