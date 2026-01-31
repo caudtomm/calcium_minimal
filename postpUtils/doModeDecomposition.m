@@ -23,7 +23,7 @@ function out = doModeDecomposition(data, varargin)
 %   out = doModeDecomposition(data, 'method', 'pca', 'nfactors', 5);
 %
 % Notes:
-%   - The 'ica', 'rastermap' and 'dpca' methods are not implemented and will throw an error.
+%   - The 'rastermap' and 'dpca' methods are not implemented and will throw an error.
 arguments
     data double % [samples x variables] or [time x cells]
 end
@@ -81,9 +81,11 @@ switch lower(method)
         [coeff, score, ~] = pca(nanzscore(data), 'NumComponents', nfactors);
         out.vals = score;
         out.coeffs = coeff;
-    case 'ica' % # TODO: Implement ICA
-        % Placeholder for ICA implementation
-        error('ICA method not implemented yet.');
+    case 'ica'
+        data = fillmissing(data, 'constant', 0);
+        ricaModel = rica(nanzscore(data), nfactors, 'Standardize', true);
+        out.vals = transform(ricaModel, nanzscore(data));
+        out.coeffs = ricaModel.TransformWeights;
     case 'rastermap' % # TODO: Implement rastermap
         % Placeholder for rastermap implementation
         error('Rastermap method not implemented yet.');
