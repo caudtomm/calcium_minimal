@@ -1,30 +1,60 @@
 function out = doDiscrimination(data, labs, varargin)
-% doDiscriminate performs classification on neural response data using a specified
-% classifier and cross-validation scheme, and optionally computes a shuffle baseline.
+% doDiscrimination performs block-based multiclass decoding of neural
+% population activity using a template-matching classifier, with optional
+% within-trial neuron shuffling to estimate a chance-level baseline.
 %
 % INPUTS:
-%   data      - double matrix of neural activity, with one of the following shapes:
-%                 [variables x trials]        (e.g., cells x trials)
-%                 [time x variables x trials] (will be averaged across time)
-%   labs      - cell array {trials x 1} of string labels, one per trial
+%   data  - numeric array of neural activity with one of the following shapes:
+%             [cells x trials]
+%             [time x cells x trials]
+%           If time is present, activity is averaged across the time dimension
+%           using mean(...,'omitmissing').
+%
+%   labs  - cell array [trials x 1] of trial labels. Label identity and
+%           repetition structure are inferred from order of appearance.
 %
 % NAME-VALUE PAIRS (optional):
-%   'method'          - similarity metric for classification (default: 'correlation')
-%   'trainblockmode'  - cross-validation scheme: 'single' or '3blocks' (default: 'single')
-%   'classifier'      - classification method: 'template_match' (default) or 'SVM' (not implemented)
-%   'nshuffles'       - number of shuffle iterations for significance testing (default: 50)
+%   'method'         - distance metric passed to pdist for template matching
+%                      (default: 'correlation')
+%
+%   'trainblockmode' - training block definition based on label repetitions:
+%                        'single'  : train on one repetition index
+%                        '3blocks' : train on sliding windows of three
+%                                    consecutive repetition indices
+%                      (default: 'single')
+%
+%   'classifier'     - decoding method. Currently supported:
+%                        'template_match' (default)
+%                      Other options (e.g. 'SVM') are present but not functional.
+%
+%   'nshuffles'      - number of shuffle iterations for baseline estimation
+%                      (default: 50)
+%
+% CLASSIFICATION PROCEDURE:
+%   - Trials are grouped into repetition blocks separately for each label.
+%   - Training trials are selected based on repetition index; all remaining
+%     trials are used for testing.
+%   - For each class, a template is computed as the mean activity vector
+%     across its training trials.
+%   - Each trial is assigned the label of the nearest template according to
+%     the chosen distance metric.
+%
+% SHUFFLE BASELINE:
+%   - For each shuffle iteration, neuron identities are randomly permuted
+%     independently within each trial, preserving trial-wise activity
+%     distributions.
 %
 % OUTPUT:
-%   out - structure containing classification results:
-%       .input_labs               - original trial labels
-%       .train_trials             - [nTrials x nSets] logical matrix of training indices
-%       .test_trials              - [nTrials x nSets] logical matrix of testing indices
-%       .predicted_labs           - [nTrials x nSets] cell array of predicted labels
-%       .predicted_labs_SH        - [nTrials x nSets x nShuffles] cell array of shuffled predictions
-%       .prediction_iscorrect     - [nTrials x nSets] array of correctness (1=correct, 0=incorrect, NaN=missing)
-%       .prediction_iscorrect_SH  - [nTrials x nSets x nShuffles] array of shuffled correctness
-%       .prediction_confidence    - [nTrials x nSets] array of prediction confidence values
-%
+%   out - structure containing decoding results:
+%       .input_labs              - original trial labels
+%       .train_trials            - [nTrials x nSets] logical training mask
+%       .test_trials             - [nTrials x nSets] logical test mask
+%       .predicted_labs          - [nTrials x nSets] predicted labels
+%       .predicted_labs_SH       - [nTrials x nSets x nShuffles] shuffled predictions
+%       .prediction_iscorrect    - correctness matrix (1/0/NaN)
+%       .prediction_iscorrect_SH - shuffled correctness matrix
+%       .prediction_confidence   - relative distance margin between best and
+%                                  second-best template (not a probability)
 % Notes:
 % - Trials are grouped into repetition blocks based on label repetition order.
 % - Shuffle testing permutes the neuron identity independently for each trial.
@@ -165,17 +195,13 @@ for i_set = 1:nsets
 end
 
 
-%[p,h,stats] = ranksum(totFractionCorrectLab(:,1),totFractionCorrectLab(:,end))
-% y = totFractionCorrectLab(:,end-2:end);
-% [p,h,stats] = ranksum(totFractionCorrectLab(:,1),y(:))
-
 end
 
 
 %% Functions
 
 function [yfit, predictions] = fit_SVM(trainData,trainlabs,testData,stims)
-    [svm, accuracy, predictions] = postpUtils.trainSVM(trainData,trainlabs,stims);
+    [svm, accuracy, predictions] = trainSVM(trainData,trainlabs,stims);
     yfit = svm.predictFcn(testData);
 end
 
