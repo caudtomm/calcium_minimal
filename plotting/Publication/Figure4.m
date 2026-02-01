@@ -40,6 +40,30 @@ dft = v.dataFilter;
 
 %% FIGURE 4
 
+grouptag = 'trained';
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained';
+
+% full matrix
+hf = figure;
+C = v.plotDistancesHead;
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
+cfg.figSize = 'small';
+cfg.aspRatioType = 'square';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' stim intertrial corr full'], saveType)
+
+% repetitions
+hf = figure;
+C = v.plotDistancesHead('plotType','repetitions');
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
+cfg.figSize = 'small';
+cfg.aspRatioType = 'wide';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' stim intertrial corr reps'], saveType)
+v.dataFilter = dft;
+
 
 %% intertrial correlations, without pre-stimulus correlations
 v.dataFilter = dft;
