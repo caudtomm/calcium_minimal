@@ -152,11 +152,17 @@ for i_set = 1:nsets
         trainData = tmp(:,trials_train);
         testData = tmp(:,trials_test);
 
-        switch classifier
-            % case "SVM"
-                % [yfit, predictions] = fit_SVM(trainData',trainlabs,testData',stims);
+        switch lower(classifier)
+            case "svm"
+                res = fit_SVM(trainData',trainlabs,testData',stims);
             case "template_match"
                 res = template_matching(trainData', trainlabs, testData', stims, method);
+            case 'lda'
+                res = lindiscrim(trainData',trainlabs,testData',stims,'linear'); % needs multiple train-examples per class
+            case 'qda'
+                res = lindiscrim(trainData',trainlabs,testData',stims,'quadratic'); % needs multiple train-examples per class
+            case 'dbd'
+                res = dbd(trainData',trainlabs,testData',stims);
             otherwise
                 error('unknown classifier')
         end
@@ -200,9 +206,34 @@ end
 
 %% Functions
 
-function [yfit, predictions] = fit_SVM(trainData,trainlabs,testData,stims)
-    [svm, accuracy, predictions] = trainSVM(trainData,trainlabs,stims);
-    yfit = svm.predictFcn(testData);
+% function [yfit, predictions] = fit_SVM(trainData,trainlabs,testData,stims)
+%     [svm, accuracy, predictions] = trainSVM(trainData,trainlabs,stims);
+%     yfit = svm.predictFcn(testData);
+% end
+
+function out = fit_SVM(trainData, trainlabs, testData, stims)
+    % ensure categorical labels for ECOC
+    trainlabs_cat = categorical(trainlabs, stims);
+
+    svm = fitcecoc(trainData, trainlabs_cat, ...
+        'Coding','onevsall', ...
+        'Learners','linear', ...
+        'Verbose',0);
+
+    [pred_train, score_train] = predict(svm, trainData);
+    [pred_test,  score_test ] = predict(svm, testData);
+
+    out.predictions_trainData = cellstr(pred_train);
+    out.predictions_testData  = cellstr(pred_test);
+
+    out.confidence_trainData = scoreMargin(score_train);
+    out.confidence_testData  = scoreMargin(score_test);
+
+    function conf = scoreMargin(scores)
+        % scores: [nSamples x nClasses]
+        scores = sort(scores,2,'descend');
+        conf = (scores(:,1) - scores(:,2)) ./ abs(scores(:,1));
+    end
 end
 
 function out = template_matching(trainData, trainlabs, testData, stims, method)
@@ -247,21 +278,65 @@ function out = template_matching(trainData, trainlabs, testData, stims, method)
     end
 end
 
-function out = qda(trainData, trainlabs, testData, stims)
-    % quadratic discriminant analysis
-
-end
-
 function out = train_RNN(trainData, trainlabs, testData, stims)
-
+    % Placeholder for future RNN implementation
 end
 
-function out = lda(trainData, trainlabs, testData, stims)
-    % linear discriminant analysis
+function out = lindiscrim(trainData, trainlabs, testData, stims, discrimType)
+    trainlabs_cat = categorical(trainlabs, stims);
+    % Ensure there are multiple entries for each category in trainlabs (required for this classifier)
+    if any(histcounts(trainlabs_cat) < 2)
+        error('Each category must have at least two training set entries for lda/qda.');
+    end
 
+    switch discrimType
+        case 'linear'
+            gamma = 0;
+        case 'quadratic'
+            gamma = 1;
+        otherwise
+            error('unknown discrimType for lindiscrim')
+    end
+
+    lda = fitcdiscr(trainData, trainlabs_cat, ...
+        'DiscrimType',discrimType, ... % lda if 'linear', qda is 'quadratic'
+        'Gamma', gamma); 
+
+    [pred_train, score_train] = predict(lda, trainData);
+    [pred_test,  score_test ] = predict(lda, testData);
+
+    out.predictions_trainData = cellstr(pred_train);
+    out.predictions_testData  = cellstr(pred_test);
+
+    out.confidence_trainData = scoreMargin(score_train);
+    out.confidence_testData  = scoreMargin(score_test);
+
+    function conf = scoreMargin(scores)
+        scores = sort(scores,2,'descend');
+        conf = (scores(:,1) - scores(:,2)) ./ abs(scores(:,1));
+    end
 end
 
 function out = dbd(trainData, trainlabs, testData, stims)
-    % direct basis decoder
+    nstims = numel(stims);
+    nvars  = size(trainData,2);
 
+    bases = nan(nstims, nvars);
+    for i = 1:nstims
+        bases(i,:) = mean(trainData(ismember(trainlabs,stims{i}),:),1,'omitmissing');
+    end
+
+    [out.predictions_trainData, out.confidence_trainData] = ...
+        predictLabels(trainData, bases, stims);
+
+    [out.predictions_testData, out.confidence_testData] = ...
+        predictLabels(testData, bases, stims);
+
+    function [predictions, confidence] = predictLabels(data, bases, labels)
+        scores = data * bases'; % projection
+        [scores, idx] = sort(scores,2,'descend');
+
+        predictions = labels(idx(:,1));
+        confidence  = (scores(:,1) - scores(:,2)) ./ abs(scores(:,1));
+    end
 end
