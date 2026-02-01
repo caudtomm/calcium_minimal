@@ -25,7 +25,10 @@ function out = doDiscrimination(data, labs, varargin)
 %
 %   'classifier'     - decoding method. Currently supported:
 %                        'template_match' (default)
-%                      Other options (e.g. 'SVM') are present but not functional.
+%                        'lda'             - linear discriminant analysis
+%                        'qda'             - quadratic discriminant analysis
+%                        'dbd'             - direct basis decoder
+%                        'svm'             - support vector machine
 %
 %   'nshuffles'      - number of shuffle iterations for baseline estimation
 %                      (default: 50)
