@@ -159,8 +159,8 @@ classdef ModeSelector
                         thislabels = obj.labels{i};
 
                         if randomizeLabels % this is for control analyses
+                            thislabels = sort(thislabels); % sort labels
                             idx = randperm(size(thislabels,1));
-                            thislabels = thislabels(idx, :);
                         else
                             [thislabels, idx] = sort(thislabels); % sort labels
                         end
@@ -352,6 +352,8 @@ classdef ModeSelector
                 dpca_group = 'trained';
             elseif contains(obj.mode_file,'uncoupled')
                 dpca_group = 'uncoupled';
+            elseif contains(obj.mode_file,'all')
+                dpca_group = 'all';
             else
                 error('dpca group not recognized')
             end
