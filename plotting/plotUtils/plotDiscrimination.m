@@ -194,8 +194,8 @@ function out = performanceLines()
     if do_zscore; performance = nanzscore(performance,[],2); end
     jit = .1*randn(size(performance));
     x = repmat(1:nsets,[nsubjects,1]) + jit;
-    scatter(x, performance,30,cfg.axcol,'filled')
-    plot(x',performance','Color',cfg.axcol,'DisplayName','data')
+    % scatter(x, performance,30,cfg.axcol,'filled')
+    % plot(x',performance','Color',cfg.axcol,'DisplayName','data')
 
     %% average performance over subjects
     x = 1:nsets;

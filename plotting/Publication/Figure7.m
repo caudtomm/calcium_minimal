@@ -196,7 +196,38 @@ function new_group_data = mergeTrainedGroups(group_data)
 end
 
 
-%% template matching
+%% template matching lines
+
+v.dataFilter = dft;
+grouptag = 'uncoupled';
+stimtag = 'allstims';
+v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.interval = [.5, 20];
+v.dataFilter.repetitions = 2:5;
+method = 'correlation';
+focus_stims = 'all stimuli';
+
+hf = figure;
+c = v.plotDiscriminationHead(...
+    'plotType', 'performance_lines', ...
+    'method',method, ...
+    'focus_stims', focus_stims, ...
+    'zscore',false);
+for i = 2:width(c)
+    p = signrank(c(:,1),c(:,i));
+    disp(['Paired Wilcoxon signed-rank test - reps 1 vs ', num2str(i),': ',num2str(p)])
+end
+xlabel('Template trial #')
+ylabel('Performance')
+ylim([0 1])
+cfg.figSize = "tiny";
+cfg.aspRatioType = "tall";
+cfg.setFigure;
+cfg.saveFigure(gcf,['template ',grouptag, ' ',stimtag,' lines 2-5'], saveType)
+
+
+%% template matching mats
 
 v.dataFilter = dft;
 grouptag = 'uncoupled';
