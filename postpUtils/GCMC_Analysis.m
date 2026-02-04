@@ -469,24 +469,47 @@ function T = addRepetitionColumns(T)
     % Add manifold_rep1 and manifold_rep2 columns based on manifold indices
     % For each unique manifold_name, assign rep numbers based on sorted manifold_idx
     % Number of reps per stimulus may vary
+    %
+    % Important: idx_1/name_1 and idx_2/name_2 refer to the same underlying manifold set,
+    % so we build the idx->rep mapping from the union of both columns.
 
     if ~ismember('manifold_name_1', T.Properties.VariableNames)
         return;  % columns not present
     end
 
-    T.manifold_rep1 = deriveReps(T.manifold_idx_1, T.manifold_name_1);
-    T.manifold_rep2 = deriveReps(T.manifold_idx_2, T.manifold_name_2);
+    % Build unified idx->rep mapping from both columns
+    all_idx = [T.manifold_idx_1; T.manifold_idx_2];
+    all_names = [T.manifold_name_1; T.manifold_name_2];
+
+    % Create mapping: for each unique (idx, name) pair, determine rep number
+    idx2rep = buildIdxToRepMap(all_idx, all_names);
+
+    % Apply mapping to both columns
+    T.manifold_rep1 = arrayfun(@(x) idx2rep(x), T.manifold_idx_1);
+    T.manifold_rep2 = arrayfun(@(x) idx2rep(x), T.manifold_idx_2);
 end
 
-function reps = deriveReps(idx_col, name_col)
-    % Derive repetition numbers from manifold indices grouped by name
-    reps = zeros(numel(idx_col), 1);
-    unique_names = unique(name_col);
+function idx2rep = buildIdxToRepMap(all_idx, all_names)
+    % Build a containers.Map from manifold_idx to repetition number
+    % Repetition is determined by rank within each stimulus name
+
+    % Get unique (idx, name) pairs
+    [unique_idx, ia] = unique(all_idx);
+    unique_names_for_idx = all_names(ia);
+
+    % For each unique name, rank the indices to get repetition numbers
+    idx2rep = containers.Map('KeyType', 'double', 'ValueType', 'double');
+    unique_names = unique(unique_names_for_idx);
 
     for i = 1:numel(unique_names)
-        mask = strcmp(name_col, unique_names{i});
-        indices = idx_col(mask);
-        [~, ~, rank] = unique(indices);
-        reps(mask) = rank;
+        name = unique_names{i};
+        mask = strcmp(unique_names_for_idx, name);
+        indices_for_name = unique_idx(mask);
+
+        % Sort indices and assign rep numbers 1, 2, 3, ...
+        [sorted_idx, ~] = sort(indices_for_name);
+        for r = 1:numel(sorted_idx)
+            idx2rep(sorted_idx(r)) = r;
+        end
     end
 end

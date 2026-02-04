@@ -246,16 +246,27 @@ function firingDistribBoxplots(v,cfg,saveType,grouptag,dPCtag,yrange)
     c = v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions');
     close(hf)
     c = abs(c);
-    % [~,~,stats] = kruskalwallis(c);
-    % c = multcompare(stats);
-    for i = 2:5
-        p = signrank(c(:,1),c(:,i));
-        disp(['Paired Wilcoxon signed-rank test - reps 1 vs ', num2str(i),': ',num2str(p)])
+
+    % Friedman test for overall effect of repetition
+    result = statsUtils.friedman(c);
+    if result.valid
+        disp(sprintf('Friedman test for rep effect in %s: chi2=%.2f, p=%.4g', ...
+            grouptag, result.chi2, result.p))
+    else
+        disp(['Friedman test for rep effect in ', grouptag, ': insufficient data'])
     end
-    hf = figure; boxplot(c,'BoxStyle','filled','Colors','k');hold on; 
+
+    hf = figure; boxplot(c,'BoxStyle','filled','Colors','k');hold on;
     scatter(1:5,mean(c,'omitmissing'),5,'r','filled')
     xlabel('Repetition #'); ylabel('|iFR| (Hz)')
     ylim(yrange)
+
+    % Add Friedman test result annotation
+    if result.valid
+        stars = statsUtils.pvalToStars(result.p);
+        title(sprintf('Friedman: p=%.3g %s', result.p, stars))
+    end
+
     cfg.figSize = 'tiny';
     cfg.aspRatioType = 'tall';
     cfg.setFigure;

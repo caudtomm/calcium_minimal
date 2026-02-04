@@ -337,6 +337,234 @@ methods (Static)
 
     end
 
+    function [hf, stats] = plotMetricsByRepLine(group_data, cfg, filter, metric_name)
+        % Plot metric values across repetitions as line plot with error ribbons
+        %
+        % Uses statsUtils for statistics and plotLineNShade for visualization.
+        %
+        % Inputs:
+        %   group_data - struct array with .group_name and .data (table)
+        %   cfg - PlotConfig object
+        %   filter - GCMCResultsFilter
+        %   metric_name - name of metric column (e.g., 'Fun_capacity')
+        %
+        % Outputs:
+        %   hf - figure handle
+        %   stats - struct with .friedman and .between_group results
+
+        arguments
+            group_data struct
+            cfg PlotConfig = PlotConfig()
+            filter GCMCResultsFilter = GCMCResultsFilter('shuffle', false)
+            metric_name char = 'Fun_capacity'
+        end
+
+        nGroups = numel(group_data);
+        group_names = {group_data.group_name};
+
+        % === Extract data by group and rep ===
+        [data_by_group_rep, reps] = extractDataByGroupRep(group_data, filter, metric_name);
+        nReps = numel(reps);
+
+        if nReps == 0
+            warning('No repetition data found.');
+            hf = figure; stats = struct();
+            return;
+        end
+
+        % === Compute summary statistics ===
+        [means, sems] = computeGroupRepStats(data_by_group_rep);
+
+        % === Statistical tests ===
+        stats = struct();
+
+        % Friedman test per group
+        stats.friedman = computeFriedmanByGroup(group_data, filter, metric_name, reps);
+
+        % Between-group Mann-Whitney at each rep (with FDR)
+        stats.between_group = computeBetweenGroupStats(data_by_group_rep, group_names, reps);
+
+        % === Plotting ===
+        hf = figure;
+        hold on;
+        line_handles = gobjects(nGroups, 1);
+
+        for i_group = 1:nGroups
+            color = cfg.c(i_group, :);
+
+            % Use plotLineNShade for ribbon
+            mu = means(i_group, :);
+            sem = sems(i_group, :);
+            valid = ~isnan(mu);
+
+            if sum(valid) > 1
+                lcfg.lineStyle = '-';
+                lcfg.lineWidth = 2;
+                plotLineNShade(reps(valid), mu(valid)', sem(valid)', color, lcfg);
+            end
+
+            % Build legend with Friedman result
+            legend_str = group_names{i_group};
+            if i_group <= numel(stats.friedman) && ~isnan(stats.friedman(i_group).p)
+                legend_str = sprintf('%s (F: %s)', legend_str, ...
+                    statsUtils.pvalToStars(stats.friedman(i_group).p));
+            end
+
+            line_handles(i_group) = plot(reps, mu, 'o', ...
+                'Color', color, 'MarkerFaceColor', color, ...
+                'MarkerSize', 6, 'DisplayName', legend_str);
+        end
+
+        % Add significance stars for between-group comparisons
+        y_max = max(means(:) + sems(:), [], 'omitnan');
+        y_min = min(means(:) - sems(:), [], 'omitnan');
+        star_offset = 0.05 * (y_max - y_min);
+
+        for i = 1:numel(stats.between_group)
+            if stats.between_group(i).p_fdr < 0.05
+                i_rep = stats.between_group(i).i_rep;
+                y_pos = y_max + star_offset * (1 + mod(i-1, 3));  % stagger if multiple
+                addSignificanceAnnotation(gca, reps(i_rep), y_pos, ...
+                    stats.between_group(i).p_fdr, 'color', cfg.axcol);
+            end
+        end
+
+        hold off;
+
+        % Formatting
+        xlabel('Repetition');
+        ylabel(strrep(metric_name, 'Fun_', ''));
+        legend(line_handles, 'Location', 'best', 'Box', 'off');
+        box off;
+        xlim([min(reps)-0.5, max(reps)+0.5]);
+        xticks(reps);
+
+        set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
+        set(gcf, 'color', cfg.bgcol);
+        set(gcf, 'Position', [100, 100, 400, 350]);
+    end
+
 end
 
+end
+
+%% Local helper functions for plotMetricsByRepLine
+
+function [data_by_group_rep, reps] = extractDataByGroupRep(group_data, filter, metric_name)
+    % Extract metric data organized by [group, rep]
+    nGroups = numel(group_data);
+
+    % Find available reps
+    all_reps = [];
+    for i = 1:nGroups
+        filtered = filter.filterTable(group_data(i).data);
+        if ismember('manifold_rep1', filtered.Properties.VariableNames)
+            all_reps = unique([all_reps; filtered.manifold_rep1]);
+        end
+    end
+    reps = sort(all_reps);
+    nReps = numel(reps);
+
+    % Extract data
+    data_by_group_rep = cell(nGroups, nReps);
+    for i_group = 1:nGroups
+        for i_rep = 1:nReps
+            rep_filter = filter;
+            rep_filter.manifold_rep1 = reps(i_rep);
+            rep_filter.manifold_rep2 = reps(i_rep);
+            filtered = rep_filter.filterTable(group_data(i_group).data);
+            if ~isempty(filtered) && ismember(metric_name, filtered.Properties.VariableNames)
+                data_by_group_rep{i_group, i_rep} = filtered.(metric_name);
+            else
+                data_by_group_rep{i_group, i_rep} = [];
+            end
+        end
+    end
+end
+
+function [means, sems] = computeGroupRepStats(data_by_group_rep)
+    % Compute mean and SEM for each cell in data_by_group_rep
+    [nGroups, nReps] = size(data_by_group_rep);
+    means = nan(nGroups, nReps);
+    sems = nan(nGroups, nReps);
+
+    for i = 1:nGroups
+        for j = 1:nReps
+            vals = data_by_group_rep{i, j};
+            if ~isempty(vals)
+                [means(i,j), sems(i,j)] = statsUtils.groupStats({vals});
+            end
+        end
+    end
+end
+
+function friedman_results = computeFriedmanByGroup(group_data, filter, metric_name, reps)
+    % Compute Friedman test for each group (subjects x reps)
+    nGroups = numel(group_data);
+    nReps = numel(reps);
+    friedman_results = struct('group', {}, 'p', {}, 'chi2', {});
+
+    for i_group = 1:nGroups
+        friedman_results(i_group).group = group_data(i_group).group_name;
+        friedman_results(i_group).p = NaN;
+        friedman_results(i_group).chi2 = NaN;
+
+        filtered = filter.filterTable(group_data(i_group).data);
+        if ~ismember('subj_id', filtered.Properties.VariableNames)
+            continue;
+        end
+
+        % Build subjects x reps matrix
+        subj_ids = unique(filtered.subj_id);
+        subj_rep_matrix = nan(numel(subj_ids), nReps);
+
+        for i_subj = 1:numel(subj_ids)
+            for i_rep = 1:nReps
+                rep_filter = filter;
+                rep_filter.manifold_rep1 = reps(i_rep);
+                rep_filter.manifold_rep2 = reps(i_rep);
+                rep_filter.subj_ids = subj_ids(i_subj);
+                subj_data = rep_filter.filterTable(group_data(i_group).data);
+                if ~isempty(subj_data) && ismember(metric_name, subj_data.Properties.VariableNames)
+                    subj_rep_matrix(i_subj, i_rep) = mean(subj_data.(metric_name), 'omitnan');
+                end
+            end
+        end
+
+        % Run Friedman test
+        result = statsUtils.friedman(subj_rep_matrix);
+        friedman_results(i_group).p = result.p;
+        friedman_results(i_group).chi2 = result.chi2;
+    end
+end
+
+function between_results = computeBetweenGroupStats(data_by_group_rep, group_names, reps)
+    % Mann-Whitney U between groups at each rep, with FDR correction
+    [nGroups, nReps] = size(data_by_group_rep);
+    between_results = struct('rep', {}, 'group1', {}, 'group2', {}, ...
+                            'i_rep', {}, 'p_raw', {}, 'p_fdr', {});
+
+    p_raw = [];
+    idx = 0;
+
+    for i_rep = 1:nReps
+        groups_at_rep = data_by_group_rep(:, i_rep);
+        mw_results = statsUtils.pairwiseMannWhitney(groups_at_rep, group_names, false);
+
+        for k = 1:numel(mw_results)
+            idx = idx + 1;
+            between_results(idx).rep = reps(i_rep);
+            between_results(idx).i_rep = i_rep;
+            between_results(idx).group1 = mw_results(k).group1;
+            between_results(idx).group2 = mw_results(k).group2;
+            between_results(idx).p_raw = mw_results(k).p_raw;
+            p_raw(idx) = mw_results(k).p_raw;
+        end
+    end
+
+    % Apply FDR across all comparisons
+    p_fdr = statsUtils.fdr(p_raw);
+    for k = 1:numel(between_results)
+        between_results(k).p_fdr = p_fdr(k);
+    end
 end
