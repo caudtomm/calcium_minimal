@@ -1,6 +1,7 @@
 # ignore temporary files
 *.swp
 *.asv
+CLAUDE.md
 
 # ignore folders
 /temporary/

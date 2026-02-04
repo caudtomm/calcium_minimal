@@ -285,6 +285,9 @@ classdef GCMC_Analysis
                     this_data.subj_id = repmat(this_subj_id, height(this_data),1);
                     group_data(i).data = [group_data(i).data; this_data];
                 end
+
+                % Add repetition columns
+                group_data(i).data = addRepetitionColumns(group_data(i).data);
             end
         end
 
@@ -460,4 +463,30 @@ end
 % Sort based on the extracted numerical values
 [~, idx] = sort(numeric_values, 'ascend');
 results_out = results_in(idx);
+end
+
+function T = addRepetitionColumns(T)
+    % Add manifold_rep1 and manifold_rep2 columns based on manifold indices
+    % For each unique manifold_name, assign rep numbers based on sorted manifold_idx
+    % Number of reps per stimulus may vary
+
+    if ~ismember('manifold_name_1', T.Properties.VariableNames)
+        return;  % columns not present
+    end
+
+    T.manifold_rep1 = deriveReps(T.manifold_idx_1, T.manifold_name_1);
+    T.manifold_rep2 = deriveReps(T.manifold_idx_2, T.manifold_name_2);
+end
+
+function reps = deriveReps(idx_col, name_col)
+    % Derive repetition numbers from manifold indices grouped by name
+    reps = zeros(numel(idx_col), 1);
+    unique_names = unique(name_col);
+
+    for i = 1:numel(unique_names)
+        mask = strcmp(name_col, unique_names{i});
+        indices = idx_col(mask);
+        [~, ~, rank] = unique(indices);
+        reps(mask) = rank;
+    end
 end

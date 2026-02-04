@@ -128,11 +128,11 @@ methods (Static)
     
     %% yes data required
 
-    function hf = plotBoxplotsByGroup(group_data, cfg, shuffle)
+    function hf = plotBoxplotsByGroup(group_data, cfg, filter)
         arguments
             group_data struct
             cfg PlotConfig = PlotConfig()
-            shuffle logical = false;
+            filter GCMCResultsFilter = GCMCResultsFilter('shuffle', false)
         end
 
         nGroups = numel(group_data);
@@ -152,7 +152,8 @@ methods (Static)
             box_data = [];
             datacells = cell(1,nGroups);
             for i_group = 1:nGroups
-                this_data = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle, metrics{i_metric}};
+                filtered_table = filter.filterTable(group_data(i_group).data);
+                this_data = filtered_table{:, metrics{i_metric}};
                 box_data = [box_data; this_data];
                 datacells{i_group} = this_data(:);
                 group_labels = [group_labels; repelem(string(group_data(i_group).group_name), size(this_data, 1), 1)];
@@ -160,9 +161,11 @@ methods (Static)
 
             % Mann-Whitney U-test (non-parametric test)
             for i_group = 1:nGroups
-                this_data = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle, metrics{i_metric}};
+                filtered_table = filter.filterTable(group_data(i_group).data);
+                this_data = filtered_table{:, metrics{i_metric}};
                 for j_group = i_group+1:nGroups
-                    other_data = group_data(j_group).data{shuffle==group_data(j_group).data.shuffle, metrics{i_metric}};
+                    filtered_other = filter.filterTable(group_data(j_group).data);
+                    other_data = filtered_other{:, metrics{i_metric}};
                     p = ranksum(this_data, other_data); % Mann-Whitney U-test
                     disp(['Mann-Whitney U-test between ', group_data(i_group).group_name, ...
                             ' and ', group_data(j_group).group_name, ...
@@ -176,8 +179,9 @@ methods (Static)
             xticks([1:nGroups]); xticklabels({group_data(:).group_name})
             % Superimpose scatter plot for each group
             for i_group = 1:nGroups
-                this_data = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle, metrics{i_metric}};
-                this_subj_ids = group_data(i_group).data{shuffle==group_data(i_group).data.shuffle,'subj_id'};
+                filtered_table = filter.filterTable(group_data(i_group).data);
+                this_data = filtered_table{:, metrics{i_metric}};
+                this_subj_ids = filtered_table{:, 'subj_id'};
                 %scatter(repelem(i_group, numel(this_data)), ...
                 %        this_data, 40, 'filled', 'CData', cfg.c(this_subj_ids,:), 'MarkerFaceAlpha', 0.7, ...
                 %        'jitter', 'on', 'jitterAmount', 0.15);
@@ -194,20 +198,26 @@ methods (Static)
             set(gcf, 'Position', [100, 100, 200, 500]);
             hold off;
         end
-        
+
     end
 
-    function plotBoxplotsForEachMetric(avg_results, cfg)
+    function plotBoxplotsForEachMetric(avg_results, cfg, filter)
         arguments
             avg_results table % from a single subj
             cfg PlotConfig = PlotConfig()
+            filter GCMCResultsFilter = GCMCResultsFilter()
         end
 
         metrics = avg_results.Properties.VariableNames(5:end-2); % exclude grouping variables and stimulus names
 
+        % Apply filter (excluding shuffle filter, which is handled separately below)
+        filter_no_shuffle = filter;
+        filter_no_shuffle.shuffle = [];  % don't filter by shuffle here
+        filtered_results = filter_no_shuffle.filterTable(avg_results);
+
         % separate data and shuffle conditions
-        y_data = avg_results{avg_results.shuffle==false, metrics};
-        y_shuffle = avg_results{avg_results.shuffle==true, metrics};
+        y_data = filtered_results{filtered_results.shuffle==false, metrics};
+        y_shuffle = filtered_results{filtered_results.shuffle==true, metrics};
 
         % create boxplots for each metric
         nMetrics = numel(metrics);
@@ -253,14 +263,14 @@ methods (Static)
         end
     end
 
-    function plotMetricStability(results, cfg)
+    function plotMetricStability(results, cfg, filter)
         arguments
             results table
             cfg PlotConfig = PlotConfig()
+            filter GCMCResultsFilter = GCMCResultsFilter('shuffle', false)
         end
 
-
-        results = results(results.shuffle==false, :); % only data, no shuffle
+        results = filter.filterTable(results);
 
         bin_size = 10; % number of measurements per bin
         nRandomSamples = 10; % number of random sampling for each bin
