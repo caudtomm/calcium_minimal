@@ -200,9 +200,8 @@ function out = performanceLines()
     %% average performance over subjects
     x = 1:nsets;
     y = mean(performance,'omitmissing');
-    line(x,y,'Color','r','LineWidth',5)
-    err = std(performance);
-    errorbar(y,err,'r');
+    err = std(performance,[],1,'omitmissing') ./ sqrt(sum(~isnan(performance),1)); % sem
+    errorbar(x,y,err,'LineStyle','-','Color','r','LineWidth',1,'CapSize',10);
 
     %% cosmetics
     u = legendUnq();

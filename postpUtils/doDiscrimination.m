@@ -74,6 +74,7 @@ method = 'correlation';
 trainblockmode = 'single';
 classifier = 'template_match'; % 'SVM' or 'template_match'
 nshuffles = 50;
+SEPARATE_TEST_SET = true; % whether to use training trials only for training, or all trials for testing
 
 % Parse name-value pairs
 if ~isempty(varargin)
@@ -87,6 +88,10 @@ if ~isempty(varargin)
                 classifier = varargin{k+1};
             case 'nshuffles'
                 nshuffles = varargin{k+1};
+            case 'separatetestset'
+                SEPARATE_TEST_SET = varargin{k+1};
+            otherwise
+                error('Unknown parameter name: %s', varargin{k});
         end
     end
 end
@@ -110,10 +115,18 @@ end
 
 repetitions = 1:max(label_repetitions);
 switch trainblockmode % # TODO : this should be adaptive to the num of repetitions of each label found in the data
+    case '2blocks'
+        trainblocksets = arrayfun(@(x) x:x+1, 1:repetitions(end)-1, 'UniformOutput', false);
     case '3blocks'
         trainblocksets = arrayfun(@(x) x:x+2, 1:repetitions(end)-2, 'UniformOutput', false);
     case 'single'
         trainblocksets = num2cell(repetitions);
+    case 'all'
+        trainblocksets = {1:repetitions(end)};
+        if SEPARATE_TEST_SET
+            disp('Warning: training on all repetitions leaves no test set. Train and test sets are now identical.');
+            SEPARATE_TEST_SET = false;
+        end
     otherwise
         error('specified training blocks mode is unknown')
 end
@@ -135,7 +148,11 @@ out.prediction_confidence = nan(ntrials,nsets);
 for i_set = 1:nsets
     % specify trial indices to train and test on
     trials_train = ismember(label_repetitions, trainblocksets{i_set});
-    trials_test = ~trials_train;
+    if SEPARATE_TEST_SET
+        trials_test = ~trials_train;
+    else
+        trials_test = true(size(trials_train));
+    end
 
     % correct labels for training and testing
     trainlabs = labs(trials_train);
@@ -155,6 +172,8 @@ for i_set = 1:nsets
         trainData = tmp(:,trials_train);
         testData = tmp(:,trials_test);
 
+        try
+            % perform classification
         switch lower(classifier)
             case "svm"
                 res = fit_SVM(trainData',trainlabs,testData',stims);
@@ -168,6 +187,13 @@ for i_set = 1:nsets
                 res = dbd(trainData',trainlabs,testData',stims);
             otherwise
                 error('unknown classifier')
+        end
+        catch ME
+            warning('Classification failed: %s', ME.message);
+            res.predictions_trainData = cell(sum(trials_train),1);
+            res.predictions_testData  = cell(sum(trials_test),1);
+            res.confidence_trainData  = nan(sum(trials_train),1);
+            res.confidence_testData   = nan(sum(trials_test),1);
         end
 
         % combine predictions for training and testing trials into one cell
@@ -301,9 +327,22 @@ function out = lindiscrim(trainData, trainlabs, testData, stims, discrimType)
             error('unknown discrimType for lindiscrim')
     end
 
-    lda = fitcdiscr(trainData, trainlabs_cat, ...
-        'DiscrimType',discrimType, ... % lda if 'linear', qda is 'quadratic'
-        'Gamma', gamma); 
+    try
+        lda = fitcdiscr(trainData, trainlabs_cat, ...
+            'DiscrimType',discrimType, ... % lda if 'linear', qda is 'quadratic'
+            'Gamma', gamma); 
+    catch
+        if strcmp(discrimType,'linear')
+            discrimType = 'pseudoLinear';
+            disp('LDA failed; switching to PseudoLinear.');
+        elseif strcmp(discrimType,'quadratic')
+            discrimType = 'pseudoQuadratic';
+            disp('QDA failed; switching to PseudoQuadratic.');
+        end
+        lda = fitcdiscr(trainData, trainlabs_cat, ...
+            'DiscrimType',discrimType, ... % lda if 'linear', qda is 'quadratic'
+            'Gamma', gamma); 
+    end
 
     [pred_train, score_train] = predict(lda, trainData);
     [pred_test,  score_test ] = predict(lda, testData);

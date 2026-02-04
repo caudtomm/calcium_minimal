@@ -336,6 +336,7 @@ classdef ExperimentViewer
             method = 'correlation';
             classifier = 'template_match';
             trainblockmode = 'single';
+            separatetestset = false;
             focus_stims = 'all trials'; % by default, no further filtering
             do_zscore = false;
 
@@ -350,6 +351,8 @@ classdef ExperimentViewer
                             classifier = varargin{k+1};
                         case 'trainblockmode'
                             trainblockmode = varargin{k+1};
+                        case 'separatetestset'
+                            separatetestset = varargin{k+1};
                         % plotting parameters
                         case 'plottype'
                             plotType = varargin{k+1};
@@ -385,7 +388,8 @@ classdef ExperimentViewer
                 all_out{i} = doDiscrimination(thisevents, thislabs, ...
                                                        'method', method, ...
                                                        'classifier', classifier, ...
-                                                       'trainblockmode', trainblockmode);
+                                                       'trainblockmode', trainblockmode, ...
+                                                       'separatetestset', separatetestset);
             end
 
             % focus on specific trials for plotting (without changing any of the values!)

@@ -40,6 +40,7 @@ dft = v.dataFilter;
 
 %% FIGURE 4
 
+%% intertrial correlations
 grouptag = 'trained';
 
 v.dataFilter = dft;
@@ -270,6 +271,66 @@ cfg.setFigure;
 cfg.saveFigure(gcf,'same vs diff valence intertrial corr', saveType)
 cfg = v.plotConfig;
 
+%% upper bound discrimination across groups (multiple classifier)
+
+classifiers = {'template_match','svm','dbd','lda','qda'};
+classif_nicknames = {'TM','SVM','DBD','LDA','QDA'};
+groups = {'naïve', 'trained'};
+focus_stims = {'Arg','Ala','His','Trp','Ser','Leu'};
+v.dataFilter.stims_allowed = {'Arg','Ala','His','Trp','Ser','Leu'};
+v.dataFilter.repetitions = [1:5];
+
+nclass = numel(classifiers); ngroups = numel(groups); noptions = numel(focus_stims);
+chancelv = 1/noptions;
+
+res = cell(ngroups,1);
+figure;
+for g = 1:ngroups
+    v.dataFilter.subjectGroup = groups{g};
+    for c = 1:nclass
+        out = v.plotDiscriminationHead('classifier',classifiers{c},...
+            'trainblockmode','all',...
+            'separatetestset',false,...
+            'focus_stims',focus_stims);
+        res{g}(:,c) = out;
+    end
+end
+close
+
+y = zeros(ngroups,nclass);
+err = zeros(ngroups,nclass);
+for g = 1:ngroups
+    y(g,:) = mean(res{g},1,'omitmissing');
+    err(g,:) = std(res{g},1,'omitmissing');
+end
+
+% sort by decreasing performance
+[~, idx] = sort(y(1,:),'descend');
+y = y(:,idx); err = err(:,idx); classifiers = classifiers(idx);
+classif_nicknames = classif_nicknames(idx);
+
+% turn performance to normalized performance (relative to chance)
+% y = ((y-chancelv)/(1-chancelv)); err = err/(1-chancelv);
+
+hf = figure;
+step = .2;
+clear b;
+for g = 1:ngroups
+    x = [1:nclass] + step*(g-1);
+    b(g) = errorbar(x,y(g,:)',err(g,:), ...
+        'LineStyle','none','Marker','o',...
+        'MarkerFaceColor',cfg.c(g,:),'Color',cfg.c(g,:), ...
+        'MarkerSize',2, 'CapSize',2);
+    hold on
+end
+xticks(1:nclass); xticklabels(classif_nicknames); xtickangle(90); xlim([.5 nclass+.5])
+ylabel('Norm. performance'); ylim([0 1.1])
+% legend(b,groups)
+cfg.figSize = "small";
+cfg.aspRatioType = 'square';
+cfg.setFigure;
+cfg.saveFigure(gcf,'upper bound classification performance - only novel', saveType)
+cfg = v.plotConfig;
 
 %%
 v.dataFilter = dft;

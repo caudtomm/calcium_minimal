@@ -92,26 +92,26 @@ v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'stimulus';
 v.dataFilter.mode_method = 'mode_values';
-v.dataFilter.subjectGroup = 'naïve';
-v.dataFilter.mode_file = 'dpca_naive.mat';
+v.dataFilter.subjectGroup = 'all';
+v.dataFilter.mode_file = 'dpca_shuffle_all.mat';
 m = ModeSelector(v).extract;
 c = [];
 for i= 1:numel(m.coeffs)
-    thisdata = m.coeffs{i}(:,m.parseModeOI(i));
-    thisdata = sum(thisdata);
+    thisdata = m.fullout{i}.V(:,m.parseModeOI(i));
+    thisdata = sum(thisdata.^2);
     c = [c; thisdata(:)];
 end
 %histogram
 figure; histogram(c, 100, 'FaceColor','k','EdgeAlpha',0);
 box off; axis square
 axis tight
-xlabel('sum of weights'); ylabel('histogram')
+xlabel('Sum of sq. weights'); ylabel('Histogram')
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
 % 
 c = []; % [w1 N; w2 N; ...]
 for i= 1:numel(m.coeffs)
-    thisdata = m.coeffs{i}(:,m.parseModeOI(i));
+    thisdata = m.fullout{i}.V(:,m.parseModeOI(i));
     c = [c; thisdata(:), ones(numel(thisdata),1)*v.filtered_traces{i}.N];
 end
 %histogram
@@ -215,8 +215,8 @@ v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'stimulus';
 v.dataFilter.mode_method = 'mode_values';
-v.dataFilter.subjectGroup = 'naïve';
-v.dataFilter.mode_file = 'dpca_naive.mat';
+v.dataFilter.subjectGroup = 'all';
+v.dataFilter.mode_file = 'dpca_shuffle_all.mat';
 m = ModeSelector(v).extract;
 v.dataFilter.mode_OI = 'novelty';
 n = ModeSelector(v).extract;
@@ -240,15 +240,15 @@ v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'novelty';
 v.dataFilter.mode_method = 'mode_values';
-v.dataFilter.subjectGroup = 'naïve';
-v.dataFilter.mode_file = 'dpca_naive.mat';
+v.dataFilter.subjectGroup = 'all';
+v.dataFilter.mode_file = 'dpca_shuffle_all.mat';
 m = ModeSelector(v).extract;
 c = []; % [w1 N; w2 N; ...]
 for i= 1:numel(m.coeffs)
     thisdata = m.coeffs{i}(:,m.parseModeOI(i));
     c = [c; thisdata(:), ones(numel(thisdata),1)*v.filtered_traces{i}.N];
 end
-%histogram
+% histogram
 y = abs(c(:,1)).*c(:,2);
 subplot(212); histogram(y, 100, 'FaceColor','k','EdgeAlpha',0);
 [~,p,~] = kstest(y-1);
@@ -264,6 +264,36 @@ set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cf
 set(gcf, 'color', cfg.bgcol);
 cfg.figSize = 'small';
 cfg.aspRatioType = 'tall';
+cfg.setFigure;
+cfg.saveFigure(gcf,'naive novelty weights', saveType)
+
+
+
+v.dataFilter = dft;
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'stimulus';
+v.dataFilter.mode_method = 'mode_values';
+v.dataFilter.subjectGroup = 'all';
+v.dataFilter.mode_file = 'dpca_shuffle_all.mat';
+m = ModeSelector(v).extract;
+c = []; % []
+for i= 1:numel(m.coeffs)
+    thisdata = m.coeffs{i}(:,m.parseModeOI(i));
+    thisdata = thisdata.^2;
+    sumw = sum(thisdata(:));
+    stdw = std(thisdata(:));
+    c = [c; (stdw^2)];
+end
+hf = figure;
+y = c(:); histogram(y, 100, 'FaceColor','k','EdgeAlpha',0);
+% [~,p,~] = kstest(y-1);
+% disp(['1-sample KS test - p-val: ',num2str(p)])
+box off; axis square tight
+xlabel('Var(w)'); ylabel('histogram')
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+cfg.figSize = 'tiny';
+cfg.aspRatioType = 'square';
 cfg.setFigure;
 cfg.saveFigure(gcf,'naive novelty weights', saveType)
 

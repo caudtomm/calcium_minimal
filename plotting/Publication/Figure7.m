@@ -149,7 +149,7 @@ cfg.saveFigure(gcf,[grouptag, ' interrep vector corr boxplot'], saveType)
 close all
 
 % odor manifolds (all odors)
-folder_tag = 'odors'; hf = plotMetrics(v, folder_tag, cfg);
+folder_tag = 'trials'; hf = plotMetrics(v, folder_tag, cfg);
 savePlot(hf(1),'Capacity',[0 .15], folder_tag, cfg, saveType);
 savePlot(hf(2),'Dimension',[0 30], folder_tag, cfg, saveType);
 savePlot(hf(3),'Radius',[0 2], folder_tag, cfg, saveType);
@@ -197,14 +197,14 @@ end
 
 
 %% template matching lines
-
+classifier = 'qda';
 v.dataFilter = dft;
-grouptag = 'uncoupled';
+grouptag = 'naive';
 stimtag = 'allstims';
-v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.subjectGroup = 'naïve';
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.interval = [.5, 20];
-v.dataFilter.repetitions = 2:5;
+v.dataFilter.repetitions = 1:5;
 method = 'correlation';
 focus_stims = 'all stimuli';
 
@@ -213,6 +213,9 @@ c = v.plotDiscriminationHead(...
     'plotType', 'performance_lines', ...
     'method',method, ...
     'focus_stims', focus_stims, ...
+    'classifier',classifier,...
+    'trainblockmode','2blocks',...
+    'separatetestset',true,...
     'zscore',false);
 for i = 2:width(c)
     p = signrank(c(:,1),c(:,i));
@@ -221,10 +224,11 @@ end
 xlabel('Template trial #')
 ylabel('Performance')
 ylim([0 1])
+title(classifier)
 cfg.figSize = "tiny";
 cfg.aspRatioType = "tall";
 cfg.setFigure;
-cfg.saveFigure(gcf,['template ',grouptag, ' ',stimtag,' lines 2-5'], saveType)
+cfg.saveFigure(gcf,['template ',grouptag, ' ',stimtag,' lines'], saveType)
 
 
 %% template matching mats
