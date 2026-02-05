@@ -128,18 +128,23 @@ methods (Static)
     
     %% yes data required
 
-    function hf = plotBoxplotsByGroup(group_data, cfg, filter)
+    function [hf, all_stats] = plotBoxplotsByGroup(group_data, cfg, filter, metrics)
         arguments
             group_data struct
             cfg PlotConfig = PlotConfig()
             filter GCMCResultsFilter = GCMCResultsFilter('shuffle', false)
+            metrics cell = {}
         end
 
         nGroups = numel(group_data);
-        metrics = group_data(1).data.Properties.VariableNames(5:end-3); % exclude grouping variables and stimulus names
-        nMetrics = 7; %numel(metrics);
+        group_names = {group_data.group_name};
+        if isempty(metrics)
+            metrics = group_data(1).data.Properties.VariableNames(5:end-3);
+        end
+        nMetrics = numel(metrics);
 
         hf = gobjects(nMetrics,1);
+        all_stats = struct('metric', {}, 'mw', {});
 
         for i_metric = 1:nMetrics
             hf(i_metric) = figure;
@@ -148,44 +153,29 @@ methods (Static)
             disp(['Metric: ', metrics{i_metric}])
 
             % Collect data for each group
-            group_labels = {};
-            box_data = [];
             datacells = cell(1,nGroups);
             for i_group = 1:nGroups
                 filtered_table = filter.filterTable(group_data(i_group).data);
                 this_data = filtered_table{:, metrics{i_metric}};
-                box_data = [box_data; this_data];
                 datacells{i_group} = this_data(:);
-                group_labels = [group_labels; repelem(string(group_data(i_group).group_name), size(this_data, 1), 1)];
             end
 
-            % Mann-Whitney U-test (non-parametric test)
-            for i_group = 1:nGroups
-                filtered_table = filter.filterTable(group_data(i_group).data);
-                this_data = filtered_table{:, metrics{i_metric}};
-                for j_group = i_group+1:nGroups
-                    filtered_other = filter.filterTable(group_data(j_group).data);
-                    other_data = filtered_other{:, metrics{i_metric}};
-                    p = ranksum(this_data, other_data); % Mann-Whitney U-test
-                    disp(['Mann-Whitney U-test between ', group_data(i_group).group_name, ...
-                            ' and ', group_data(j_group).group_name, ...
-                            ' for metric ', metrics{i_metric}, ': p = ', num2str(p)]);
-                end
+            % Pairwise Mann-Whitney U-tests with FDR correction
+            mw_results = statsUtils.pairwiseMannWhitney(datacells, group_names);
+            all_stats(i_metric).metric = metrics{i_metric};
+            all_stats(i_metric).mw = mw_results;
+
+            for k = 1:numel(mw_results)
+                disp(sprintf('  %s vs %s: p_raw=%.4g, p_adj=%.4g %s', ...
+                    mw_results(k).group1, mw_results(k).group2, ...
+                    mw_results(k).p_raw, mw_results(k).p_adj, ...
+                    statsUtils.pvalToStars(mw_results(k).p_adj)));
             end
 
             % Create boxplot
-            %boxplot(box_data, group_labels, 'Notch', 'on', 'Labels', unique(group_labels, 'stable'));
             RF_mkBoxPlot3(datacells,[],[],.1,.5,.5,2,[]);
-            xticks([1:nGroups]); xticklabels({group_data(:).group_name})
-            % Superimpose scatter plot for each group
-            for i_group = 1:nGroups
-                filtered_table = filter.filterTable(group_data(i_group).data);
-                this_data = filtered_table{:, metrics{i_metric}};
-                this_subj_ids = filtered_table{:, 'subj_id'};
-                %scatter(repelem(i_group, numel(this_data)), ...
-                %        this_data, 40, 'filled', 'CData', cfg.c(this_subj_ids,:), 'MarkerFaceAlpha', 0.7, ...
-                %        'jitter', 'on', 'jitterAmount', 0.15);
-            end
+            xticks(1:nGroups); xticklabels(group_names)
+
             title(['Metric: ', metrics{i_metric}]);
             ylabel(metrics{i_metric});
 
@@ -193,6 +183,23 @@ methods (Static)
             box off;
             axis tight
             xlim([.5 max(xticks)+.5])
+
+            % Add significance brackets
+            yl = ylim;
+            y_range = yl(2) - yl(1);
+            bracket_y = yl(2) + 0.05 * y_range;
+            bracket_step = 0.08 * y_range;
+            for k = 1:numel(mw_results)
+                if mw_results(k).p_adj < 0.05
+                    addSignificanceAnnotation(gca, ...
+                        [mw_results(k).i, mw_results(k).j], ...
+                        bracket_y, mw_results(k).p_adj, ...
+                        'style', 'bracket', 'color', cfg.axcol);
+                    bracket_y = bracket_y + bracket_step;
+                end
+            end
+            ylim([yl(1), bracket_y + 0.02 * y_range]);
+
             set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol, 'ZColor', cfg.axcol);
             set(gcf, 'color', cfg.bgcol);
             set(gcf, 'Position', [100, 100, 200, 500]);
@@ -201,14 +208,17 @@ methods (Static)
 
     end
 
-    function plotBoxplotsForEachMetric(avg_results, cfg, filter)
+    function plotBoxplotsForEachMetric(avg_results, cfg, filter, metrics)
         arguments
             avg_results table % from a single subj
             cfg PlotConfig = PlotConfig()
             filter GCMCResultsFilter = GCMCResultsFilter()
+            metrics cell = {}
         end
 
-        metrics = avg_results.Properties.VariableNames(5:end-2); % exclude grouping variables and stimulus names
+        if isempty(metrics)
+            metrics = avg_results.Properties.VariableNames(5:end-2);
+        end
 
         % Apply filter (excluding shuffle filter, which is handled separately below)
         filter_no_shuffle = filter;
@@ -223,43 +233,52 @@ methods (Static)
         nMetrics = numel(metrics);
         for i = 1:nMetrics
             figure;
+            hold on;
 
             thisdata = y_data(:,i);
             thisshuffle = y_shuffle(:,i);
 
-            % stats
+            % Mann-Whitney U-test (non-parametric, unpaired)
+            p_mw = NaN;
+            if numel(thisdata) >= 2 && numel(thisshuffle) >= 2
+                p_mw = ranksum(thisdata, thisshuffle);
+            end
 
-            % determine which tail to use based on difference in means.
-            % this makes sense only because the shuffle is the internal control!
-            % it's just a quicker way to define what's expected to be higher or lower in the data.
+            % Paired t-test (one-tailed, using mean difference to pick tail)
             mean_data = mean(thisdata);
             mean_shuffle = mean(thisshuffle);
-            if mean_data > mean_shuffle
-                tail = 'right';
-            else
-                tail = 'left';
-            end
-
+            if mean_data > mean_shuffle; tail = 'right'; else; tail = 'left'; end
             try
-                [~, p] = ttest(thisdata, thisshuffle, 'Tail', tail);
+                [~, p_tt] = ttest(thisdata, thisshuffle, 'Tail', tail);
             catch
-                p = NaN;
+                p_tt = NaN;
             end
-            disp(['Metric: ', metrics{i}, ', p-value (one-tailed paired t-test): ', num2str(p)]);
 
-            boxplot([thisdata;thisshuffle], ...
-                [repelem("Data", size(y_data,1),1); repelem("Shuffle", size(y_shuffle,1),1)]);
-            hold on;
+            disp(sprintf('Metric: %s | Mann-Whitney p=%.4g | paired t-test p=%.4g', ...
+                metrics{i}, p_mw, p_tt));
+
+            % Box plot
+            datacells = {thisdata, thisshuffle};
+            RF_mkBoxPlot3(datacells,[],[],.1,.5,.5,2,[]);
+            xticks([1 2]); xticklabels({'Data', 'Shuffle'})
+
+            % Scatter overlay
             scatter(repelem(1, size(y_data, 1)), y_data(:, i), 'r', 'filled', 'jitter', 'on', 'jitterAmount', 0.15);
             scatter(repelem(2, size(y_shuffle, 1)), y_shuffle(:, i), 'b', 'filled', 'jitter', 'on', 'jitterAmount', 0.15);
-            hold off;
-            title([metrics{i}, ', p=', sprintf(num2str(p), '%.5f')]);
-            ylabel(metrics{i});
 
+            % Significance bracket (use Mann-Whitney p-value)
+            yl = ylim;
+            bracket_y = yl(2) + 0.05 * (yl(2) - yl(1));
+            addSignificanceAnnotation(gca, [1 2], bracket_y, p_mw, ...
+                'style', 'bracket', 'color', cfg.axcol);
+
+            title(metrics{i});
+            ylabel(metrics{i});
             box off
             set(gcf,'Position',[100 100 200 400])
             set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
-            set(gcf, 'color', cfg.bgcol); 
+            set(gcf, 'color', cfg.bgcol);
+            hold off;
         end
     end
 
@@ -399,7 +418,7 @@ methods (Static)
 
             if sum(valid) > 1
                 lcfg.lineStyle = '-';
-                lcfg.lineWidth = 2;
+                lcfg.lineWidth = .5;
                 plotLineNShade(reps(valid), mu(valid)', sem(valid)', color, lcfg);
             end
 
@@ -412,7 +431,7 @@ methods (Static)
 
             line_handles(i_group) = plot(reps, mu, 'o', ...
                 'Color', color, 'MarkerFaceColor', color, ...
-                'MarkerSize', 6, 'DisplayName', legend_str);
+                'MarkerSize', 1, 'DisplayName', legend_str);
         end
 
         % Add significance stars for between-group comparisons
@@ -442,6 +461,141 @@ methods (Static)
         set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
         set(gcf, 'color', cfg.bgcol);
         set(gcf, 'Position', [100, 100, 400, 350]);
+    end
+
+    %% Helper methods
+
+    function [group_data, all_results] = loadAndPrepareData(v, folder_tag, exp_name)
+        % Load GCMC results and prepare group data with merged trained groups
+        %
+        % Inputs:
+        %   v          - ExperimentViewer object
+        %   folder_tag - subfolder name (e.g., 'odors', 'trials')
+        %   exp_name   - experiment name (subfolder under manifold_data/folder_tag)
+        %
+        % Outputs:
+        %   group_data   - struct array with .group_name and .data
+        %   all_results  - raw results table
+
+        arguments
+            v
+            folder_tag char
+            exp_name char = ''
+        end
+
+        if isempty(exp_name)
+            % Try to derive from experiment record
+            if isfield(v.experiment.record, 'tabpath')
+                [~, exp_name] = fileparts(v.experiment.record.tabpath);
+            else
+                error('GCMC_Plotting:loadAndPrepareData', ...
+                    'exp_name must be specified when experiment record has no tabpath.');
+            end
+        end
+
+        indir = fullfiletol('manifold_data', folder_tag);
+        all_results = GCMC_Analysis(v).extractResultsFromMultipleSubjects(fullfiletol(indir, exp_name));
+        group_data_raw = GCMC_Analysis(v).clusterByGroup(all_results);
+        group_data = GCMC_Plotting.mergeTrainedGroups(group_data_raw);
+    end
+
+    function new_group_data = mergeTrainedGroups(group_data)
+        % Merge trained subgroups into single 'trained' group
+        new_group_data = struct('group_name', {}, 'data', {});
+
+        naive_idx = find(strcmp({group_data.group_name}, 'naïve'));
+        uncoupled_idx = find(strcmp({group_data.group_name}, 'uncoupled'));
+        trained_idx = find(contains({group_data.group_name}, 'trained'));
+
+        idx = 0;
+        if ~isempty(naive_idx)
+            idx = idx + 1;
+            new_group_data(idx) = group_data(naive_idx);
+        end
+        if ~isempty(trained_idx)
+            idx = idx + 1;
+            new_group_data(idx).group_name = 'trained';
+            new_group_data(idx).data = group_data(trained_idx(1)).data;
+            for i = 2:numel(trained_idx)
+                new_group_data(idx).data = [new_group_data(idx).data; group_data(trained_idx(i)).data];
+            end
+        end
+        if ~isempty(uncoupled_idx)
+            idx = idx + 1;
+            new_group_data(idx) = group_data(uncoupled_idx);
+        end
+    end
+
+    function plotAndSaveBoxplots(group_data, cfg, filter, metrics, labels, yranges, savedir, saveType)
+        % Plot and save boxplots for multiple metrics
+        %
+        % Inputs:
+        %   group_data - struct array with .group_name and .data
+        %   cfg        - PlotConfig
+        %   filter     - GCMCResultsFilter
+        %   metrics    - cell array of metric column names
+        %   labels     - cell array of display labels
+        %   yranges    - cell array of [ymin ymax] ranges
+        %   savedir    - directory to save figures
+        %   saveType   - 'vector' or 'raster'
+
+        hf = GCMC_Plotting.plotBoxplotsByGroup(group_data, cfg, filter, metrics);
+
+        nFigs = numel(hf);
+        for i = 1:nFigs
+            if i <= numel(labels) && i <= numel(yranges)
+                figure(hf(i));
+                ylim(yranges{i});
+                title('');
+                ylabel(labels{i});
+                cfg.figSize = 'tiny';
+                cfg.aspRatioType = 'tall';
+                cfg.lineWidth = 0.5;
+                cfg.setLines = true;
+                cfg.setFigure;
+                cfg.savePath = savedir;
+                cfg.saveFigure(gcf, [labels{i}, ' boxplot'], saveType);
+            end
+        end
+        close all;
+    end
+
+    function plotAndSaveRepLines(group_data, cfg, filter, metrics, labels, savedir, saveType)
+        % Plot and save line plots across repetitions for multiple metrics
+        %
+        % Inputs:
+        %   group_data - struct array with .group_name and .data
+        %   cfg        - PlotConfig
+        %   filter     - GCMCResultsFilter
+        %   metrics    - cell array of metric column names
+        %   labels     - cell array of display labels
+        %   savedir    - directory to save figures
+        %   saveType   - 'vector' or 'raster'
+
+        for i = 1:numel(metrics)
+            [hf, stats] = GCMC_Plotting.plotMetricsByRepLine(group_data, cfg, filter, metrics{i});
+
+            % Display stats summary
+            disp(['=== Stats for ', labels{i}, ' ===']);
+            for j = 1:numel(stats.friedman)
+                disp(sprintf('  Friedman %s: p=%.4g', stats.friedman(j).group, stats.friedman(j).p));
+            end
+            sig_between = find([stats.between_group.p_fdr] < 0.05);
+            for j = sig_between
+                disp(sprintf('  Between-group rep%d %s vs %s: p_fdr=%.4g', ...
+                    stats.between_group(j).rep, stats.between_group(j).group1, ...
+                    stats.between_group(j).group2, stats.between_group(j).p_fdr));
+            end
+
+            ylabel(labels{i});
+            title('');
+            cfg.figSize = 'small';
+            cfg.aspRatioType = 'square';
+            cfg.setFigure;
+            cfg.savePath = savedir;
+            cfg.saveFigure(gcf, [labels{i}, ' by rep'], saveType);
+            close(hf);
+        end
     end
 
 end
