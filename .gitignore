@@ -2,6 +2,7 @@
 *.swp
 *.asv
 CLAUDE.md
+settings.*
 
 # ignore folders
 /temporary/
