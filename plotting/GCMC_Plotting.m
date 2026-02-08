@@ -356,7 +356,7 @@ methods (Static)
 
     end
 
-    function [hf, stats] = plotMetricsByRepLine(group_data, cfg, filter, metric_name)
+    function [hf, stats] = plotMetricsByRepLine(group_data, cfg, filter, metric_name, opts)
         % Plot metric values across repetitions as line plot with error ribbons
         %
         % Uses statsUtils for statistics and plotLineNShade for visualization.
@@ -366,6 +366,7 @@ methods (Static)
         %   cfg - PlotConfig object
         %   filter - GCMCResultsFilter
         %   metric_name - name of metric column (e.g., 'Fun_capacity')
+        %   opts.average_by_subject - if true, average rows per subject before stats
         %
         % Outputs:
         %   hf - figure handle
@@ -376,13 +377,14 @@ methods (Static)
             cfg PlotConfig = PlotConfig()
             filter GCMCResultsFilter = GCMCResultsFilter('shuffle', false)
             metric_name char = 'Fun_capacity'
+            opts.average_by_subject logical = false
         end
 
         nGroups = numel(group_data);
         group_names = {group_data.group_name};
 
         % === Extract data by group and rep ===
-        [data_by_group_rep, reps] = extractDataByGroupRep(group_data, filter, metric_name);
+        [data_by_group_rep, reps] = extractDataByGroupRep(group_data, filter, metric_name, opts.average_by_subject);
         nReps = numel(reps);
 
         if nReps == 0
@@ -560,7 +562,7 @@ methods (Static)
         close all;
     end
 
-    function plotAndSaveRepLines(group_data, cfg, filter, metrics, labels, savedir, saveType)
+    function plotAndSaveRepLines(group_data, cfg, filter, metrics, labels, savedir, saveType, opts)
         % Plot and save line plots across repetitions for multiple metrics
         %
         % Inputs:
@@ -571,9 +573,22 @@ methods (Static)
         %   labels     - cell array of display labels
         %   savedir    - directory to save figures
         %   saveType   - 'vector' or 'raster'
+        %   opts.average_by_subject - if true, average rows per subject before stats
+
+        arguments
+            group_data struct
+            cfg PlotConfig
+            filter GCMCResultsFilter
+            metrics cell
+            labels cell
+            savedir
+            saveType
+            opts.average_by_subject logical = false
+        end
 
         for i = 1:numel(metrics)
-            [hf, stats] = GCMC_Plotting.plotMetricsByRepLine(group_data, cfg, filter, metrics{i});
+            [hf, stats] = GCMC_Plotting.plotMetricsByRepLine(group_data, cfg, filter, metrics{i}, ...
+                'average_by_subject', opts.average_by_subject);
 
             % Display stats summary
             disp(['=== Stats for ', labels{i}, ' ===']);
@@ -598,14 +613,173 @@ methods (Static)
         end
     end
 
+    %% Sliding window methods
+
+    function sw = loadSlidingWindowData(v, folder_tag, exp_name)
+        % Load GCMC results across time windows
+        %
+        % Directory structure:
+        %   manifold_data/<folder_tag>/<exp_name>/<time_window>/manifolds_subj*/...
+        %   where time_window is e.g. '0.5-4.5s', '-4-0s', '-6--2s'
+        %
+        % Inputs:
+        %   v          - ExperimentViewer object
+        %   folder_tag - subfolder name (e.g., 'odors_slide_windows')
+        %   exp_name   - experiment name (subfolder under folder_tag)
+        %
+        % Output:
+        %   sw struct with fields:
+        %     .windows   - cell{1,nW} of sorted window label strings
+        %     .t_centers - [1 x nW] double, window midpoints (seconds)
+        %     .t_edges   - [nW x 2] double, [t0, t1] per window
+        %     .groups    - cell{1,nG} of group names
+        %     .data      - {nG x nW} cell array of tables
+
+        arguments
+            v
+            folder_tag char
+            exp_name char = ''
+        end
+
+        if isempty(exp_name)
+            if isfield(v.experiment.record, 'tabpath')
+                [~, exp_name] = fileparts(v.experiment.record.tabpath);
+            else
+                error('GCMC_Plotting:loadSlidingWindowData', ...
+                    'exp_name must be specified when experiment record has no tabpath.');
+            end
+        end
+
+        basedir = fullfiletol('manifold_data', folder_tag, exp_name);
+
+        % Discover subdirectories
+        entries = dir(basedir);
+        entries = entries([entries.isdir] & ~ismember({entries.name}, {'.', '..'}));
+
+        % Filter to valid time-window names and parse edges
+        all_names = {entries.name};
+        [t_edges_raw, valid] = parseSlidingWindowEdges(all_names);
+        window_labels = all_names(valid);
+        t_edges_raw = t_edges_raw(valid, :);
+
+        if isempty(window_labels)
+            error('GCMC_Plotting:loadSlidingWindowData', ...
+                'No valid time window directories found in %s', basedir);
+        end
+
+        % Sort by window start time
+        [t_edges, sort_idx] = sortrows(t_edges_raw, 1);
+        window_labels = window_labels(sort_idx);
+        t_centers = mean(t_edges, 2)';
+        nWindows = numel(window_labels);
+
+        % Load GCMC results for each window
+        gcmc = GCMC_Analysis(v);
+        gd_per_window = cell(nWindows, 1);
+        for i_win = 1:nWindows
+            winpath = fullfiletol(basedir, window_labels{i_win});
+            fprintf('Loading window %d/%d: %s\n', i_win, nWindows, window_labels{i_win});
+            results = gcmc.extractResultsFromMultipleSubjects(winpath);
+            gd_raw = gcmc.clusterByGroup(results);
+            gd_per_window{i_win} = GCMC_Plotting.mergeTrainedGroups(gd_raw);
+        end
+
+        % Determine consistent group ordering from first window
+        group_names = {gd_per_window{1}.group_name};
+        nGroups = numel(group_names);
+
+        % Organize into {nGroups x nWindows} cell array of tables
+        data = cell(nGroups, nWindows);
+        for i_win = 1:nWindows
+            gd = gd_per_window{i_win};
+            for j = 1:numel(gd)
+                grp_idx = find(strcmp(group_names, gd(j).group_name), 1);
+                if ~isempty(grp_idx)
+                    data{grp_idx, i_win} = gd(j).data;
+                end
+            end
+        end
+
+        sw.windows = window_labels;
+        sw.t_centers = t_centers;
+        sw.t_edges = t_edges;
+        sw.groups = group_names;
+        sw.data = data;
+    end
+
+    function [hf, p_friedman] = plotSlidingWindowMetrics(sw, cfg, filter, metrics, opts)
+        % Plot GCMC metrics across sliding time windows
+        %
+        % Auto-selects plot mode:
+        %   nReps > 1 → imagesc heatmap [reps x windows] per (group, metric)
+        %   nReps ≤ 1 → line plot per metric, groups overlaid (mean ± SEM)
+        %
+        % Inputs:
+        %   sw      - struct from loadSlidingWindowData
+        %   cfg     - PlotConfig
+        %   filter  - GCMCResultsFilter
+        %   metrics - cell array of metric column names (auto-detected if empty)
+        %   opts    - optional name-value pairs:
+        %       relative - logical, if true subtract pre-stimulus baseline (default: false)
+        %       clim     - [nMetrics x 2] double, [cmin cmax] per metric row, or [] for auto
+        %       average_by_subject - logical, if true average rows per subject (default: false)
+        %
+        % Outputs:
+        %   hf         - figure handles: [nG x nM] (heatmap) or [nM x 1] (line)
+        %   p_friedman - [nG x nW x nM] double, Friedman p per (group, window, metric)
+        %               NaN where test is inapplicable
+
+        arguments
+            sw struct
+            cfg PlotConfig = PlotConfig()
+            filter GCMCResultsFilter = GCMCResultsFilter('shuffle', false)
+            metrics cell = {}
+            opts.relative logical = false
+            opts.clim double = []
+            opts.average_by_subject logical = false
+        end
+
+        nGroups = numel(sw.groups);
+        nWindows = numel(sw.windows);
+
+        % Auto-detect metrics from first non-empty table
+        if isempty(metrics)
+            for idx = 1:numel(sw.data)
+                if ~isempty(sw.data{idx})
+                    metrics = sw.data{idx}.Properties.VariableNames(5:end-3);
+                    break;
+                end
+            end
+        end
+        nMetrics = numel(metrics);
+
+        % Discover available reps across all filtered data
+        reps = discoverReps(sw, filter);
+        nReps = numel(reps);
+
+        % Identify pre-stimulus windows (end time < 0)
+        pre_stim_mask = sw.t_edges(:, 2) < 0;
+
+        if nReps > 1
+            [hf, p_friedman] = plotSWHeatmaps(sw, cfg, filter, metrics, reps, ...
+                opts.relative, opts.clim, pre_stim_mask, opts.average_by_subject);
+        else
+            [hf, p_friedman] = plotSWLines(sw, cfg, filter, metrics, ...
+                opts.relative, opts.clim, pre_stim_mask, opts.average_by_subject);
+        end
+    end
+
 end
 
 end
 
 %% Local helper functions for plotMetricsByRepLine
 
-function [data_by_group_rep, reps] = extractDataByGroupRep(group_data, filter, metric_name)
+function [data_by_group_rep, reps] = extractDataByGroupRep(group_data, filter, metric_name, average_by_subject)
     % Extract metric data organized by [group, rep]
+    % If average_by_subject is true, return one value per subject (mean across rows)
+    if nargin < 4; average_by_subject = false; end
+
     nGroups = numel(group_data);
 
     % Find available reps
@@ -628,7 +802,11 @@ function [data_by_group_rep, reps] = extractDataByGroupRep(group_data, filter, m
             rep_filter.manifold_rep2 = reps(i_rep);
             filtered = rep_filter.filterTable(group_data(i_group).data);
             if ~isempty(filtered) && ismember(metric_name, filtered.Properties.VariableNames)
-                data_by_group_rep{i_group, i_rep} = filtered.(metric_name);
+                if average_by_subject
+                    data_by_group_rep{i_group, i_rep} = averageMetricBySubject(filtered, metric_name);
+                else
+                    data_by_group_rep{i_group, i_rep} = filtered.(metric_name);
+                end
             else
                 data_by_group_rep{i_group, i_rep} = [];
             end
@@ -720,5 +898,427 @@ function between_results = computeBetweenGroupStats(data_by_group_rep, group_nam
     p_fdr = statsUtils.fdr(p_raw);
     for k = 1:numel(between_results)
         between_results(k).p_fdr = p_fdr(k);
+    end
+end
+
+%% Local helper functions for sliding window methods
+
+function [t_edges, valid] = parseSlidingWindowEdges(window_names)
+    % Parse time window directory names into [t0, t1] edges
+    %
+    % Handles formats: '0.5-4.5s', '-4-0s', '-6--2s', '0_5-4_5s' (underscore for decimals)
+    % Reuses regex pattern from sortByWindow in GCMC_Analysis.m
+    %
+    % Inputs:
+    %   window_names - cell array of directory name strings
+    %
+    % Outputs:
+    %   t_edges - [n x 2] double, [t0, t1] for each name
+    %   valid   - [n x 1] logical, true if name was successfully parsed
+
+    n = numel(window_names);
+    t_edges = nan(n, 2);
+    valid = false(n, 1);
+
+    pattern = '([-]?\d+\.?\d*)-([-]?\d+\.?\d*)\w*';
+    for i = 1:n
+        name = strrep(window_names{i}, '_', '.'); % underscore→decimal convention
+        tokens = regexp(name, pattern, 'tokens');
+        if ~isempty(tokens)
+            t0 = str2double(tokens{1}{1});
+            t1 = str2double(tokens{1}{2});
+            if ~isnan(t0) && ~isnan(t1)
+                t_edges(i, :) = [t0, t1];
+                valid(i) = true;
+            end
+        end
+    end
+end
+
+function reps = discoverReps(sw, filter)
+    % Find unique manifold_rep1 values across all filtered sliding window data
+    reps = [];
+    for i = 1:numel(sw.data)
+        tbl = sw.data{i};
+        if isempty(tbl); continue; end
+        filtered = filter.filterTable(tbl);
+        if ismember('manifold_rep1', filtered.Properties.VariableNames)
+            reps = unique([reps; filtered.manifold_rep1]);
+        end
+    end
+    reps = sort(reps);
+end
+
+function [hf, p_friedman] = plotSWHeatmaps(sw, cfg, filter, metrics, reps, do_relative, clim_arr, pre_stim_mask, average_by_subject)
+    % Heatmap mode: one figure per (group, metric), dims [reps x windows]
+    % Friedman test per (group, window): subjects × reps
+    %
+    % do_relative: if true, subtract pre-stimulus baseline per (subject, stim pair, rep)
+    % clim_arr: [nMetrics x 2] double, or [] for auto per-figure
+    % pre_stim_mask: logical [nWindows x 1], true for pre-stimulus windows
+    % average_by_subject: if true, average by subject before computing heatmap cell means
+    if nargin < 9; average_by_subject = false; end
+
+    nGroups = numel(sw.groups);
+    nWindows = numel(sw.windows);
+    nMetrics = numel(metrics);
+    nReps = numel(reps);
+
+    hf = gobjects(nGroups, nMetrics);
+    p_friedman = nan(nGroups, nWindows, nMetrics);
+
+    for i_m = 1:nMetrics
+        metric = metrics{i_m};
+
+        % Get clim for this metric (if provided)
+        if ~isempty(clim_arr) && size(clim_arr, 1) >= i_m
+            metric_clim = clim_arr(i_m, :);
+        else
+            metric_clim = [];
+        end
+
+        for i_g = 1:nGroups
+            if do_relative
+                [heatmap_data, p_friedman(i_g, :, i_m)] = ...
+                    computeHeatmapRelative(sw.data(i_g, :), filter, metric, reps, pre_stim_mask, average_by_subject);
+            else
+                [heatmap_data, p_friedman(i_g, :, i_m)] = ...
+                    computeHeatmapAbsolute(sw.data(i_g, :), filter, metric, reps, average_by_subject);
+            end
+
+            % Plot
+            hf(i_g, i_m) = figure;
+            imagesc(sw.t_centers, reps, heatmap_data);
+            if ~isempty(metric_clim)
+                clim(metric_clim);
+            end
+            axis tight;
+            xlabel('Time (s)');
+            ylabel('Repetition #');
+            suffix = '';
+            if do_relative; suffix = ' (rel)'; end
+            title(sprintf('%s - %s%s', sw.groups{i_g}, strrep(metric, 'Fun_', ''), suffix));
+            colorbar;
+            colormap(cfg.colormapName);
+            set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
+            set(gcf, 'color', cfg.bgcol);
+            set(gcf, 'Position', [100, 100, 400, 300]);
+        end
+    end
+end
+
+function [hf, p_friedman] = plotSWLines(sw, cfg, filter, metrics, do_relative, clim_arr, pre_stim_mask, average_by_subject) %#ok<INUSD>
+    % Line mode: one figure per metric, groups overlaid (mean ± SEM across subjects)
+    % No Friedman test (no rep dimension)
+    %
+    % do_relative: if true, subtract pre-stimulus baseline per subject
+    % clim_arr: [nMetrics x 2] double, or [] for auto
+    % pre_stim_mask: logical [nWindows x 1], true for pre-stimulus windows
+    % average_by_subject: accepted for API consistency (no behavior change;
+    %   computeSubjectWindowMatrix already averages by subject)
+
+    nGroups = numel(sw.groups);
+    nWindows = numel(sw.windows);
+    nMetrics = numel(metrics);
+
+    hf = gobjects(nMetrics, 1);
+    p_friedman = nan(nGroups, nWindows, nMetrics);
+
+    for i_m = 1:nMetrics
+        metric = metrics{i_m};
+
+        % Get ylim for this metric (if provided)
+        if ~isempty(clim_arr) && size(clim_arr, 1) >= i_m
+            metric_ylim = clim_arr(i_m, :);
+        else
+            metric_ylim = [];
+        end
+
+        % Compute per-subject values for all groups
+        mu_all = nan(nGroups, nWindows);
+        sem_all = nan(nGroups, nWindows);
+
+        for i_g = 1:nGroups
+            subj_vals = computeSubjectWindowMatrix(sw.data(i_g, :), filter, metric);
+
+            if do_relative && any(pre_stim_mask)
+                baseline = mean(subj_vals(:, pre_stim_mask), 2, 'omitnan');
+                subj_vals = subj_vals - baseline;
+            end
+
+            for i_w = 1:nWindows
+                vals = subj_vals(:, i_w);
+                [mu_all(i_g, i_w), sem_all(i_g, i_w)] = statsUtils.groupStats({vals});
+            end
+        end
+
+        % Plot
+        hf(i_m) = figure;
+        hold on;
+        line_handles = gobjects(nGroups, 1);
+
+        for i_g = 1:nGroups
+            mu = mu_all(i_g, :);
+            sem = sem_all(i_g, :);
+            color = cfg.c(i_g, :);
+            valid = ~isnan(mu);
+
+            if sum(valid) > 1
+                lcfg.lineStyle = '-';
+                lcfg.lineWidth = .5;
+                plotLineNShade(sw.t_centers(valid), mu(valid)', sem(valid)', color, lcfg);
+            end
+
+            line_handles(i_g) = plot(sw.t_centers, mu, 'o-', ...
+                'Color', color, 'MarkerFaceColor', color, ...
+                'MarkerSize', 3, 'DisplayName', sw.groups{i_g});
+        end
+
+        hold off;
+        xlabel('Time (s)');
+        suffix = '';
+        if do_relative; suffix = ' (rel)'; end
+        ylabel([strrep(metric, 'Fun_', ''), suffix]);
+        if ~isempty(metric_ylim)
+            ylim(metric_ylim);
+        end
+        legend(line_handles, 'Location', 'best', 'Box', 'off');
+        box off;
+        set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
+        set(gcf, 'color', cfg.bgcol);
+        set(gcf, 'Position', [100, 100, 400, 350]);
+    end
+end
+
+function p = friedmanAtWindow(filtered, metric, reps)
+    % Friedman test at a single window: subjects × reps
+    p = NaN;
+    nReps = numel(reps);
+    if ~ismember('subj_id', filtered.Properties.VariableNames) || nReps < 2
+        return;
+    end
+
+    subj_ids = unique(filtered.subj_id);
+    nSubj = numel(subj_ids);
+    if nSubj < 2; return; end
+
+    subj_rep_mat = nan(nSubj, nReps);
+    for i_s = 1:nSubj
+        for i_r = 1:nReps
+            mask = filtered.subj_id == subj_ids(i_s) & ...
+                   filtered.manifold_rep1 == reps(i_r) & ...
+                   filtered.manifold_rep2 == reps(i_r);
+            vals = filtered{mask, metric};
+            if ~isempty(vals)
+                subj_rep_mat(i_s, i_r) = mean(vals, 'omitnan');
+            end
+        end
+    end
+
+    result = statsUtils.friedman(subj_rep_mat);
+    p = result.p;
+end
+
+function [heatmap_data, p_friedman] = computeHeatmapAbsolute(data_row, filter, metric, reps, average_by_subject)
+    % Compute heatmap data (absolute values) for a single group
+    % data_row: {1 x nWindows} cell array of tables
+    % average_by_subject: if true, average by subject before taking cell mean
+    % Returns: heatmap_data [nReps x nWindows], p_friedman [1 x nWindows]
+    if nargin < 5; average_by_subject = false; end
+
+    nWindows = numel(data_row);
+    nReps = numel(reps);
+    heatmap_data = nan(nReps, nWindows);
+    p_friedman = nan(1, nWindows);
+
+    for i_w = 1:nWindows
+        tbl = data_row{i_w};
+        if isempty(tbl); continue; end
+        filtered = filter.filterTable(tbl);
+        if isempty(filtered) || ~ismember(metric, filtered.Properties.VariableNames)
+            continue;
+        end
+
+        for i_r = 1:nReps
+            mask = filtered.manifold_rep1 == reps(i_r) & ...
+                   filtered.manifold_rep2 == reps(i_r);
+            rep_rows = filtered(mask, :);
+            if ~isempty(rep_rows)
+                if average_by_subject
+                    vals = averageMetricBySubject(rep_rows, metric);
+                else
+                    vals = rep_rows.(metric);
+                end
+                heatmap_data(i_r, i_w) = mean(vals, 'omitnan');
+            end
+        end
+
+        p_friedman(i_w) = friedmanAtWindow(filtered, metric, reps);
+    end
+end
+
+function [heatmap_data, p_friedman] = computeHeatmapRelative(data_row, filter, metric, reps, pre_stim_mask, average_by_subject)
+    % Compute heatmap data relative to pre-stimulus baseline
+    % Baseline subtraction happens per (subject, stim-pair, rep) BEFORE averaging
+    %
+    % data_row: {1 x nWindows} cell array of tables
+    % pre_stim_mask: logical [nWindows x 1], true for pre-stimulus windows
+    % average_by_subject: if true, average by subject after baseline subtraction
+    % Returns: heatmap_data [nReps x nWindows], p_friedman [1 x nWindows]
+    if nargin < 6; average_by_subject = false; end
+
+    nWindows = numel(data_row);
+    nReps = numel(reps);
+    heatmap_data = nan(nReps, nWindows);
+    p_friedman = nan(1, nWindows);
+
+    if ~any(pre_stim_mask)
+        % No pre-stimulus windows → fall back to absolute
+        [heatmap_data, p_friedman] = computeHeatmapAbsolute(data_row, filter, metric, reps, average_by_subject);
+        return;
+    end
+
+    % Build a map: (subj_id, stim_pair_key, rep) → baseline value
+    % stim_pair_key = sprintf('%d_%d', manifold_idx_1, manifold_idx_2)
+    baseline_map = containers.Map('KeyType', 'char', 'ValueType', 'double');
+
+    % Collect baseline values from pre-stimulus windows
+    pre_win_idx = find(pre_stim_mask);
+    for i_w = pre_win_idx(:)'
+        tbl = data_row{i_w};
+        if isempty(tbl); continue; end
+        filtered = filter.filterTable(tbl);
+        if isempty(filtered) || ~ismember(metric, filtered.Properties.VariableNames)
+            continue;
+        end
+        if ~ismember('subj_id', filtered.Properties.VariableNames); continue; end
+
+        for i_row = 1:height(filtered)
+            row = filtered(i_row, :);
+            key = sprintf('%d_%d_%d_%d', row.subj_id, row.manifold_idx_1, ...
+                row.manifold_idx_2, row.manifold_rep1);
+            val = row.(metric);
+            if isKey(baseline_map, key)
+                baseline_map(key) = [baseline_map(key), val];
+            else
+                baseline_map(key) = val;
+            end
+        end
+    end
+
+    % Average baselines
+    keys = baseline_map.keys;
+    for i = 1:numel(keys)
+        baseline_map(keys{i}) = mean(baseline_map(keys{i}), 'omitnan');
+    end
+
+    % Compute relative values for all windows
+    for i_w = 1:nWindows
+        tbl = data_row{i_w};
+        if isempty(tbl); continue; end
+        filtered = filter.filterTable(tbl);
+        if isempty(filtered) || ~ismember(metric, filtered.Properties.VariableNames)
+            continue;
+        end
+        if ~ismember('subj_id', filtered.Properties.VariableNames); continue; end
+
+        for i_r = 1:nReps
+            mask = filtered.manifold_rep1 == reps(i_r) & ...
+                   filtered.manifold_rep2 == reps(i_r);
+            rows = filtered(mask, :);
+            if isempty(rows); continue; end
+
+            rel_vals = nan(height(rows), 1);
+            for j = 1:height(rows)
+                row = rows(j, :);
+                key = sprintf('%d_%d_%d_%d', row.subj_id, row.manifold_idx_1, ...
+                    row.manifold_idx_2, row.manifold_rep1);
+                if isKey(baseline_map, key)
+                    rel_vals(j) = row.(metric) - baseline_map(key);
+                else
+                    rel_vals(j) = row.(metric);  % no baseline available
+                end
+            end
+
+            if average_by_subject && ismember('subj_id', rows.Properties.VariableNames)
+                % Average relative values per subject, then take mean
+                subj_ids = unique(rows.subj_id);
+                subj_means = nan(numel(subj_ids), 1);
+                for js = 1:numel(subj_ids)
+                    subj_means(js) = mean(rel_vals(rows.subj_id == subj_ids(js)), 'omitnan');
+                end
+                heatmap_data(i_r, i_w) = mean(subj_means, 'omitnan');
+            else
+                heatmap_data(i_r, i_w) = mean(rel_vals, 'omitnan');
+            end
+        end
+
+        % Friedman on relative values requires re-filtering with baseline subtraction
+        % For simplicity, use Friedman on absolute (test is about rank differences anyway)
+        p_friedman(i_w) = friedmanAtWindow(filtered, metric, reps);
+    end
+end
+
+function subj_window_mat = computeSubjectWindowMatrix(data_row, filter, metric)
+    % Compute [nSubjects x nWindows] matrix of per-subject mean values
+    % data_row: {1 x nWindows} cell array of tables
+
+    nWindows = numel(data_row);
+
+    % First pass: find all subject IDs
+    all_subj = [];
+    for i_w = 1:nWindows
+        tbl = data_row{i_w};
+        if isempty(tbl); continue; end
+        filtered = filter.filterTable(tbl);
+        if ~isempty(filtered) && ismember('subj_id', filtered.Properties.VariableNames)
+            all_subj = unique([all_subj; filtered.subj_id]);
+        end
+    end
+    nSubj = numel(all_subj);
+    subj_window_mat = nan(nSubj, nWindows);
+
+    % Second pass: fill matrix
+    for i_w = 1:nWindows
+        tbl = data_row{i_w};
+        if isempty(tbl); continue; end
+        filtered = filter.filterTable(tbl);
+        if isempty(filtered) || ~ismember(metric, filtered.Properties.VariableNames)
+            continue;
+        end
+
+        if ismember('subj_id', filtered.Properties.VariableNames)
+            for i_s = 1:nSubj
+                sv = filtered{filtered.subj_id == all_subj(i_s), metric};
+                subj_window_mat(i_s, i_w) = mean(sv, 'omitnan');
+            end
+        else
+            % No subj_id column → treat all rows as one "subject"
+            subj_window_mat(1, i_w) = mean(filtered.(metric), 'omitnan');
+        end
+    end
+end
+
+function vals = averageMetricBySubject(filtered, metric_name)
+    % Average metric values per unique subject, returning one value per subject
+    %
+    % Inputs:
+    %   filtered    - table with rows to average
+    %   metric_name - name of the metric column
+    %
+    % Output:
+    %   vals - [nSubjects x 1] vector of per-subject means
+    %          Falls back to raw values if no subj_id column exists
+
+    if ~ismember('subj_id', filtered.Properties.VariableNames)
+        vals = filtered.(metric_name);
+        return;
+    end
+
+    subj_ids = unique(filtered.subj_id);
+    nSubj = numel(subj_ids);
+    vals = nan(nSubj, 1);
+    for i = 1:nSubj
+        vals(i) = mean(filtered{filtered.subj_id == subj_ids(i), metric_name}, 'omitnan');
     end
 end

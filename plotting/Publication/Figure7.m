@@ -93,13 +93,27 @@ cfg.saveFigure(gcf,'naive PCA 2d', saveType)
 
 %% plot UMAP lines
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.stims_allowed = 'all stimuli';
-v.dataFilter.interval = [.5, 20];
+v.dataFilter.interval = [1, 20];
 v.dataFilter.repetitions = 1:5;
 
-[~,events,labs] = ModeSelector(v).extract;
-proj = computeLDE(events,labs,'pooldata',true,'nans2zeros',true, 'method','umap');
+% v.dataFilter.mode_name = 'dpca';
+% v.dataFilter.mode_OI = 'stimulus';
+% v.dataFilter.mode_method = 'isolate';
+% v.dataFilter.mode_file = 'dpca_trained.mat';
+
+% [~,events,labs] = ModeSelector(v).extract;
+
+[~,odor_events,all_labs] = ModeSelector(v).extract;
+L = height(odor_events{1});
+v.dataFilter.interval = [-22 -2];
+[~,base_events] = ModeSelector(v).extract;
+base_events = cellfun(@(x) repmat(mean(x,1,'omitmissing'),L,1,1),base_events,'UniformOutput',false);
+events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
+
+proj = computeLDE(events,labs,'pooldata',true,'nans2zeros',true, ...
+    'method','umap','n_components',2, 'metric','euclidean');
 figure; out = plotLDE(proj.embedding{1}.reduction,...
     'lines',proj.labs{1},cfg, 'ldetype',proj.name); % plot
 xlabel('UMAP 1'); ylabel('UMAP 2');
@@ -186,7 +200,7 @@ f = GCMCResultsFilter('shuffle', false, 'manifold_name_1', novel_stims, 'manifol
 GCMC_Plotting.plotAndSaveBoxplots(group_data, cfg, f, metrics_to_plot, metric_labels, metric_yranges, subdir, saveType);
 
 %% ========== TRIAL MANIFOLDS (line plots by rep) ==========
-folder_tag = 'trials_';
+folder_tag = 'trials';
 gcmc_savepath = fullfiletol(savepath, 'gcmc', folder_tag);
 if ~isfolder(gcmc_savepath); mkdir(gcmc_savepath); end
 
@@ -199,7 +213,7 @@ if ~isfolder(subdir); mkdir(subdir); end
 f = GCMCResultsFilter('shuffle', false);
 f.pairFilters.manifold_name = 'different';  % different stimulus only
 f.pairFilters.manifold_rep = 'same';   % same repetition only
-GCMC_Plotting.plotAndSaveRepLines(group_data_trials, cfg, f, metrics_to_plot, metric_labels, subdir, saveType);
+GCMC_Plotting.plotAndSaveRepLines(group_data_trials, cfg, f, metrics_to_plot, metric_labels, subdir, saveType,'average_by_subject',true);
 
 % --- Same rep trial manifolds (familiar stimuli only) ---
 subdir = fullfiletol(gcmc_savepath, 'familiar_samerep');
@@ -216,6 +230,92 @@ f = GCMCResultsFilter('shuffle', false, 'manifold_name_1', novel_stims, 'manifol
 f.pairFilters.manifold_name = 'different';
 f.pairFilters.manifold_rep = 'same';
 GCMC_Plotting.plotAndSaveRepLines(group_data_trials, cfg, f, metrics_to_plot, metric_labels, subdir, saveType);
+
+
+%% ========== SLIDING WINDOW TRIAL MANIFOLDS ==========
+folder_tag = 'trial_slide_windows';
+gcmc_savepath = fullfiletol(savepath, 'gcmc', folder_tag);
+if ~isfolder(gcmc_savepath); mkdir(gcmc_savepath); end
+
+% Load all time windows
+sw = GCMC_Plotting.loadSlidingWindowData(v, folder_tag, exp_name);
+
+% Color limits per metric: [nMetrics x 2] - same as metric_yranges but for heatmaps
+sw_clim = cell2mat(metric_yranges');  % convert {[0 .15], [0 30], ...} to [nM x 2]
+
+% --- All stimuli, same-rep, different-stim (absolute) ---
+subdir = fullfiletol(gcmc_savepath, 'allstims_samerep');
+if ~isfolder(subdir); mkdir(subdir); end
+f = GCMCResultsFilter('shuffle', false);
+f.pairFilters.manifold_name = 'different';
+f.pairFilters.manifold_rep = 'same';
+[hf_sw, pf_sw] = GCMC_Plotting.plotSlidingWindowMetrics(sw, cfg, f, metrics_to_plot, ...
+    'clim', sw_clim,'relative',true);
+
+% Display Friedman p-values
+for i_m = 1:numel(metrics_to_plot)
+    disp(['=== Sliding window Friedman: ', metric_labels{i_m}, ' ===']);
+    disp(array2table(pf_sw(:,:,i_m), ...
+        'VariableNames', sw.windows, 'RowNames', sw.groups));
+end
+
+% Save figures
+for i = 1:numel(hf_sw)
+    if isgraphics(hf_sw(i))
+        figure(hf_sw(i));
+        cfg.savePath = subdir;
+        cfg.saveFigure(hf_sw(i), get(get(gca,'Title'),'String'), saveType);
+    end
+end
+close all;
+
+% --- All stimuli, same-rep, different-stim (RELATIVE to pre-stimulus) ---
+subdir = fullfiletol(gcmc_savepath, 'allstims_samerep_rel');
+if ~isfolder(subdir); mkdir(subdir); end
+[hf_sw, ~] = GCMC_Plotting.plotSlidingWindowMetrics(sw, cfg, f, metrics_to_plot, ...
+    'relative', true);
+for i = 1:numel(hf_sw)
+    if isgraphics(hf_sw(i))
+        figure(hf_sw(i));
+        cfg.savePath = subdir;
+        cfg.saveFigure(hf_sw(i), get(get(gca,'Title'),'String'), saveType);
+    end
+end
+close all;
+
+% --- Familiar stimuli, same-rep ---
+subdir = fullfiletol(gcmc_savepath, 'familiar_samerep');
+if ~isfolder(subdir); mkdir(subdir); end
+f = GCMCResultsFilter('shuffle', false, 'manifold_name_1', familiar_stims, 'manifold_name_2', familiar_stims);
+f.pairFilters.manifold_name = 'different';
+f.pairFilters.manifold_rep = 'same';
+[hf_sw, ~] = GCMC_Plotting.plotSlidingWindowMetrics(sw, cfg, f, metrics_to_plot, ...
+    'clim', sw_clim);
+for i = 1:numel(hf_sw)
+    if isgraphics(hf_sw(i))
+        figure(hf_sw(i));
+        cfg.savePath = subdir;
+        cfg.saveFigure(hf_sw(i), get(get(gca,'Title'),'String'), saveType);
+    end
+end
+close all;
+
+% --- Novel stimuli, same-rep ---
+subdir = fullfiletol(gcmc_savepath, 'novel_samerep');
+if ~isfolder(subdir); mkdir(subdir); end
+f = GCMCResultsFilter('shuffle', false, 'manifold_name_1', novel_stims, 'manifold_name_2', novel_stims);
+f.pairFilters.manifold_name = 'different';
+f.pairFilters.manifold_rep = 'same';
+[hf_sw, ~] = GCMC_Plotting.plotSlidingWindowMetrics(sw, cfg, f, metrics_to_plot, ...
+    'clim', sw_clim);
+for i = 1:numel(hf_sw)
+    if isgraphics(hf_sw(i))
+        figure(hf_sw(i));
+        cfg.savePath = subdir;
+        cfg.saveFigure(hf_sw(i), get(get(gca,'Title'),'String'), saveType);
+    end
+end
+close all;
 
 
 %% template matching lines
