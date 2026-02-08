@@ -44,11 +44,11 @@ dft = v.dataFilter;
 grouptag = 'trained';
 
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.subjectGroup = 'naïve';
 
 % full matrix
 hf = figure;
-C = v.plotDistancesHead;
+C = v.plotDistancesHead('method','euclidean');
 xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
 cfg.figSize = 'small';
 cfg.aspRatioType = 'square';
@@ -102,14 +102,14 @@ v.dataFilter = dft;
 
 %% intertrial correlations, without pre-stimulus correlations
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.interval = [-22 -2];
 [~,base_events] = ModeSelector(v).extract;
 v.dataFilter.interval = [1 20];
 [~,odor_events,all_labs] = ModeSelector(v).extract;
-base_events = cellfun(@(x) mean(x,1,'omitmissing'),base_events,'UniformOutput',false);
-odor_events = cellfun(@(x) mean(x,1,'omitmissing'),odor_events,'UniformOutput',false);
+L = height(odor_events{1});
+base_events = cellfun(@(x) repmat(mean(x,1,'omitmissing'),L,1,1),base_events,'UniformOutput',false);
 diff_events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
 figure; plotDistances(diff_events,'full','correlation',all_labs{1},cfg);
 clim([0 .5])
@@ -273,12 +273,19 @@ cfg = v.plotConfig;
 
 %% upper bound discrimination across groups (multiple classifier)
 
+v.dataFilter = dft;
+
 classifiers = {'template_match','svm','dbd','lda','qda'};
 classif_nicknames = {'TM','SVM','DBD','LDA','QDA'};
-groups = {'naïve', 'trained'};
+groups = { 'trained'};
 focus_stims = {'Arg','Ala','His','Trp','Ser','Leu'};
 v.dataFilter.stims_allowed = {'Arg','Ala','His','Trp','Ser','Leu'};
 v.dataFilter.repetitions = [1:5];
+
+% v.dataFilter.mode_name = 'dpca';
+% v.dataFilter.mode_OI = 'stimulus';
+% v.dataFilter.mode_method = 'mode_values';
+% v.dataFilter.mode_file = 'dpca_trained.mat';
 
 nclass = numel(classifiers); ngroups = numel(groups); noptions = numel(focus_stims);
 chancelv = 1/noptions;
