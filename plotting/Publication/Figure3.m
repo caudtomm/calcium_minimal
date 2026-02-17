@@ -41,6 +41,7 @@ dft = v.dataFilter;
 
 
 %% unit firing distributions
+
 baseline_interval = [-22 -2];
 odor_interval = dft.interval;
 yrange = [-.2 .3];
@@ -63,6 +64,70 @@ cfg.lineWidth = .5;
 cfg.setFigure
 cfg.saveFigure(gcf,'trained unit delta firing distribution', saveType)
 cfg = v.plotConfig;
+% overall
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.interval = odor_interval;
+out = v.plotUnitActivityMetricHead('method','avg intensity');
+v.dataFilter.interval = baseline_interval;
+outbase = v.plotUnitActivityMetricHead('method','avg intensity');
+data_naive = cell2mat(out) - cell2mat(outbase);
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.interval = odor_interval;
+out = v.plotUnitActivityMetricHead('method','avg intensity');
+v.dataFilter.interval = baseline_interval;
+outbase = v.plotUnitActivityMetricHead('method','avg intensity');
+data_trained = cell2mat(out) - cell2mat(outbase);
+[~,~,labs] = ModeSelector(v).extract;
+labs = labs{1};
+repnum = arrayfun(@(i) sum(strcmp(labs(1:i), labs(i))), 1:numel(labs))';
+hf = figure;
+[stims,~,stimidx] = unique(labs,'stable');
+cols = colorcube(10);
+hold on;
+for i = 1:numel(stims)
+    idx = stimidx == i;
+    scatter(mean(data_naive(:,idx),1,'omitmissing'), mean(data_trained(:,idx),1,'omitmissing'),...
+        30, 'filled', 'CData', cols(i,:), 'MarkerFaceAlpha', 'flat', ...
+        'AlphaData', .7 + .3./repnum(idx), 'DisplayName', stims{i});
+end
+maxrange = max([max(xlim),max(ylim)]);
+xlim([0 maxrange]); ylim([0 maxrange]);
+plot([0 maxrange],[0 maxrange],'r-','DisplayName','x=y')
+u = legendUnq; legend(u)
+hold off;
+axis square
+xlabel('naive iFR (Hz)');
+ylabel('trained iFR (Hz)')
+
+hf = figure;
+[stims,~,stimidx] = unique(labs,'stable');
+cols = colorcube(10);
+hold on;
+for i = 1:numel(stims)
+    idx = stimidx == i;
+    x_mean = mean(data_naive(:,idx),1,'omitmissing');
+    y_mean = mean(data_trained(:,idx),1,'omitmissing');
+    x_std = std(data_naive(:,idx),0,1,'omitmissing')./sqrt(sum(idx));
+    y_std = std(data_trained(:,idx),0,1,'omitmissing')./sqrt(sum(idx));
+    
+    % Plot errorbars
+    errorbar(x_mean, y_mean, y_std, y_std, x_std, x_std, '.', ...
+        'Color', cols(i,:), 'LineWidth', 1, 'HandleVisibility', 'off');
+    
+    % Plot scatter with size based on repnum
+    scatter(x_mean, y_mean, 30 + 50*repnum(idx)/max(repnum), ...
+        'filled', 'CData', cols(i,:), 'MarkerFaceAlpha', 0.7, ...
+        'DisplayName', stims{i});
+end
+maxrange = max([max(xlim),max(ylim)]);
+xlim([0 maxrange]); ylim([0 maxrange]);
+plot([0 maxrange],[0 maxrange],'r-','DisplayName','x=y')
+u = legendUnq; legend(u)
+hold off;
+axis square
+xlabel('naive iFR (Hz)');
+ylabel('trained iFR (Hz)')
 
 % unit firing distributions (repetitions)
 baseline_interval = [-22 -2];
@@ -75,15 +140,16 @@ v.dataFilter.stims_allowed = 'all stimuli';
 [~,~, labs] = ModeSelector(v).extract; labs = labs{1};
 % over reps
 stims = unique(labs); nstims = numel(stims);
-data = [];
+data_trained_allstim = [];
 for i = 1:nstims
     v.dataFilter.stims_allowed = stims(i);
     v.dataFilter.interval = odor_interval;
     out = v.plotUnitActivityMetricHead('method','avg intensity');
     v.dataFilter.interval = baseline_interval;
     outbase = v.plotUnitActivityMetricHead('method','avg intensity');
-    data = [data; cell2mat(out) - cell2mat(outbase)];
+    data_trained_allstim = [data_trained_allstim; cell2mat(out) - cell2mat(outbase)];
 end
+data = data_trained_allstim;
 hf = figure;
 subplot(121); b = prettyBoxplot(data,{'1','2','3','4','5'},'scatterSize',5,'plotLine',true);
 ylabel('Cellwise delta iFR (Hz)')
@@ -94,8 +160,8 @@ v.dataFilter.interval = odor_interval;
 out = v.plotUnitActivityMetricHead('method','avg intensity');
 v.dataFilter.interval = baseline_interval;
 outbase = v.plotUnitActivityMetricHead('method','avg intensity');
-data = cell2mat(out) - cell2mat(outbase);
-subplot(122); b = prettyBoxplot(data,{'1','2','3','4','5'},'scatterSize',5,'plotLine',true);
+data_trained_leu = cell2mat(out) - cell2mat(outbase);
+subplot(122); b = prettyBoxplot(data_trained_leu,{'1','2','3','4','5'},'scatterSize',5,'plotLine',true);
 ylim(yrange)
 ylabel('Cellwise delta iFR (Hz)')
 cfg.figSize = "medium";
@@ -105,7 +171,140 @@ cfg.setFigure
 cfg.saveFigure(gcf,'trained unit delta firing distribution repetitions', saveType)
 cfg = v.plotConfig;
 
-% 
+% Friedman test: does firing change across repetitions? (trained)
+fr_trained = statsUtils.friedman(data_trained_allstim);
+fprintf('Friedman test (trained, all stimuli): chi2=%.2f, df=%d, p=%.4g\n', ...
+    fr_trained.chi2, fr_trained.df, fr_trained.p);
+fr_trained = statsUtils.friedman(data_trained_leu);
+fprintf('Friedman test (trained, all stimuli): chi2=%.2f, df=%d, p=%.4g\n', ...
+    fr_trained.chi2, fr_trained.df, fr_trained.p);
+
+% repeat for naive group
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.trial_sorting = 'chronological';
+v.dataFilter.stims_allowed = 'all stimuli';
+[~,~, labs_n] = ModeSelector(v).extract; labs_n = labs_n{1};
+stims_n = unique(labs_n); nstims_n = numel(stims_n);
+data_naive_allstim = [];
+for i = 1:nstims_n
+    v.dataFilter.stims_allowed = stims_n(i);
+    v.dataFilter.interval = odor_interval;
+    out = v.plotUnitActivityMetricHead('method','avg intensity');
+    v.dataFilter.interval = baseline_interval;
+    outbase = v.plotUnitActivityMetricHead('method','avg intensity');
+    data_naive_allstim = [data_naive_allstim; cell2mat(out) - cell2mat(outbase)];
+end
+hf = figure;
+subplot(121); b = prettyBoxplot(data_naive_allstim,{'1','2','3','4','5'},'scatterSize',5,'plotLine',true);
+ylabel('Cellwise delta iFR (Hz)'); ylim(yrange); title('naive - all stimuli')
+% Leu
+v.dataFilter.stims_allowed = {'Leu'};
+v.dataFilter.interval = odor_interval;
+out = v.plotUnitActivityMetricHead('method','avg intensity');
+v.dataFilter.interval = baseline_interval;
+outbase = v.plotUnitActivityMetricHead('method','avg intensity');
+data_naive_leu = cell2mat(out) - cell2mat(outbase);
+subplot(122); b = prettyBoxplot(data_naive_leu,{'1','2','3','4','5'},'scatterSize',5,'plotLine',true);
+ylim(yrange); ylabel('Cellwise delta iFR (Hz)'); title('naive - Leu')
+cfg.figSize = "medium"; cfg.aspRatioType = "square"; cfg.lineWidth = .5;
+cfg.setFigure
+cfg.saveFigure(gcf,'naive unit delta firing distribution repetitions', saveType)
+cfg = v.plotConfig;
+
+fr_naive = statsUtils.friedman(data_naive_allstim);
+fprintf('Friedman test (naive, all stimuli): chi2=%.2f, df=%d, p=%.4g\n', ...
+    fr_naive.chi2, fr_naive.df, fr_naive.p);
+fr_naive = statsUtils.friedman(data_naive_leu);
+fprintf('Friedman test (naive, Leu): chi2=%.2f, df=%d, p=%.4g\n', ...
+    fr_naive.chi2, fr_naive.df, fr_naive.p);
+v.dataFilter = dft;
+
+%% suppression score comparison across groups
+
+yrange = [-4 4];
+
+v.dataFilter = dft;
+v.dataFilter.stims_allowed = {'Leu'};
+v.dataFilter.subjectGroup = 'trained';
+supp_trained = cell2mat(v.plotUnitActivityMetricHead('method','general suppression score'));
+v.dataFilter.subjectGroup = 'naïve';
+supp_naive = cell2mat(v.plotUnitActivityMetricHead('method','general suppression score'));
+v.dataFilter = dft;
+
+supp_stats = statsUtils.pairwiseMannWhitney({supp_naive, supp_trained}, {'naive','trained'}, true);
+fprintf('Suppression score (naive vs trained): p_raw=%.4g, p_adj=%.4g, %s\n', ...
+    supp_stats.p_raw, supp_stats.p_adj, statsUtils.pvalToStars(supp_stats.p_adj));
+hf = figure; splitViolin({supp_naive, supp_trained},cfg,yrange);
+
+cfg.figSize = 'small'; cfg.aspRatioType = 'square'; cfg.setFigure;
+cfg.saveFigure(gcf,'suppression score Leu naive vs trained', saveType);
+cfg = v.plotConfig;
+
+v.dataFilter = dft;
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.subjectGroup = 'trained';
+supp_trained = cell2mat(v.plotUnitActivityMetricHead('method','general suppression score'));
+v.dataFilter.subjectGroup = 'naïve';
+supp_naive = cell2mat(v.plotUnitActivityMetricHead('method','general suppression score'));
+v.dataFilter = dft;
+
+supp_stats = statsUtils.pairwiseMannWhitney({supp_naive, supp_trained}, {'naive','trained'}, true);
+fprintf('Suppression score (naive vs trained): p_raw=%.4g, p_adj=%.4g, %s\n', ...
+    supp_stats.p_raw, supp_stats.p_adj, statsUtils.pvalToStars(supp_stats.p_adj));
+hf = figure; splitViolin({supp_naive, supp_trained},cfg,yrange);
+
+cfg.figSize = 'small'; cfg.aspRatioType = 'square'; cfg.setFigure;
+cfg.saveFigure(gcf,'suppression score allstims naive vs trained', saveType);
+cfg = v.plotConfig;
+
+
+
+function splitViolin(data,cfg,yrange)
+    % split violin for naive (left) and trained (right)
+    xcenter = 1;
+    width = 0.25; % half-violin max width
+    colors = cfg.c(1:2,:);
+    
+    hold on;
+    for i = 1:2
+        d = data{i};
+        d = d(~isnan(d));
+        if isempty(d), continue; end
+        [f, xi] = ksdensity(d, 'NumPoints', 256);
+        f = f / max(f) * width;
+        if i == 1 % left (naive)
+            X = [xcenter - f, xcenter*ones(1,numel(f))];
+        else % right (trained)
+            X = [xcenter + f, xcenter*ones(1,numel(f))];
+        end
+        Y = [xi, fliplr(xi)];
+        patch(X, Y, colors(i,:), 'EdgeColor', 'none', 'FaceAlpha', 0.6);
+        % % median line
+        % med = median(d);
+        % if i == 1
+        %     plot([xcenter - width*0.9, xcenter], [med med], 'k', 'LineWidth', 1.5);
+        % else
+        %     plot([xcenter, xcenter + width*0.9], [med med], 'k', 'LineWidth', 1.5);
+        % end
+        % % jittered points
+        % jitter = (rand(size(d)) - 0.5) * width * 0.6;
+        % if i == 1
+        %     xs = xcenter - 0.02 + jitter;
+        % else
+        %     xs = xcenter + 0.02 + jitter;
+        % end
+        % scatter(xs, d, 8, 'k', 'filled', 'MarkerFaceAlpha', 0.25);
+    end
+    xlim([xcenter-0.6, xcenter+0.6]);
+    set(gca, 'XTick', xcenter, 'XTickLabel', {'naive    |    trained'});
+    ylim(yrange); ylabel('Suppression (a.u.)');
+    box off; axis square;
+end
+
+
+
+%
 % % unit firing distributions
 % baseline_interval = [-22 -2];
 % odor_interval = dft.interval;

@@ -70,6 +70,76 @@ for i = 1:n_stimgroups
 end
 
 
+%% per-time-bin pairwise group comparisons
+res = {};
+t_centers = mean(windows,2);
+for i_sg = 1:n_stimgroups
+    % build pair labels from subject_groups
+    pair_labels = {};
+    for a = 1:n_subject_groups
+        for b = a+1:n_subject_groups
+            pair_labels{end+1} = [subject_groups{a},' vs ',subject_groups{b}]; %#ok
+        end
+    end
+    npairs = numel(pair_labels);
+    p_matrix = nan(nwindows, npairs);
+
+    for i_w = 1:nwindows
+        % collect data per subject group for this stim group
+        grp_data = cell(n_subject_groups,1);
+        for g = 1:n_subject_groups
+            i_p = find(idx_by_stimgroup==i_sg & idx_by_subjectgroup==g);
+            if ~isempty(i_p) && ~isempty(out{i_w}{i_p(1)})
+                grp_data{g} = out{i_w}{i_p(1)}.data(:);
+            else
+                grp_data{g} = [];
+            end
+        end
+        % pairwise ranksum
+        pidx = 0;
+        for a = 1:n_subject_groups
+            for b = a+1:n_subject_groups
+                pidx = pidx + 1;
+                if ~isempty(grp_data{a}) && ~isempty(grp_data{b})
+                    p_matrix(i_w, pidx) = ranksum(grp_data{a}, grp_data{b});
+                end
+            end
+        end
+    end
+
+    % FDR correction per pair across time bins
+    p_adj_matrix = p_matrix;
+    for pidx = 1:npairs
+        p_adj_matrix(:,pidx) = statsUtils.fdr(p_matrix(:,pidx));
+    end
+
+    % build results table
+    T = table(t_centers, 'VariableNames', {'t_center'});
+    for pidx = 1:npairs
+        safe_name = matlab.lang.makeValidName(pair_labels{pidx});
+        T.(safe_name) = p_adj_matrix(:,pidx);
+    end
+    fprintf('\n=== Per-bin group comparison (stim group: %s) — FDR-adjusted p-values ===\n', stim_groups{i_sg});
+    disp(T);
+    res{i_sg} = T;
+end
+
+clear b;
+figure;
+b(1) = plot(res{1}.t_center,res{1}.na_veVsTrained,'Color',cfg.c(1,:));
+hold on;
+b(2) = plot(res{2}.t_center,res{2}.na_veVsTrained,'Color',cfg.c(2,:));
+b(3) = plot(res{3}.t_center,res{3}.na_veVsTrained,'Color',cfg.c(3,:));
+plot([min(xlim),max(xlim)],[.05 .05],'r--')
+yscale log
+xlabel('Time from stim. onset (s)')
+ylabel('P-value')
+legend(b,{'familiar','novel','all'})
+cfg.figSize = 'small'; cfg.aspRatioType = 'wide'; cfg.setFigure;
+cfg.saveFigure(gcf,'similarity dynamics - intergroup corr pvalues','vector')
+
+
+
 %% plot all familiar in trained vs all novel in trained vs all novel in naive
 
 mode = 'exponential';
@@ -209,7 +279,7 @@ hold on;
 b = gobjects(n_vars,1);
 for i = 1:n_vars
     mu = data(:, i, 1);
-    sem = data(:, i, 2);
+    sem = data(:, i, 3);
     
     % Shaded error bars (optional, looks cleaner)
     fill([t fliplr(t)], [mu - sem; flipud(mu + sem)]', ...

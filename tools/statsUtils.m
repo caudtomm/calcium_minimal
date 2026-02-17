@@ -128,7 +128,7 @@ classdef statsUtils
             try
                 [p, tbl, stats] = friedman(data_clean, 1, display_opt);
                 result.p = p;
-                result.chi2 = stats.chisq;
+                % result.chi2 = stats.chisq;
                 result.df = k - 1;
                 result.valid = true;
             catch

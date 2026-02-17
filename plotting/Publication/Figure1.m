@@ -40,6 +40,41 @@ dft = v.dataFilter;
 
 %% FIGURE 1
 
+%% topography of the activity
+
+% different single-unit metrics vs anatomy
+out = v.plotTopographicHead('plotType','maps','method','avg intensity')
+out = v.plotTopographicHead('plotType','maps','method','variance')
+out = v.plotTopographicHead('plotType','maps','method','selectivity of tuning')
+out = v.plotTopographicHead('plotType','maps','method','stability of tuning')
+out = v.plotTopographicHead('plotType','maps','method','general suppression score')
+
+
+% response cosine sim vs anatomy
+v.dataFilter.interval = [.5 20]; % stimulus
+[~,events] = ModeSelector(v).extract;
+res = {};
+for n = 1:42
+    ta = TopographicAnalysis(v.filtered_traces{n});
+    data = ActivityTraces.format(events{n});
+    res{n} = ta.quantify(data,'cosine',100,10);
+    title(['fish #',num2str(n)])
+end
+mantelRs = cellfun(@(x) x.mantelR,res);
+figure; histogram(mantelRs,10)
+
+% noise cosine sim vs anatomy
+v.dataFilter.interval = [-22 -2]; % pre-stimulus
+[~,events] = ModeSelector(v).extract;
+res = {};
+for n = 1:42
+    ta = TopographicAnalysis(v.filtered_traces{n});
+    data = ActivityTraces.format(events{n});
+    res{n} = ta.quantify(data,'cosine',100,10);
+    title(['fish #',num2str(n)])
+end
+mantelRs = cellfun(@(x) x.mantelR,res);
+figure; histogram(mantelRs,10)
 
 %% naive intertrial baseline correlation
 v.dataFilter = dft;

@@ -643,6 +643,86 @@ classdef ExperimentViewer
 
         end
 
+        function out = plotTopographicHead(obj, varargin)
+        % PLOTTOPOGRAPHICHEAD Topographic analysis of unit activity metrics.
+        %
+        %   out = plotTopographicHead(obj, 'method', 'selectivity of tuning', ...
+        %                                  'plotType', 'maps')
+        %
+        %   NAME-VALUE PAIR ARGUMENTS:
+        %       'method'           - activity metric (default: 'selectivity of tuning')
+        %       'plotType'         - 'maps' or 'stats' (default: 'maps')
+        %       'similarityMetric' - for 'stats' mode (default: 'correlation')
+        %       'nShuffles'        - for 'stats' mode (default: 1000)
+        %       'nBins'            - for 'stats' mode (default: 10)
+            arguments
+                obj
+            end
+            arguments (Repeating)
+                varargin
+            end
+
+            % Set default values
+            plotType = 'maps';
+            method = 'selectivity of tuning';
+            n_equals = 'cells';
+            extraArgs = {};
+
+            % Parse name-value pairs
+            if ~isempty(varargin)
+                for k = 1:2:length(varargin)
+                    switch lower(varargin{k})
+                        case 'method'
+                            method = varargin{k+1};
+                        case 'n_equals'
+                            n_equals = varargin{k+1};
+                        case 'plottype'
+                            plotType = varargin{k+1};
+                        case {'similaritymetric', 'nshuffles', 'nbins'}
+                            extraArgs = [extraArgs, varargin(k:k+1)]; %#ok<AGROW>
+                    end
+                end
+            end
+
+            % initialize output
+            out = [];
+
+            % Isolating relevant data
+            [~, events, all_labs] = ModeSelector(obj).extract;
+            if all(cellfun(@isempty,events)); return; end
+
+            % useful metrics
+            nsubjects = numel(obj.filtered_traces);
+
+            % call low-level processor (compute per-unit metric)
+            all_metrics = cell(nsubjects, 1);
+            for i = 1:nsubjects
+                thisevents = events{i};
+                thislabs = all_labs{i};
+                if isempty(thislabs); continue; end
+
+                m = extractActivityMetric(thisevents, method, n_equals, ...
+                    'StimTypes', thislabs);
+                % reduce to [units x 1] if needed
+                if ~isvector(m)
+                    m = mean(m, 2:ndims(m), 'omitmissing');
+                end
+                all_metrics{i} = m(:);
+            end
+
+            % get rid of empty data
+            idx = cellfun(@isempty, all_metrics);
+            all_metrics(idx) = [];
+            events(idx) = [];
+            traces = obj.filtered_traces;
+            traces(idx) = [];
+            if isempty(all_metrics); return; end
+
+            % call low-level plotter
+            out = plotTopographic(all_metrics, traces, plotType, ...
+                events, obj.plotConfig, extraArgs{:});
+        end
+
         %% complex and idiosyncratic high-level plotters are saved in external files
 
 

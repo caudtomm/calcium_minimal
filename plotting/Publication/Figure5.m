@@ -352,8 +352,8 @@ v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'novelty';
 v.dataFilter.mode_method = 'mode_values';
-v.dataFilter.subjectGroup = 'naïve';
-v.dataFilter.mode_file = 'dpca_naive.mat';
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.mode_file = 'dpca_trained.mat';
 m = ModeSelector(v).extract;
 c = []; % [w1 N; w2 N; ...]
 for i= 1:numel(m.coeffs)
@@ -377,7 +377,7 @@ set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cf
 set(gcf, 'color', cfg.bgcol);
 %% novelty w correlation with general suppression
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'trained';
 supp = v.plotUnitActivityMetricHead('method','general suppression score');
 supp = cell2mat(supp);
 figure; plotHeatmapAndIsoclines(supp,log(abs(c(:,1))),25,1,0,0)
@@ -427,7 +427,7 @@ x = mean(c(:,1),'omitmissing') + std(c(:,1),'omitmissing') .* [-1 1];
 hold on; plot(x,polyval(p,x),'r','LineWidth',2)
 %% novelty w correlation with population intensity
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.repetitions = 1;
 unitint = v.plotUnitActivityMetricHead('method','avg intensity');
 unitint = mean(cell2mat(unitint), 2, 'omitmissing');
