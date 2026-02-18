@@ -105,18 +105,18 @@ hf = figure;
 cols = colorcube(10);
 hold on;
 for i = 1:numel(stims)
-    idx = stimidx == i;
+    idx = ismember(stimidx,i);
     x_mean = mean(data_naive(:,idx),1,'omitmissing');
     y_mean = mean(data_trained(:,idx),1,'omitmissing');
     x_std = std(data_naive(:,idx),0,1,'omitmissing')./sqrt(sum(idx));
-    y_std = std(data_trained(:,idx),0,1,'omitmissing')./sqrt(sum(idx));
+    y_std = std(data_trained(:,idx),0,1,'omitmissing');
     
     % Plot errorbars
     errorbar(x_mean, y_mean, y_std, y_std, x_std, x_std, '.', ...
         'Color', cols(i,:), 'LineWidth', 1, 'HandleVisibility', 'off');
     
     % Plot scatter with size based on repnum
-    scatter(x_mean, y_mean, 30 + 50*repnum(idx)/max(repnum), ...
+    scatter(x_mean, y_mean, 30 + 50./repnum(idx), ...
         'filled', 'CData', cols(i,:), 'MarkerFaceAlpha', 0.7, ...
         'DisplayName', stims{i});
 end
