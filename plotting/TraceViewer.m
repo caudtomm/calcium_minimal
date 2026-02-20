@@ -1,6 +1,6 @@
 classdef TraceViewer
     properties
-        traces ActivityTraces
+        traces
         idx logical % which units to use
     end
 
@@ -127,7 +127,7 @@ classdef TraceViewer
     methods
         function obj = TraceViewer(traces, rois_touse)
             arguments
-                traces ActivityTraces
+                traces
                 rois_touse double = traces.goodNeuron_IDs
             end
             obj.traces = traces;

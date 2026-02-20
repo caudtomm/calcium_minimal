@@ -166,7 +166,7 @@ function stim_series = build_stim_series(meta, K, R)
 
     for k = 1:K
         for r = 1:R
-            i              = (k-1)*R + r;
+            i              = (r-1)*K + k;
             stimulus{i}    = meta.stimulus_names{k};
             odor_channel(i) = k;
         end

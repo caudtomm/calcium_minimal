@@ -5,7 +5,8 @@ classdef GeometryBuilder
 %   funnel manifold geometry, given a ToyParams object.
 %
 %   Identity axes e_k:  one per odor, drawn from a D-dimensional subspace U.
-%                       Pairwise correlations <e_k, e_j> depend on D.
+%                       Pairwise correlations <e_k, e_j> = rho_e exactly,
+%                       set independently of D via a Gram matrix construction.
 %
 %   Novelty axes n_k:   n_k = alpha * e_k + sqrt(1-alpha^2) * w_k
 %                       where w_k ⊥ span(U) with <w_k, w_j> = rho exactly.
@@ -15,7 +16,7 @@ classdef GeometryBuilder
 %   Drift direction d:  single unit vector orthogonal to span(U).
 %
 %   Usage:
-%     params = ToyParams('D', 20, 'rho', 0.3, 'alpha', 0.1);
+%     params = ToyParams('D', 20, 'rho', 0.3, 'rho_e', 0.2, 'alpha', 0.1);
 %     geom   = GeometryBuilder(params);
 %     geom.e          % [N x K] identity axes
 %     geom.n          % [N x K] novelty axes
@@ -60,8 +61,8 @@ classdef GeometryBuilder
             % 1. Identity subspace: [N x D] orthonormal basis
             obj.U = build_identity_subspace(N, D, params.rotation_mix);
 
-            % 2. Identity axes: [N x K] unit vectors in span(U)
-            obj.e = build_identity_axes(obj.U, K);
+            % 2. Identity axes: [N x K] unit vectors in span(U) with <e_k,e_j> = rho_e
+            obj.e = build_identity_axes(obj.U, K, params.rho_e);
 
             % 3. Novelty axes: [N x K] unit vectors with controlled correlations
             obj.n = build_novelty_axes(N, K, obj.U, obj.e, params.alpha, params.rho);
@@ -126,16 +127,34 @@ end
 
 % ------------------------------------------------------------------------- %
 
-function e = build_identity_axes(U, K)
-% BUILD_IDENTITY_AXES  Returns [N x K] unit vectors in span(U).
+function e = build_identity_axes(U, K, rho_e)
+% BUILD_IDENTITY_AXES  Returns [N x K] unit vectors in span(U) with
+%   <e_k, e_j> = rho_e exactly for all k ~= j (Gram matrix construction).
 %
-%   Pairwise correlations <e_k, e_j> are determined by the dimensionality D
-%   of U: low D -> more correlated axes; high D -> more orthogonal.
+%   Steps:
+%     1. Build Gram matrix G: G_{kj} = rho_e (k~=j), G_{kk} = 1.
+%     2. Cholesky factor: G = L * L'  (regularized for boundary case).
+%     3. Draw K orthonormal coordinate vectors in R^D via QR.
+%     4. E_raw = U * V_e  → [N x K] orthonormal in R^N, within span(U).
+%     5. e     = E_raw * L'  → <e_k, e_j> = G_{kj} = rho_e.
+%
+%   Proof: e'*e = L*(E_raw'*E_raw)*L' = L*I*L' = G.
 
-    D     = size(U, 2);
-    C     = randn(D, K);            % random coordinates in the subspace
-    E_raw = U * C;                  % [N x K], each column in span(U)
-    e     = E_raw ./ vecnorm(E_raw, 2, 1);  % normalize to unit vectors
+    D = size(U, 2);
+
+    % Gram matrix for identity axes
+    G = rho_e * ones(K) + (1 - rho_e) * eye(K) + 1e-10 * eye(K);
+    L = chol(G, 'lower');   % [K x K], G = L * L'
+
+    % K orthonormal coordinate vectors in R^D
+    [V_e, ~] = qr(randn(D, K), 'econ');   % [D x K], orthonormal
+    V_e      = V_e(:, 1:K);
+
+    % Map into neuron space via identity subspace
+    E_raw = U * V_e;   % [N x K], orthonormal columns in R^N
+
+    % Apply Cholesky factor to impose target correlations
+    e = E_raw * L';    % [N x K], <e_k,e_j> = rho_e exactly
 end
 
 % ------------------------------------------------------------------------- %

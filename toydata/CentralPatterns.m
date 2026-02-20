@@ -4,14 +4,21 @@ classdef CentralPatterns
 %   Evaluates the funnel model's mean response vector for every (odor, rep)
 %   combination:
 %
-%     mu(:, k, r) = A * e_k  +  B * exp(-(r-1)/tau) * n_k  +  gamma*(r-1) * d
-%                  |_identity_|  |_______novelty decay_______|  |___drift___|
+%     mu(:,k,r) = A*(1 + lambda_A*(1-exp(-(r-1)/tau))) * e_k
+%               + B*exp(-(r-1)/tau)                    * n_k
+%               + gamma*(r-1)                          * d
+%               |________identity (growing)___________|
+%                         |_____novelty (decaying)_____|  |__drift__|
+%
+%   Identity and novelty share the time constant tau: as novelty decays,
+%   identity grows toward A*(1+lambda_A).  lambda_A=0 recovers the original
+%   flat identity model.
 %
 %   mu is the expected population firing rate (Hz) during the odor window,
 %   relative to zero.  It may be negative for some neurons; the NoiseModel
 %   adds a per-neuron baseline so that total firing rates remain positive.
 %
-%   Null model (B=0, gamma=0): mu(:,:,r) is identical for all r.
+%   Null model (B=0, gamma=0, lambda_A=0): mu(:,:,r) is identical for all r.
 %
 %   Usage:
 %     params = ToyParams();
@@ -27,8 +34,9 @@ classdef CentralPatterns
         mu              double  % [N x K x R]  central patterns (Hz)
 
         % Per-repetition scalar weights (useful for plotting trajectories)
-        novelty_weights double  % [R x 1]  B * exp(-(r-1)/tau) for r = 1..R
-        drift_offsets   double  % [R x 1]  gamma * (r-1)        for r = 1..R
+        identity_weights double % [R x 1]  A*(1+lambda_A*(1-exp(-(r-1)/tau))) for r=1..R
+        novelty_weights  double % [R x 1]  B*exp(-(r-1)/tau)                  for r=1..R
+        drift_offsets    double % [R x 1]  gamma*(r-1)                         for r=1..R
 
     end
 
@@ -48,22 +56,22 @@ classdef CentralPatterns
             R = params.R;
 
             r_idx = (0 : R-1)';                        % [R x 1], 0-indexed
+            exp_decay = exp(-r_idx / params.tau);      % [R x 1], shared decay envelope
 
-            obj.novelty_weights = params.B     * exp(-r_idx / params.tau);
-            obj.drift_offsets   = params.gamma * r_idx;
+            obj.identity_weights = params.A * (1 + params.lambda_A * (1 - exp_decay));
+            obj.novelty_weights  = params.B * exp_decay;
+            obj.drift_offsets    = params.gamma * r_idx;
 
             % Allocate output: [N x K x R]
             obj.mu = zeros(N, K, R);
 
-            % Identity component is the same for all reps: [N x K]
-            identity_part = params.A * geom.e;
-
             for r = 1:R
+                iw = obj.identity_weights(r);  % scalar
                 nw = obj.novelty_weights(r);   % scalar
                 dw = obj.drift_offsets(r);     % scalar
 
-                % [N x K] + nw*[N x K] + dw*[N x 1]  (column broadcast)
-                obj.mu(:, :, r) = identity_part  + nw * geom.n  + dw * geom.d;
+                % iw*[N x K] + nw*[N x K] + dw*[N x 1]  (column broadcast)
+                obj.mu(:, :, r) = iw * geom.e  + nw * geom.n  + dw * geom.d;
             end
         end
 
@@ -74,6 +82,10 @@ classdef CentralPatterns
             [~, K, R] = size(obj.mu);
 
             fprintf('CentralPatterns diagnostics\n');
+            fprintf('  Identity weights  A*(1+lambda_A*(1-exp(-(r-1)/tau))):\n');
+            for r = 1:R
+                fprintf('    rep %d:  %.4f Hz\n', r, obj.identity_weights(r));
+            end
             fprintf('  Novelty weights  B*exp(-(r-1)/tau):\n');
             for r = 1:R
                 fprintf('    rep %d:  %.4f Hz\n', r, obj.novelty_weights(r));

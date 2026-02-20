@@ -30,23 +30,33 @@ classdef ToyParams
         % Manifold geometry
         % ----------------------------------------------------------------
 
-        % D: dimensionality of the latent subspace from which identity axes
-        %    e_k are drawn. Controls pairwise correlations <e_k, e_j>:
-        %    low D -> more correlated; high D -> more orthogonal.
+        % D: dimensionality of the identity subspace span(U).
+        %    Determines how many directions are available for identity axes,
+        %    and how many novelty / drift axes can be orthogonal to span(U).
+        %    Pairwise correlations of e_k are controlled independently by rho_e.
         %    Constraints: K <= D <= N.
         D double = 30
 
         % A: identity amplitude (Hz), uniform across odors.
-        %    Sets the magnitude of the odor-specific component of mu_{k,r}.
+        %    Sets the magnitude of the odor-specific component at rep 1.
         A double = 5
+
+        % lambda_A: fractional growth of the identity amplitude across reps.
+        %           identity component = A * (1 + lambda_A*(1-exp(-(r-1)/tau))) * e_k
+        %           0 = flat (default, recovers original model);
+        %           1 = amplitude doubles asymptotically.
+        %           Shares time constant tau with novelty decay.
+        lambda_A double = 0
 
         % B: initial novelty amplitude (Hz) at repetition 1.
         %    Decays exponentially across repetitions with time constant tau.
         %    Set to 0 for the null model (no novelty-driven attenuation).
         B double = 8
 
-        % tau: novelty decay time constant (units: repetitions).
+        % tau: shared time constant (units: repetitions) for novelty decay
+        %      and identity growth.
         %      novelty component = B * exp(-(r-1) / tau).
+        %      identity scale    = 1 + lambda_A*(1 - exp(-(r-1)/tau)).
         tau double = 1.5
 
         % gamma: directed drift strength (Hz per repetition) along the
@@ -67,6 +77,12 @@ classdef ToyParams
         %      odors (k ~= j). 0 = uncorrelated (default); range [-1, 1].
         %      Must be >= -1/(K-1) to keep the Gram matrix PSD.
         rho double = 0
+
+        % rho_e: inner product <e_k, e_j> between identity axes of different
+        %        odors (k ~= j). 0 = orthogonal (default); range [-1, 1].
+        %        Must be >= -1/(K-1) to keep the Gram matrix PSD.
+        %        Independent of D (which sets subspace dimensionality only).
+        rho_e double = 0
 
         % ----------------------------------------------------------------
         % Mixed selectivity
@@ -185,12 +201,17 @@ classdef ToyParams
                 'ToyParams: alpha must be in [-1, 1] (got %.3f).', obj.alpha);
             assert(obj.rho >= -1 && obj.rho <= 1, ...
                 'ToyParams: rho must be in [-1, 1] (got %.3f).', obj.rho);
+            assert(obj.rho_e >= -1 && obj.rho_e <= 1, ...
+                'ToyParams: rho_e must be in [-1, 1] (got %.3f).', obj.rho_e);
 
-            % Minimum rho for PSD Gram matrix: 1 + (K-1)*rho >= 0
+            % Minimum rho / rho_e for PSD Gram matrix: 1 + (K-1)*rho >= 0
             rho_min = -1 / (obj.K - 1);
             assert(obj.rho >= rho_min, ...
                 ['ToyParams: rho (%.3f) too negative for K=%d. ' ...
                  'Minimum valid rho is %.3f.'], obj.rho, obj.K, rho_min);
+            assert(obj.rho_e >= rho_min, ...
+                ['ToyParams: rho_e (%.3f) too negative for K=%d. ' ...
+                 'Minimum valid rho_e is %.3f.'], obj.rho_e, obj.K, rho_min);
 
             assert(obj.rotation_mix >= 0 && obj.rotation_mix <= 1, ...
                 'ToyParams: rotation_mix must be in [0, 1] (got %.3f).', obj.rotation_mix);
@@ -210,6 +231,8 @@ classdef ToyParams
                 'ToyParams: B must be non-negative.');
             assert(obj.gamma >= 0, ...
                 'ToyParams: gamma must be non-negative.');
+            assert(obj.lambda_A >= 0, ...
+                'ToyParams: lambda_A must be non-negative.');
 
             assert(obj.t_odor_end > obj.t_odor_start, ...
                 'ToyParams: t_odor_end must be > t_odor_start.');
@@ -247,21 +270,21 @@ classdef ToyParams
             end
         end
 
+        function p = makeNull(obj)
+        % MAKENULL  Returns a null-model ToyParams (B=0, gamma=0) from an existing ToyParams object.
+        %
+        %   Example:
+        %     p = ToyParams('tau', 2, 'rho', 0.1)
+        %     p_null = p.makeNull`
+            p = obj;
+            p.B     = 0;
+            p.gamma = 0;
+        end
+
     end
 
     % --------------------------------------------------------------------- %
     methods (Static)
-
-        function p = makeNull(varargin)
-        % MAKENULL  Returns a null-model ToyParams (B=0, gamma=0).
-        %   Any additional name-value pairs are forwarded to the constructor.
-        %
-        %   Example:
-        %     p = ToyParams.makeNull('tau', 2, 'rho', 0.1)
-            p = ToyParams(varargin{:});
-            p.B     = 0;
-            p.gamma = 0;
-        end
 
         function p = fromStruct(s)
         % FROMSTRUCT  Reconstruct a ToyParams object from a saved struct.

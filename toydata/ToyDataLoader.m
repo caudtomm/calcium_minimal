@@ -158,7 +158,7 @@ classdef ToyDataLoader
         %   exp = ToyDataLoader.loadNullAndHypothesis(null_dir, hyp_dir, null_group, hyp_group)
         %
         %   Loads all 'toydata_null_*.mat' from null_dir and all
-        %   'toydata_hyp_*.mat' from hyp_dir into a single Experiment,
+        %   'toydata_hypothesis_*.mat' from hyp_dir into a single Experiment,
         %   with subjects labelled by their respective groups.
         %   Useful for comparing null vs hypothesis in one ExperimentViewer.
 
@@ -166,7 +166,7 @@ classdef ToyDataLoader
             if nargin < 4 || isempty(hyp_group);  hyp_group  = 'hypothesis'; end
 
             null_files = dir(fullfiletol(null_dir, 'toydata_null_*.mat'));
-            hyp_files  = dir(fullfiletol(hyp_dir,  'toydata_hyp_*.mat'));
+            hyp_files  = dir(fullfiletol(hyp_dir,  'toydata_hypothesis_*.mat'));
 
             if isempty(null_files)
                 error('ToyDataLoader: no null .mat files found in: %s', null_dir);

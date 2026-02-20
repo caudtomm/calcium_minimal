@@ -98,9 +98,10 @@ classdef ToyDataGenerator
             s.geometry.U = obj.geom.U;              % [N x D]
 
             % Noiseless central patterns (small)
-            s.patterns.mu              = obj.cp.mu;               % [N x K x R]
-            s.patterns.novelty_weights = obj.cp.novelty_weights;  % [R x 1]
-            s.patterns.drift_offsets   = obj.cp.drift_offsets;    % [R x 1]
+            s.patterns.mu               = obj.cp.mu;                % [N x K x R]
+            s.patterns.identity_weights = obj.cp.identity_weights;  % [R x 1]
+            s.patterns.novelty_weights  = obj.cp.novelty_weights;   % [R x 1]
+            s.patterns.drift_offsets    = obj.cp.drift_offsets;     % [R x 1]
 
             % Noise diagnostics
             s.noise.baseline    = obj.nm.baseline;     % [N x 1]
