@@ -5,8 +5,12 @@ classdef GeometryBuilder
 %   funnel manifold geometry, given a ToyParams object.
 %
 %   Identity axes e_k:  one per odor, drawn from a D-dimensional subspace U.
-%                       Pairwise correlations <e_k, e_j> = rho_e exactly,
-%                       set independently of D via a Gram matrix construction.
+%                       Pairwise correlations <e_k, e_j> = rho_e exactly at
+%                       rep 1, set via a Gram matrix construction.
+%                       E_raw (the underlying orthonormal frame) is stored so
+%                       that CentralPatterns can recompute e_k per repetition
+%                       when eta > 0, by applying a new Cholesky factor to the
+%                       same E_raw without any N-D rotation.
 %
 %   Novelty axes n_k:   n_k = alpha * e_k + sqrt(1-alpha^2) * w_k
 %                       where w_k ⊥ span(U) with <w_k, w_j> = rho exactly.
@@ -27,7 +31,10 @@ classdef GeometryBuilder
 
     properties (SetAccess = private)
 
-        e       double  % [N x K]  odor identity axes (unit vectors)
+        e       double  % [N x K]  odor identity axes at rep 1 (unit vectors)
+        E_raw   double  % [N x K]  orthonormal frame underlying e (U * V_e);
+                        %          fixed across reps; used by CentralPatterns
+                        %          to recompute e per repetition when eta > 0.
         n       double  % [N x K]  odor novelty axes  (unit vectors)
         d       double  % [N x 1]  shared drift direction (unit vector)
         U       double  % [N x D]  identity subspace basis (orthonormal columns)
@@ -62,7 +69,7 @@ classdef GeometryBuilder
             obj.U = build_identity_subspace(N, D, params.rotation_mix);
 
             % 2. Identity axes: [N x K] unit vectors in span(U) with <e_k,e_j> = rho_e
-            obj.e = build_identity_axes(obj.U, K, params.rho_e);
+            [obj.e, obj.E_raw] = build_identity_axes(obj.U, K, params.rho_e);
 
             % 3. Novelty axes: [N x K] unit vectors with controlled correlations
             obj.n = build_novelty_axes(N, K, obj.U, obj.e, params.alpha, params.rho);
@@ -127,9 +134,9 @@ end
 
 % ------------------------------------------------------------------------- %
 
-function e = build_identity_axes(U, K, rho_e)
-% BUILD_IDENTITY_AXES  Returns [N x K] unit vectors in span(U) with
-%   <e_k, e_j> = rho_e exactly for all k ~= j (Gram matrix construction).
+function [e, E_raw] = build_identity_axes(U, K, rho_e)
+% BUILD_IDENTITY_AXES  Returns [N x K] identity axes with <e_k,e_j> = rho_e,
+%   plus the underlying orthonormal frame E_raw for per-rep updates.
 %
 %   Steps:
 %     1. Build Gram matrix G: G_{kj} = rho_e (k~=j), G_{kk} = 1.
@@ -139,6 +146,10 @@ function e = build_identity_axes(U, K, rho_e)
 %     5. e     = E_raw * L'  → <e_k, e_j> = G_{kj} = rho_e.
 %
 %   Proof: e'*e = L*(E_raw'*E_raw)*L' = L*I*L' = G.
+%
+%   E_raw is returned so that CentralPatterns can recompute e_k for a
+%   different rho_e_eff(r) without any N-dimensional rotation:
+%     e_r = E_raw * chol(G(rho_e_eff(r)), 'lower')'
 
     D = size(U, 2);
 

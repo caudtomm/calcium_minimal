@@ -78,11 +78,22 @@ classdef ToyParams
         %      Must be >= -1/(K-1) to keep the Gram matrix PSD.
         rho double = 0
 
-        % rho_e: inner product <e_k, e_j> between identity axes of different
-        %        odors (k ~= j). 0 = orthogonal (default); range [-1, 1].
+        % rho_e: starting inner product <e_k, e_j> between identity axes of
+        %        different odors (k ~= j) at rep 1.
+        %        0 = orthogonal (default); range [-1, 1].
         %        Must be >= -1/(K-1) to keep the Gram matrix PSD.
         %        Independent of D (which sets subspace dimensionality only).
         rho_e double = 0
+
+        % eta: gain of the exponential saturation of rho_e across repetitions.
+        %      rho_e_eff(r) = rho_e + eta * (1 - exp(-(r-1)/tau))
+        %      0    = constant rho_e (default).
+        %      eta > 0: identity axes grow more correlated over reps.
+        %      eta < 0: identity axes grow less correlated (or more
+        %               anti-correlated) over reps; useful when rho_e > 0
+        %               or to push decorrelated axes toward anti-correlation.
+        %      Constraint: rho_e + eta in [-1/(K-1), 1].
+        eta double = 0
 
         % ----------------------------------------------------------------
         % Mixed selectivity
@@ -212,6 +223,14 @@ classdef ToyParams
             assert(obj.rho_e >= rho_min, ...
                 ['ToyParams: rho_e (%.3f) too negative for K=%d. ' ...
                  'Minimum valid rho_e is %.3f.'], obj.rho_e, obj.K, rho_min);
+
+            rho_e_asym = obj.rho_e + obj.eta;   % asymptotic rho_e_eff as r -> inf
+            assert(rho_e_asym <= 1, ...
+                ['ToyParams: rho_e + eta (%.3f) exceeds 1. ' ...
+                 'Asymptotic rho_e_eff must be <= 1.'], rho_e_asym);
+            assert(rho_e_asym >= rho_min, ...
+                ['ToyParams: rho_e + eta (%.3f) violates PSD bound for K=%d. ' ...
+                 'Minimum asymptotic rho_e_eff is %.3f.'], rho_e_asym, obj.K, rho_min);
 
             assert(obj.rotation_mix >= 0 && obj.rotation_mix <= 1, ...
                 'ToyParams: rotation_mix must be in [0, 1] (got %.3f).', obj.rotation_mix);

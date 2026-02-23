@@ -102,6 +102,7 @@ classdef ToyDataGenerator
             s.patterns.identity_weights = obj.cp.identity_weights;  % [R x 1]
             s.patterns.novelty_weights  = obj.cp.novelty_weights;   % [R x 1]
             s.patterns.drift_offsets    = obj.cp.drift_offsets;     % [R x 1]
+            s.patterns.rho_e_schedule   = obj.cp.rho_e_schedule;    % [R x 1]
 
             % Noise diagnostics
             s.noise.baseline    = obj.nm.baseline;     % [N x 1]

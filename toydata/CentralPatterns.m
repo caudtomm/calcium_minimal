@@ -37,6 +37,7 @@ classdef CentralPatterns
         identity_weights double % [R x 1]  A*(1+lambda_A*(1-exp(-(r-1)/tau))) for r=1..R
         novelty_weights  double % [R x 1]  B*exp(-(r-1)/tau)                  for r=1..R
         drift_offsets    double % [R x 1]  gamma*(r-1)                         for r=1..R
+        rho_e_schedule   double % [R x 1]  rho_e+eta*(1-exp(-(r-1)/tau))      for r=1..R
 
     end
 
@@ -61,6 +62,7 @@ classdef CentralPatterns
             obj.identity_weights = params.A * (1 + params.lambda_A * (1 - exp_decay));
             obj.novelty_weights  = params.B * exp_decay;
             obj.drift_offsets    = params.gamma * r_idx;
+            obj.rho_e_schedule   = params.rho_e + params.eta * (1 - exp_decay);
 
             % Allocate output: [N x K x R]
             obj.mu = zeros(N, K, R);
@@ -70,8 +72,15 @@ classdef CentralPatterns
                 nw = obj.novelty_weights(r);   % scalar
                 dw = obj.drift_offsets(r);     % scalar
 
+                % Per-rep identity axes: same orthonormal frame E_raw, new
+                % Gram mixing for rho_e_eff(r).  n_k is kept fixed (rep-1).
+                rho_r = obj.rho_e_schedule(r);
+                G_r   = rho_r * ones(K) + (1 - rho_r) * eye(K) + 1e-10 * eye(K);
+                L_r   = chol(G_r, 'lower');
+                e_r   = geom.E_raw * L_r';     % [N x K]
+
                 % iw*[N x K] + nw*[N x K] + dw*[N x 1]  (column broadcast)
-                obj.mu(:, :, r) = iw * geom.e  + nw * geom.n  + dw * geom.d;
+                obj.mu(:, :, r) = iw * e_r  + nw * geom.n  + dw * geom.d;
             end
         end
 
@@ -82,6 +91,10 @@ classdef CentralPatterns
             [~, K, R] = size(obj.mu);
 
             fprintf('CentralPatterns diagnostics\n');
+            fprintf('  rho_e schedule  (rho_e + eta*(1-exp(-(r-1)/tau))):\n');
+            for r = 1:R
+                fprintf('    rep %d:  %.4f\n', r, obj.rho_e_schedule(r));
+            end
             fprintf('  Identity weights  A*(1+lambda_A*(1-exp(-(r-1)/tau))):\n');
             for r = 1:R
                 fprintf('    rep %d:  %.4f Hz\n', r, obj.identity_weights(r));
