@@ -17,10 +17,11 @@ classdef GeometryBuilder
 %                       Since w_k ⊥ e_k, n_k is already a unit vector.
 %                       Actual <n_k, n_j> = alpha^2 * <e_k, e_j> + (1-alpha^2) * rho.
 %
-%   Drift direction d:  single unit vector orthogonal to span(U).
+%   Drift directions d_k: one per odor, orthogonal to span(U).
+%                         Pairwise correlations <d_k, d_j> = rho_d exactly.
 %
 %   Usage:
-%     params = ToyParams('D', 20, 'rho', 0.3, 'rho_e', 0.2, 'alpha', 0.1);
+%     params = ToyParams('D', 20, 'rho', 0.3, 'rho_e', 0.2, 'rho_d', 0.5, 'alpha', 0.1);
 %     geom   = GeometryBuilder(params);
 %     geom.e          % [N x K] identity axes
 %     geom.n          % [N x K] novelty axes
@@ -36,13 +37,16 @@ classdef GeometryBuilder
                         %          fixed across reps; used by CentralPatterns
                         %          to recompute e per repetition when eta > 0.
         n       double  % [N x K]  odor novelty axes  (unit vectors)
-        d       double  % [N x 1]  shared drift direction (unit vector)
+        d       double  % [N x K]  odor-specific drift directions (unit vectors)
+        u_s     double  % [N x 1]  baseline axis (unit vector, ⊥ all others)
+        v_s     double  % [N x 1]  baseline rotation axis (unit vector, ⊥ all + u_s)
         U       double  % [N x D]  identity subspace basis (orthonormal columns)
 
         % Diagnostics: actual inner products after construction.
         % Useful for verifying that targets were met.
         e_corr  double  % [K x K]  <e_k, e_j>  (diagonal = 1 by construction)
         n_corr  double  % [K x K]  <n_k, n_j>  (diagonal = 1 by construction)
+        d_corr  double  % [K x K]  <d_k, d_j>  (diagonal = 1 by construction)
         en_corr double  % [K x 1]  <e_k, n_k>  (target: alpha for all k)
 
     end
@@ -74,12 +78,18 @@ classdef GeometryBuilder
             % 3. Novelty axes: [N x K] unit vectors with controlled correlations
             obj.n = build_novelty_axes(N, K, obj.U, obj.e, params.alpha, params.rho);
 
-            % 4. Drift direction: [N x 1] unit vector orthogonal to span(U)
-            obj.d = build_drift_direction(N, obj.U);
+            % 4. Drift directions: [N x K] unit vectors orthogonal to span(U)
+            obj.d = build_drift_directions(N, K, obj.U, params.rho_d);
 
-            % 5. Diagnostics
+            % 5. Baseline axes: unit vectors orthogonal to span(U, n, d)
+            all_axes = [obj.U, obj.n, obj.d];
+            obj.u_s  = build_baseline_axis(N, all_axes);
+            obj.v_s  = build_baseline_axis(N, [all_axes, obj.u_s]);
+
+            % 6. Diagnostics
             obj.e_corr  = obj.e' * obj.e;
             obj.n_corr  = obj.n' * obj.n;
+            obj.d_corr  = obj.d' * obj.d;
             obj.en_corr = diag(obj.e' * obj.n);
         end
 
@@ -92,15 +102,21 @@ classdef GeometryBuilder
 
             e_off  = obj.e_corr(idx);
             n_off  = obj.n_corr(idx);
+            d_off  = obj.d_corr(idx);
 
             fprintf('GeometryBuilder diagnostics\n');
             fprintf('  Identity axes  <e_k, e_j>  (k~=j):  mean = %+.4f,  std = %.4f\n', ...
                     mean(e_off), std(e_off));
             fprintf('  Novelty axes   <n_k, n_j>  (k~=j):  mean = %+.4f,  std = %.4f\n', ...
                     mean(n_off), std(n_off));
+            fprintf('  Drift dirs     <d_k, d_j>  (k~=j):  mean = %+.4f,  std = %.4f\n', ...
+                    mean(d_off), std(d_off));
             fprintf('  Within-odor    <e_k, n_k>:           mean = %+.4f,  std = %.4f\n', ...
                     mean(obj.en_corr), std(obj.en_corr));
-            fprintf('  Drift          ||d|| = %.6f\n', norm(obj.d));
+            fprintf('  Baseline axes  ||u_s|| = %.6f,  ||v_s|| = %.6f\n', ...
+                    norm(obj.u_s), norm(obj.v_s));
+            fprintf('                 <u_s, v_s> = %+.2e  (target: 0)\n', ...
+                    dot(obj.u_s, obj.v_s));
         end
 
     end
@@ -207,13 +223,38 @@ end
 
 % ------------------------------------------------------------------------- %
 
-function d = build_drift_direction(N, U)
-% BUILD_DRIFT_DIRECTION  Returns an [N x 1] unit vector orthogonal to span(U).
+function d = build_drift_directions(N, K, U, rho_d)
+% BUILD_DRIFT_DIRECTIONS  Returns [N x K] odor-specific drift directions
+%   orthogonal to span(U), with <d_k, d_j> = rho_d exactly (k ~= j).
 %
-%   The drift direction is in the complement of the identity subspace,
-%   so the directed drift component is independent of odor identity axes.
+%   Construction mirrors build_novelty_axes (without the alpha mixing):
+%     V: K orthonormal vectors in complement of span(U)
+%     G = rho_d*ones(K) + (1-rho_d)*eye(K)  → Gram matrix
+%     d = V * chol(G, 'lower')'
+%   Proof: d'*d = L*(V'V)*L' = L*I*L' = G.
 
-    d_raw = randn(N, 1);
-    d_raw = d_raw - U * (U' * d_raw);  % project out identity subspace
-    d     = d_raw / norm(d_raw);
+    G   = rho_d * ones(K) + (1 - rho_d) * eye(K) + 1e-10 * eye(K);
+    L   = chol(G, 'lower');
+
+    V_raw = randn(N, K);
+    V_raw = V_raw - U * (U' * V_raw);  % project out identity subspace
+    [V, ~] = qr(V_raw, 'econ');
+    V      = V(:, 1:K);                % [N x K], orthonormal, ⊥ U
+
+    d = V * L';   % [N x K], <d_k, d_j> = rho_d exactly
+end
+
+% ------------------------------------------------------------------------- %
+
+function u = build_baseline_axis(N, all_axes)
+% BUILD_BASELINE_AXIS  Returns a unit vector orthogonal to col(all_axes).
+%
+%   Computes the QR orthonormal basis of all_axes, then projects a random
+%   vector onto its complement and normalises.  Exact orthogonality (not
+%   approximate) for u_s and v_s relative to span(U, n, d).
+
+    [Q, ~]  = qr(all_axes, 'econ');   % orthonormal basis for col(all_axes)
+    u_raw   = randn(N, 1);
+    u_raw   = u_raw - Q * (Q' * u_raw);
+    u       = u_raw / norm(u_raw);
 end

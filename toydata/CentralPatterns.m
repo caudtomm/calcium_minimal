@@ -1,43 +1,51 @@
 classdef CentralPatterns
 % CentralPatterns  Computes the noiseless central population patterns.
 %
-%   Evaluates the funnel model's mean response vector for every (odor, rep)
-%   combination:
+%   Evaluates the funnel model's mean response vector for every trial t
+%   (defined by stim_idx):
 %
-%     mu(:,k,r) = A*(1 + lambda_A*(1-exp(-(r-1)/tau))) * e_k
-%               + B*exp(-(r-1)/tau)                    * n_k
-%               + gamma*(r-1)                          * d
-%               |________identity (growing)___________|
-%                         |_____novelty (decaying)_____|  |__drift__|
+%     mu(:,t) = A*(1+lambda_A*(1-exp(-(r-1)/tau_A))) * e_k(r)   [identity]
+%             + B*exp(-(r-1)/tau)                    * n_k       [novelty]
+%             + gamma*(r-1)                          * d_k       [drift]
+%             + C*[cos(theta*pi/2*(t-1))*u_s
+%                + sin(theta*pi/2*(t-1))*v_s]                   [baseline]
 %
-%   Identity and novelty share the time constant tau: as novelty decays,
-%   identity grows toward A*(1+lambda_A).  lambda_A=0 recovers the original
-%   flat identity model.
+%   where k = stim_idx(t) and r = number of times odor k has appeared
+%   in stim_idx(1..t) (1-indexed repetition count).
+%
+%   e_k(r): identity axes, may vary across reps when eta > 0.
+%   n_k, d_k: fixed (built from rep-1 geometry).
+%   u_s, v_s: baseline axes, orthogonal to all others.
+%   Novelty uses tau; identity growth (lambda_A, eta) uses tau_A.
+%   ||s_t|| = C exactly.  theta=0: constant offset; theta=1: consecutive
+%   trials orthogonal.
 %
 %   mu is the expected population firing rate (Hz) during the odor window,
-%   relative to zero.  It may be negative for some neurons; the NoiseModel
-%   adds a per-neuron baseline so that total firing rates remain positive.
+%   relative to zero.  The NoiseModel adds a per-neuron baseline so that
+%   total firing rates remain positive.
 %
-%   Null model (B=0, gamma=0, lambda_A=0): mu(:,:,r) is identical for all r.
+%   Null model (B=0, gamma=0, lambda_A=0, C=0): mu(:,t) identical for all
+%   trials presenting the same odor at the same repetition.
 %
 %   Usage:
 %     params = ToyParams();
 %     geom   = GeometryBuilder(params);
 %     cp     = CentralPatterns(params, geom);
-%     cp.mu           % [N x K x R] central patterns
+%     cp.mu           % [N x T_trials] central patterns
 %     cp.report()     % print summary statistics
 %
 %   See also: ToyParams, GeometryBuilder, NoiseModel, ToyDataGenerator
 
     properties (SetAccess = private)
 
-        mu              double  % [N x K x R]  central patterns (Hz)
+        mu               double  % [N x T_trials]  central patterns (Hz)
+        stim_idx         double  % [1 x T_trials]  trial presentation order
 
-        % Per-repetition scalar weights (useful for plotting trajectories)
-        identity_weights double % [R x 1]  A*(1+lambda_A*(1-exp(-(r-1)/tau))) for r=1..R
-        novelty_weights  double % [R x 1]  B*exp(-(r-1)/tau)                  for r=1..R
-        drift_offsets    double % [R x 1]  gamma*(r-1)                         for r=1..R
-        rho_e_schedule   double % [R x 1]  rho_e+eta*(1-exp(-(r-1)/tau))      for r=1..R
+        % Per-repetition scalar weights (indexed by rep number, length R_max)
+        identity_weights double  % [R_max x 1]  A*(1+lambda_A*(1-exp(-(r-1)/tau_A)))
+        novelty_weights  double  % [R_max x 1]  B*exp(-(r-1)/tau)
+        drift_offsets    double  % [R_max x 1]  gamma*(r-1)
+        rho_e_schedule   double  % [R_max x 1]  rho_e+eta*(1-exp(-(r-1)/tau_A))
 
     end
 
@@ -54,33 +62,56 @@ classdef CentralPatterns
 
             N = params.N;
             K = params.K;
-            R = params.R;
 
-            r_idx = (0 : R-1)';                        % [R x 1], 0-indexed
-            exp_decay = exp(-r_idx / params.tau);      % [R x 1], shared decay envelope
+            obj.stim_idx = params.get_stim_idx();   % [1 x T_trials]
+            T_trials     = numel(obj.stim_idx);
 
-            obj.identity_weights = params.A * (1 + params.lambda_A * (1 - exp_decay));
-            obj.novelty_weights  = params.B * exp_decay;
+            % Max repetition count across all odors
+            rep_hist = histcounts(obj.stim_idx, 0.5 : K + 0.5);  % [1 x K]
+            R_max    = max(rep_hist);
+
+            % Pre-compute per-rep weights up to R_max
+            r_idx         = (0 : R_max-1)';
+            exp_decay_nov = exp(-r_idx / params.tau);
+            exp_decay_id  = exp(-r_idx / params.tau_A);
+
+            obj.identity_weights = params.A * (1 + params.lambda_A * (1 - exp_decay_id));
+            obj.novelty_weights  = params.B * exp_decay_nov;
             obj.drift_offsets    = params.gamma * r_idx;
-            obj.rho_e_schedule   = params.rho_e + params.eta * (1 - exp_decay);
+            obj.rho_e_schedule   = params.rho_e + params.eta * (1 - exp_decay_id);
 
-            % Allocate output: [N x K x R]
-            obj.mu = zeros(N, K, R);
+            % Allocate output: [N x T_trials]
+            obj.mu    = zeros(N, T_trials);
 
-            for r = 1:R
-                iw = obj.identity_weights(r);  % scalar
-                nw = obj.novelty_weights(r);   % scalar
-                dw = obj.drift_offsets(r);     % scalar
+            % Angular drift rate for baseline (radians per trial step)
+            omega     = params.theta * (pi / 2);
 
-                % Per-rep identity axes: same orthonormal frame E_raw, new
-                % Gram mixing for rho_e_eff(r).  n_k is kept fixed (rep-1).
+            rep_count = zeros(1, K);  % how many times each odor has appeared
+
+            for t = 1:T_trials
+                k = obj.stim_idx(t);
+                rep_count(k) = rep_count(k) + 1;
+                r = rep_count(k);
+
+                iw = obj.identity_weights(r);
+                nw = obj.novelty_weights(r);
+                dw = obj.drift_offsets(r);
+
+                % Per-rep identity axes: fixed E_raw, rep-dependent Gram mixing
                 rho_r = obj.rho_e_schedule(r);
                 G_r   = rho_r * ones(K) + (1 - rho_r) * eye(K) + 1e-10 * eye(K);
                 L_r   = chol(G_r, 'lower');
-                e_r   = geom.E_raw * L_r';     % [N x K]
+                e_r   = geom.E_raw * L_r';  % [N x K]
 
-                % iw*[N x K] + nw*[N x K] + dw*[N x 1]  (column broadcast)
-                obj.mu(:, :, r) = iw * e_r  + nw * geom.n  + dw * geom.d;
+                e_k = e_r(:, k);        % [N x 1]
+                n_k = geom.n(:, k);     % [N x 1]
+                d_k = geom.d(:, k);     % [N x 1]
+
+                % Baseline: rotates in (u_s, v_s) plane at angular speed omega
+                phase = omega * (t - 1);
+                s_t   = params.C * (cos(phase) * geom.u_s + sin(phase) * geom.v_s);
+
+                obj.mu(:, t) = iw * e_k + nw * n_k + dw * d_k + s_t;
             end
         end
 
@@ -88,34 +119,35 @@ classdef CentralPatterns
 
         function report(obj)
         % REPORT  Print a summary of central pattern statistics.
-            [~, K, R] = size(obj.mu);
+            [~, T_trials] = size(obj.mu);
+            R_max = numel(obj.novelty_weights);
 
             fprintf('CentralPatterns diagnostics\n');
-            fprintf('  rho_e schedule  (rho_e + eta*(1-exp(-(r-1)/tau))):\n');
-            for r = 1:R
+            fprintf('  Trial sequence: T_trials = %d\n', T_trials);
+
+            fprintf('  rho_e schedule  (rho_e + eta*(1-exp(-(r-1)/tau_A))):\n');
+            for r = 1:R_max
                 fprintf('    rep %d:  %.4f\n', r, obj.rho_e_schedule(r));
             end
-            fprintf('  Identity weights  A*(1+lambda_A*(1-exp(-(r-1)/tau))):\n');
-            for r = 1:R
+            fprintf('  Identity weights  A*(1+lambda_A*(1-exp(-(r-1)/tau_A))):\n');
+            for r = 1:R_max
                 fprintf('    rep %d:  %.4f Hz\n', r, obj.identity_weights(r));
             end
             fprintf('  Novelty weights  B*exp(-(r-1)/tau):\n');
-            for r = 1:R
+            for r = 1:R_max
                 fprintf('    rep %d:  %.4f Hz\n', r, obj.novelty_weights(r));
             end
             fprintf('  Drift offsets  gamma*(r-1):\n');
-            for r = 1:R
+            for r = 1:R_max
                 fprintf('    rep %d:  %.4f Hz\n', r, obj.drift_offsets(r));
             end
 
-            fprintf('  Per-rep mean pattern norm  ||mu(:,k,r)||  (averaged over k):\n');
-            for r = 1:R
-                norms = vecnorm(obj.mu(:, :, r), 2, 1);  % [1 x K]
-                fprintf('    rep %d:  mean = %.4f,  std = %.4f\n', ...
-                        r, mean(norms), std(norms));
-            end
+            fprintf('  Per-trial mean pattern norm  ||mu(:,t)||:\n');
+            norms = vecnorm(obj.mu, 2, 1);   % [1 x T_trials]
+            fprintf('    mean = %.4f,  std = %.4f,  min = %.4f,  max = %.4f\n', ...
+                    mean(norms), std(norms), min(norms), max(norms));
 
-            fprintf('  Fraction of (neuron, odor, rep) entries < 0:  %.2f%%\n', ...
+            fprintf('  Fraction of (neuron, trial) entries < 0:  %.2f%%\n', ...
                     100 * mean(obj.mu(:) < 0));
         end
 

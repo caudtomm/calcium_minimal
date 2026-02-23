@@ -89,20 +89,23 @@ classdef ToyDataGenerator
             s.metadata = build_metadata(obj);
 
             % Primary output
-            s.firing_rates = obj.nm.firing_rates;   % [N x T x K x R]
+            s.firing_rates = obj.nm.firing_rates;   % [N x T x T_trials]
 
             % Geometric axes (small; useful for validation and the loader)
-            s.geometry.e = obj.geom.e;              % [N x K]
-            s.geometry.n = obj.geom.n;              % [N x K]
-            s.geometry.d = obj.geom.d;              % [N x 1]
-            s.geometry.U = obj.geom.U;              % [N x D]
+            s.geometry.e   = obj.geom.e;            % [N x K]
+            s.geometry.n   = obj.geom.n;            % [N x K]
+            s.geometry.d   = obj.geom.d;            % [N x K]
+            s.geometry.U   = obj.geom.U;            % [N x D]
+            s.geometry.u_s = obj.geom.u_s;          % [N x 1]
+            s.geometry.v_s = obj.geom.v_s;          % [N x 1]
 
             % Noiseless central patterns (small)
-            s.patterns.mu               = obj.cp.mu;                % [N x K x R]
-            s.patterns.identity_weights = obj.cp.identity_weights;  % [R x 1]
-            s.patterns.novelty_weights  = obj.cp.novelty_weights;   % [R x 1]
-            s.patterns.drift_offsets    = obj.cp.drift_offsets;     % [R x 1]
-            s.patterns.rho_e_schedule   = obj.cp.rho_e_schedule;    % [R x 1]
+            s.patterns.mu               = obj.cp.mu;                % [N x T_trials]
+            s.patterns.stim_idx         = obj.cp.stim_idx;          % [1 x T_trials]
+            s.patterns.identity_weights = obj.cp.identity_weights;  % [R_max x 1]
+            s.patterns.novelty_weights  = obj.cp.novelty_weights;   % [R_max x 1]
+            s.patterns.drift_offsets    = obj.cp.drift_offsets;     % [R_max x 1]
+            s.patterns.rho_e_schedule   = obj.cp.rho_e_schedule;    % [R_max x 1]
 
             % Noise diagnostics
             s.noise.baseline    = obj.nm.baseline;     % [N x 1]
@@ -214,8 +217,10 @@ function meta = build_metadata(obj)
     meta.t_odor_end     = p.t_odor_end;
     meta.odor_frames    = p.odor_frames;               % [start, end] 1-indexed
     meta.stimulus_names = p.get_stimulus_names();      % {1 x K} cell of char
+    meta.stim_idx       = obj.cp.stim_idx;             % [1 x T_trials]
+    meta.T_trials       = numel(obj.cp.stim_idx);
 
-    if p.B == 0 && p.gamma == 0
+    if p.B == 0 && p.gamma == 0 && p.lambda_A == 0 && p.C == 0
         meta.model_type = 'null';
     else
         meta.model_type = 'hypothesis';

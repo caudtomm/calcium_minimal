@@ -6,7 +6,8 @@ classdef ToyParams
 %   a "funnel" global manifold: novelty-driven decay toward the origin
 %   along odor-specific axes, plus an optional shared drift component.
 %
-%   Null model:  B = 0, gamma = 0  (or use ToyParams.makeNull())
+%   Null model:  B = 0, gamma = 0, lambda_A = 0, C = 0
+%                (or use ToyParams.makeNull())
 %
 %   Usage:
 %     p = ToyParams()                              % all defaults
@@ -24,7 +25,14 @@ classdef ToyParams
 
         N double = 200   % number of neurons
         K double = 6     % number of odors
-        R double = 5     % number of repetitions per odor
+        R double = 5     % repetitions per odor used to build the default stim_idx
+
+        % stim_idx: [1 x T_trials] presentation order of odors (values in 1..K).
+        %           Defines the full trial sequence; e.g. [1 2 3 1 2 3] means
+        %           odor A, B, C, A, B, C in order.
+        %           [] = default: repelem(1:K, R)  (odor-major, R reps each).
+        %           Different odors may appear different numbers of times.
+        stim_idx double = []
 
         % ----------------------------------------------------------------
         % Manifold geometry
@@ -45,7 +53,7 @@ classdef ToyParams
         %           identity component = A * (1 + lambda_A*(1-exp(-(r-1)/tau))) * e_k
         %           0 = flat (default, recovers original model);
         %           1 = amplitude doubles asymptotically.
-        %           Shares time constant tau with novelty decay.
+        %           Uses time constant tau_A.
         lambda_A double = 0
 
         % B: initial novelty amplitude (Hz) at repetition 1.
@@ -53,16 +61,33 @@ classdef ToyParams
         %    Set to 0 for the null model (no novelty-driven attenuation).
         B double = 8
 
-        % tau: shared time constant (units: repetitions) for novelty decay
-        %      and identity growth.
+        % tau: novelty decay time constant (units: repetitions).
         %      novelty component = B * exp(-(r-1) / tau).
-        %      identity scale    = 1 + lambda_A*(1 - exp(-(r-1)/tau)).
         tau double = 1.5
 
+        % tau_A: identity growth time constant (units: repetitions).
+        %        Governs both lambda_A and eta saturation:
+        %          identity scale = 1 + lambda_A*(1 - exp(-(r-1)/tau_A))
+        %          rho_e_eff(r)   = rho_e + eta*(1 - exp(-(r-1)/tau_A))
+        tau_A double = 1.5
+
         % gamma: directed drift strength (Hz per repetition) along the
-        %        shared drift axis d, common to all odors.
-        %        Set to 0 for the null model (no common drift).
+        %        odor-specific drift axis d_k.
+        %        Set to 0 for the null model (no drift).
         gamma double = 1
+
+        % C: modulus (Hz) of the trial-specific baseline vector s_t.
+        %    ||s_t|| = C exactly at every trial.
+        %    0 = no baseline term (default).
+        C double = 0
+
+        % theta: baseline drift rate across trials (rotation speed).
+        %        s_t = C*[cos(theta*pi/2*(t-1))*u_s + sin(theta*pi/2*(t-1))*v_s]
+        %        0 = constant across trials (global offset).
+        %        1 = consecutive trials are orthogonal (no correlation).
+        %        Values in (0,1): linear angular drift, partial correlation.
+        %        Values > 1: consecutive trials anti-correlated.
+        theta double = 0
 
         % ----------------------------------------------------------------
         % Axis correlations
@@ -86,7 +111,7 @@ classdef ToyParams
         rho_e double = 0
 
         % eta: gain of the exponential saturation of rho_e across repetitions.
-        %      rho_e_eff(r) = rho_e + eta * (1 - exp(-(r-1)/tau))
+        %      rho_e_eff(r) = rho_e + eta * (1 - exp(-(r-1)/tau_A))
         %      0    = constant rho_e (default).
         %      eta > 0: identity axes grow more correlated over reps.
         %      eta < 0: identity axes grow less correlated (or more
@@ -94,6 +119,12 @@ classdef ToyParams
         %               or to push decorrelated axes toward anti-correlation.
         %      Constraint: rho_e + eta in [-1/(K-1), 1].
         eta double = 0
+
+        % rho_d: inner product <d_k, d_j> between drift directions of
+        %        different odors (k ~= j). 0 = uncorrelated (default);
+        %        range [-1/(K-1), 1].  rho_d = 1 recovers a single shared
+        %        drift direction (original behaviour).
+        rho_d double = 0
 
         % ----------------------------------------------------------------
         % Mixed selectivity
@@ -232,6 +263,12 @@ classdef ToyParams
                 ['ToyParams: rho_e + eta (%.3f) violates PSD bound for K=%d. ' ...
                  'Minimum asymptotic rho_e_eff is %.3f.'], rho_e_asym, obj.K, rho_min);
 
+            assert(obj.rho_d >= -1 && obj.rho_d <= 1, ...
+                'ToyParams: rho_d must be in [-1, 1] (got %.3f).', obj.rho_d);
+            assert(obj.rho_d >= rho_min, ...
+                ['ToyParams: rho_d (%.3f) too negative for K=%d. ' ...
+                 'Minimum valid rho_d is %.3f.'], obj.rho_d, obj.K, rho_min);
+
             assert(obj.rotation_mix >= 0 && obj.rotation_mix <= 1, ...
                 'ToyParams: rotation_mix must be in [0, 1] (got %.3f).', obj.rotation_mix);
 
@@ -246,12 +283,24 @@ classdef ToyParams
                 'ToyParams: fr_cv must be positive.');
             assert(obj.tau > 0, ...
                 'ToyParams: tau must be positive.');
+            assert(obj.tau_A > 0, ...
+                'ToyParams: tau_A must be positive.');
             assert(obj.B >= 0, ...
                 'ToyParams: B must be non-negative.');
             assert(obj.gamma >= 0, ...
                 'ToyParams: gamma must be non-negative.');
             assert(obj.lambda_A >= 0, ...
                 'ToyParams: lambda_A must be non-negative.');
+            assert(obj.C >= 0, ...
+                'ToyParams: C must be non-negative.');
+            assert(obj.theta >= 0, ...
+                'ToyParams: theta must be non-negative.');
+
+            if ~isempty(obj.stim_idx)
+                assert(all(obj.stim_idx == floor(obj.stim_idx)) && ...
+                       all(obj.stim_idx >= 1) && all(obj.stim_idx <= obj.K), ...
+                    'ToyParams: stim_idx values must be integers in 1..K (%d).', obj.K);
+            end
 
             assert(obj.t_odor_end > obj.t_odor_start, ...
                 'ToyParams: t_odor_end must be > t_odor_start.');
@@ -266,6 +315,16 @@ classdef ToyParams
         end
 
         % -- Convenience ----------------------------------------------- %
+
+        function idx = get_stim_idx(obj)
+        % GET_STIM_IDX  Returns stim_idx, with default if empty.
+        %   Default: odor-major ordering, R repetitions each: [1..1 2..2 ... K..K]
+            if isempty(obj.stim_idx)
+                idx = repelem(1:obj.K, obj.R);
+            else
+                idx = obj.stim_idx;
+            end
+        end
 
         function names = get_stimulus_names(obj)
         % GET_STIMULUS_NAMES  Returns stimulus_names, with defaults if empty.
@@ -290,14 +349,14 @@ classdef ToyParams
         end
 
         function p = makeNull(obj)
-        % MAKENULL  Returns a null-model ToyParams (B=0, gamma=0) from an existing ToyParams object.
-        %
-        %   Example:
-        %     p = ToyParams('tau', 2, 'rho', 0.1)
-        %     p_null = p.makeNull`
-            p = obj;
-            p.B     = 0;
-            p.gamma = 0;
+        % MAKENULL  Returns a null-model ToyParams from an existing ToyParams object.
+        %   Sets B=0, gamma=0, lambda_A=0, C=0 (all rep- and trial-dependent
+        %   terms removed); stim_idx, noise, and geometry params are preserved.
+            p          = obj;
+            p.B        = 0;
+            p.gamma    = 0;
+            p.lambda_A = 0;
+            p.C        = 0;
         end
 
     end

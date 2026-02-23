@@ -39,7 +39,7 @@ classdef NoiseModel
 
     properties (SetAccess = private)
 
-        firing_rates    double  % [N x T x K x R]  firing rates (Hz), clipped to >= 0
+        firing_rates    double  % [N x T x T_trials]  firing rates (Hz), clipped to >= 0
         baseline        double  % [N x 1]           per-neuron mean baseline rate (Hz)
         sigma_noise     double  % [N x 1]           per-neuron noise std (Hz)
         ac_factor       double  % scalar  Var(mean_T_odor(noise)) / Var(noise(t))
@@ -68,8 +68,9 @@ classdef NoiseModel
             % 3. Per-neuron noise amplitude (Fano-matched to baseline)
             obj.sigma_noise = sqrt(params.fano_factor .* obj.baseline ./ obj.ac_factor);
 
-            % 4. Generate all noise: [N x T x K x R]
-            noise = generate_noise(params, obj.sigma_noise);
+            % 4. Generate all noise: [N x T x T_trials]
+            T_trials = size(cp.mu, 2);
+            noise = generate_noise(params, obj.sigma_noise, T_trials);
 
             % 5. Assemble signal + noise, clip to >= 0
             obj.firing_rates = assemble_traces(params, cp, obj.baseline, noise);
@@ -82,38 +83,31 @@ classdef NoiseModel
         %
         %   nm.report(params)
 
-            fr = obj.firing_rates;   % [N x T x K x R]
-            [N, ~, K, R] = size(fr);
+            fr = obj.firing_rates;   % [N x T x T_trials]
+            [N, ~, T_trials] = size(fr);
 
             f1 = params.odor_frames(1);
             f2 = params.odor_frames(2);
 
-            % Mean over odor window for each (neuron, odor, rep): [N x K x R]
-            odor_mean = mean(fr(:, f1:f2, :, :), 2);
-            odor_mean = reshape(odor_mean, N, K, R);
+            % Mean over odor window per (neuron, trial): [N x T_trials]
+            odor_mean = squeeze(mean(fr(:, f1:f2, :), 2));
 
-            % Trial-to-trial variance over reps for each (neuron, odor): [N x K]
-            trial_var  = var(odor_mean, 0, 3);   % var over rep dim
-            trial_mean = mean(odor_mean, 3);      % mean over rep dim
-
-            % Effective Fano factor: var/mean, ignoring near-zero neurons
-            active = trial_mean > 0.1;
-            fano_est = trial_var(active) ./ trial_mean(active);
+            % Effective Fano: trial-to-trial var / mean across all trials
+            trial_var  = var(odor_mean, 0, 2);   % [N x 1]
+            trial_mean = mean(odor_mean, 2);      % [N x 1]
+            active     = trial_mean > 0.1;
+            fano_est   = trial_var(active) ./ trial_mean(active);
 
             fprintf('NoiseModel diagnostics\n');
+            fprintf('  T_trials = %d\n', T_trials);
             fprintf('  Baseline firing rates (Hz):  mean = %.3f,  std = %.3f\n', ...
                     mean(obj.baseline), std(obj.baseline));
             fprintf('  Noise sigma (Hz):            mean = %.3f,  std = %.3f\n', ...
                     mean(obj.sigma_noise), std(obj.sigma_noise));
             fprintf('  Autocorrelation factor:      %.6f\n', obj.ac_factor);
-            fprintf('  Effective Fano (active neurons, over reps):\n');
+            fprintf('  Effective Fano (active neurons, across trials):\n');
             fprintf('    mean = %.3f,  median = %.3f,  target = %.3f\n', ...
                     mean(fano_est), median(fano_est), params.fano_factor);
-            fprintf('  Fraction clipped to 0:       %.2f%%\n', ...
-                    100 * mean(fr(:) == 0 & (fr(:) - obj.firing_rates(:)) < 0));
-
-            % Fraction actually clipped (negative before clipping)
-            % Estimate from negative entries in baseline + mu (approx)
             fprintf('  Firing rate range: [%.3f, %.3f] Hz\n', ...
                     min(fr(:)), max(fr(:)));
         end
@@ -166,11 +160,11 @@ end
 
 % ------------------------------------------------------------------------- %
 
-function noise = generate_noise(params, sigma_noise)
-% GENERATE_NOISE  Returns [N x T x K x R] spatially and temporally correlated noise.
+function noise = generate_noise(params, sigma_noise, T_trials)
+% GENERATE_NOISE  Returns [N x T x T_trials] spatially and temporally correlated noise.
 %
 %   Steps:
-%     1. Draw independent white noise [N x T x K x R] and shared [1 x T x K x R]
+%     1. Draw independent white noise [N x T x T_trials] and shared [1 x T x T_trials]
 %     2. Mix with factor model for spatial correlation: noise_corr
 %     3. Apply causal IIR filter along time (dim 2) for temporal correlation
 %     4. Normalize to unit variance (correct for filter's variance scaling)
@@ -178,30 +172,21 @@ function noise = generate_noise(params, sigma_noise)
 
     N = params.N;
     T = params.T;
-    K = params.K;
-    R = params.R;
     c = params.noise_corr;
 
-    alpha = exp(-1 / params.noise_tau_frames);
-    iir_b = 1 - alpha;              % IIR numerator
-    iir_a = [1, -alpha];            % IIR denominator
-    iir_std = sqrt((1-alpha) / (1+alpha));  % std of IIR output for N(0,1) input
+    alpha   = exp(-1 / params.noise_tau_frames);
+    iir_b   = 1 - alpha;
+    iir_a   = [1, -alpha];
+    iir_std = sqrt((1-alpha) / (1+alpha));
 
-    % Independent and shared white noise components
-    x_indep  = randn(N, T, K, R);
-    x_shared = randn(1, T, K, R);   % broadcast over neurons
+    x_indep  = randn(N, T, T_trials);
+    x_shared = randn(1, T, T_trials);   % broadcast over neurons
 
-    % Factor model: Corr(noise_i, noise_j) = c  (for i~=j)
-    x_mixed = sqrt(c) * x_shared + sqrt(1 - c) * x_indep;  % [N x T x K x R]
-
-    % Temporal coloring: causal exponential IIR along time dimension
-    x_colored = filter(iir_b, iir_a, x_mixed, [], 2);      % [N x T x K x R]
-
-    % Normalize to unit variance, then scale to target sigma per neuron
+    x_mixed   = sqrt(c) * x_shared + sqrt(1 - c) * x_indep;   % [N x T x T_trials]
+    x_colored = filter(iir_b, iir_a, x_mixed, [], 2);          % [N x T x T_trials]
     x_colored = x_colored / iir_std;
 
-    % sigma_noise is [N x 1]; reshape for broadcasting over [N x T x K x R]
-    noise = reshape(sigma_noise, N, 1, 1, 1) .* x_colored;
+    noise = reshape(sigma_noise, N, 1, 1) .* x_colored;        % [N x T x T_trials]
 end
 
 % ------------------------------------------------------------------------- %
@@ -209,25 +194,24 @@ end
 function fr = assemble_traces(params, cp, baseline, noise)
 % ASSEMBLE_TRACES  Combine baseline, odor signal, and noise into full traces.
 %
-%   fr(i, t, k, r) = baseline(i)           for all t
-%                  + mu(i, k, r)            for t in odor window
-%                  + noise(i, t, k, r)
+%   fr(i, t_frame, t_trial) = baseline(i)          for all t_frame
+%                            + mu(i, t_trial)       for t_frame in odor window
+%                            + noise(i, t_frame, t_trial)
 %   then clipped to >= 0.
 
-    N  = params.N;
-    T  = params.T;
-    K  = params.K;
-    R  = params.R;
-    f1 = params.odor_frames(1);
-    f2 = params.odor_frames(2);
+    N        = params.N;
+    T        = params.T;
+    T_trials = size(cp.mu, 2);
+    f1       = params.odor_frames(1);
+    f2       = params.odor_frames(2);
 
-    % Initialize with baseline: [N x T x K x R]
-    fr = repmat(baseline, 1, T, K, R);
+    % Initialize with per-neuron baseline: [N x T x T_trials]
+    fr = repmat(baseline, 1, T, T_trials);
 
     % Add odor response during odor window only.
-    % mu is [N x K x R]; reshape to [N x 1 x K x R] to broadcast over T.
-    mu_t = reshape(cp.mu, N, 1, K, R);
-    fr(:, f1:f2, :, :) = fr(:, f1:f2, :, :) + mu_t;
+    % mu is [N x T_trials]; reshape to [N x 1 x T_trials] to broadcast over T.
+    mu_t = reshape(cp.mu, N, 1, T_trials);
+    fr(:, f1:f2, :) = fr(:, f1:f2, :) + mu_t;
 
     % Add noise and clip
     fr = max(fr + noise, 0);

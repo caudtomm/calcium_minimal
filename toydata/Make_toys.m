@@ -1,18 +1,20 @@
 p = ToyParams;
 
 p.D = 30;
-p.A = 10;
-p.B = 30;
+p.A = 1;
+p.lambda_A = 6;
+p.B = 15;
 p.tau = .7;
 p.gamma = 0;
 p.alpha = 0.05;
-p.rho = 0.1;
-p.rho_e = .2;
-p.eta = -.15;
+p.rho = 0;
+p.rho_e = .8;
+p.eta = -.8;
+p.rho_d = 0;
 
-p.rotation_mix = .8;
-p.fano_factor = 2;
-p.fr_mean = .4;
+p.rotation_mix = .7;
+p.fano_factor = 1.2;
+p.fr_mean = .04;
 p.fr_cv = .9;
 p.noise_corr = .1;
 
@@ -64,7 +66,7 @@ subplot(346); imagesc(corrs(idx,idx)); axis square; % by stim
 
 % euclidean distance among central patterns
 corrs = squareform(pdist(mus',"euclidean"));
-subplot(3,4,10); imagesc(corrs); axis square; % chronological
+subplot(3,4,10); imagesc(corrs(idx,idx)); axis square; % by stim
 
 
 % firing rates
@@ -77,13 +79,15 @@ subplot(348); imagesc(corrs(idx,idx)); axis square; % by stim
 
 % euclidean distance among firing rates
 corrs = squareform(pdist(fr_avg',"euclidean"));
-subplot(3,4,12); imagesc(corrs); axis square; % chronological
+subplot(3,4,12); imagesc(corrs(idx,idx)); axis square; % by stim
 
 end
 
 %% batch generate toys
 
 outdir = 'toys\hyp';
+rmdir(outdir,'s')
+
 ToyDataGenerator.generate_batch(p,outdir,5)
 % ToyDataGenerator.generate_batch(p.makeNull,'toys\null',5)
 

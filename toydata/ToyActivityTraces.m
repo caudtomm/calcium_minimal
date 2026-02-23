@@ -7,21 +7,19 @@ classdef ToyActivityTraces
 %   ModeSelector, and GCMC_Analysis without modification.
 %
 %   Dimension conventions follow ActivityTraces:
-%     pSpike / dFoverF : [T x N x ntrials]   where ntrials = K * R
+%     pSpike / dFoverF : [T x N x T_trials]  where T_trials = numel(stim_idx)
 %     stim_series      : table with columns trialnum, odor_channel,
-%                        frame_onset, frame_offset, stimulus
+%                        frame_onset, frame_offset, stimulus, rep
 %
-%   Trial ordering (odor-major):
-%     trial i = odor ceil(i/R), rep mod(i-1, R)+1
-%     → trials 1..R  = odor 1, reps 1..R
-%       trials R+1..2R = odor 2, reps 1..R  etc.
+%   Trial ordering follows params.stim_idx exactly.
+%   Default stim_idx (empty): repelem(1:K, R)  (odor-major, R reps each).
 %
 %   Usage:
 %     s   = load('toydata_hyp_...mat');
 %     at  = ToyActivityTraces(s, 'trained');
-%     at.pSpike          % [T x N x K*R]
+%     at.pSpike          % [T x N x T_trials]
 %     at.stim_series     % table
-%     at.dFoverF_good    % [T x N x K*R]  (dependent, mirrors pSpike)
+%     at.dFoverF_good    % [T x N x T_trials]  (dependent, mirrors pSpike)
 %
 %   See also: ToyDataLoader, ToyDataGenerator, ActivityTraces
 
@@ -90,21 +88,18 @@ classdef ToyActivityTraces
             end
 
             meta = s.metadata;                % struct from build_metadata
-            fr   = s.firing_rates;            % [N x T x K x R]
+            fr   = s.firing_rates;            % [N x T x T_trials]
 
             N_neurons = meta.N;
             T_frames  = meta.T;
-            K         = meta.K;
-            R         = meta.R;
-            ntr       = K * R;
+            T_trials  = meta.T_trials;
 
-            % Reshape: [N x T x K x R] → [T x N x K*R]  (odor-major trial order)
-            fr_perm    = permute(fr, [2, 1, 3, 4]);         % [T x N x K x R]
-            fr_flat    = reshape(fr_perm, T_frames, N_neurons, ntr); % [T x N x K*R]
+            % Permute: [N x T x T_trials] → [T x N x T_trials]
+            fr_perm = permute(fr, [2, 1, 3]);
 
             % Core data
-            obj.pSpike  = fr_flat;
-            obj.dFoverF = fr_flat;
+            obj.pSpike  = fr_perm;
+            obj.dFoverF = fr_perm;
 
             % Temporal properties
             obj.framerate = meta.fs;
@@ -113,7 +108,7 @@ classdef ToyActivityTraces
             obj.T         = T_frames / meta.fs;
 
             % Dimensions
-            obj.ntrials = ntr;
+            obj.ntrials = T_trials;
             obj.N       = N_neurons;
 
             % Quality control (all neurons good, no bad trials)
@@ -127,7 +122,7 @@ classdef ToyActivityTraces
             obj.subject_locations = Locations();
 
             % Stimulus table
-            obj.stim_series = build_stim_series(meta, K, R);
+            obj.stim_series = build_stim_series(meta);
 
             % Extras for inspection
             obj.toy_params   = s.params;
@@ -151,28 +146,30 @@ end
 % Local helper
 % ========================================================================= %
 
-function stim_series = build_stim_series(meta, K, R)
+function stim_series = build_stim_series(meta)
 % BUILD_STIM_SERIES  Construct a stim_series table matching ActivityTraces format.
 %
-%   Trial ordering is odor-major: trials 1..R = odor 1, R+1..2R = odor 2, etc.
-%   Columns: trialnum, odor_channel, frame_onset, frame_offset, stimulus
+%   Uses meta.stim_idx for the exact trial presentation order.
+%   Columns: trialnum, odor_channel, frame_onset, frame_offset, stimulus, rep
 
-    ntrials      = K * R;
-    trialnum     = (1 : ntrials)';
-    odor_channel = zeros(ntrials, 1);
-    frame_onset  = repmat(meta.odor_frames(1), ntrials, 1);
-    frame_offset = repmat(meta.odor_frames(2), ntrials, 1);
-    stimulus     = cell(ntrials, 1);
+    idx          = meta.stim_idx(:);   % [T_trials x 1]
+    T_trials     = numel(idx);
+    trialnum     = (1 : T_trials)';
+    odor_channel = idx;
+    frame_onset  = repmat(meta.odor_frames(1), T_trials, 1);
+    frame_offset = repmat(meta.odor_frames(2), T_trials, 1);
+    stimulus     = cell(T_trials, 1);
+    rep          = zeros(T_trials, 1);
 
-    for k = 1:K
-        for r = 1:R
-            i              = (r-1)*K + k;
-            stimulus{i}    = meta.stimulus_names{k};
-            odor_channel(i) = k;
-        end
+    rep_count = zeros(1, meta.K);
+    for t = 1:T_trials
+        k              = idx(t);
+        rep_count(k)   = rep_count(k) + 1;
+        rep(t)         = rep_count(k);
+        stimulus{t}    = meta.stimulus_names{k};
     end
 
-    stim_series = table(trialnum, odor_channel, frame_onset, frame_offset, stimulus, ...
+    stim_series = table(trialnum, odor_channel, frame_onset, frame_offset, stimulus, rep, ...
                         'VariableNames', ...
-                        {'trialnum', 'odor_channel', 'frame_onset', 'frame_offset', 'stimulus'});
+                        {'trialnum', 'odor_channel', 'frame_onset', 'frame_offset', 'stimulus', 'rep'});
 end
