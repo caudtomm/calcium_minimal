@@ -3,21 +3,25 @@ p = ToyParams;
 p.D = 30;
 p.A = 1;
 p.lambda_A = 6;
-p.B = 15;
-p.tau = .7;
+p.tau_A = 1.5;
+p.B = 9;
+p.tau = 1;
 p.gamma = 0;
-p.alpha = 0.05;
-p.rho = 0;
-p.rho_e = .8;
-p.eta = -.8;
+p.C = 2.5;
+p.theta = .06;
+p.alpha = 0;
+p.rho = .1;
+p.rho_e = .2;
+p.eta = 0;
 p.rho_d = 0;
 
 p.rotation_mix = .7;
 p.fano_factor = 1.2;
-p.fr_mean = .04;
+p.fr_mean = .07;
 p.fr_cv = .9;
 p.noise_corr = .1;
 
+p.stim_idx = [1 2 3 4 5 1 2 3 4 5 1 2 3 4 5 1 2 3 4 5 6 1 2 3 4 5 6 6 6 6];
 p.stimulus_names = {'Arg','Ala','His','Trp','Ser','Leu'};
 
 %% plots patterns onto provided axes
@@ -42,7 +46,7 @@ L = length(t);
 
 % labels and indices
 ntrials = p.K*p.R;
-labs = reshape(repmat(p.stimulus_names,1,p.R),ntrials,1);
+labs = p.stimulus_names(p.stim_idx);
 [~,idx] = sort(labs);
 
 % central patterns
@@ -81,6 +85,7 @@ subplot(348); imagesc(corrs(idx,idx)); axis square; % by stim
 corrs = squareform(pdist(fr_avg',"euclidean"));
 subplot(3,4,12); imagesc(corrs(idx,idx)); axis square; % by stim
 
+set(gcf,'Color','w')
 end
 
 %% batch generate toys
@@ -102,7 +107,7 @@ v.dataFilter.trial_sorting = 'stim_id';
 dft = v.dataFilter;
 
 % plot corrs
-figure; v.plotDistancesHead;
+% figure; v.plotDistancesHead;
 
 % plot PCA
 v.dataFilter.stims_allowed = 'all stimuli';

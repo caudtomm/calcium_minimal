@@ -12,7 +12,7 @@ classdef ToyDataLoader
 %
 %   Usage:
 %     % Single file → ToyActivityTraces
-%     at = ToyDataLoader.loadTraces('toydata_hyp_...mat', 'trained');
+%     at = ToyDataLoader.loadTraces('toydata_hypothesis_...mat', 'trained');
 %
 %     % Multiple files → Experiment
 %     exp = ToyDataLoader.loadExperiment(filepaths, 'trained', 'my_toy_exp');
