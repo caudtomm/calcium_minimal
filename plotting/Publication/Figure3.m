@@ -109,7 +109,7 @@ for i = 1:numel(stims)
     x_mean = mean(data_naive(:,idx),1,'omitmissing');
     y_mean = mean(data_trained(:,idx),1,'omitmissing');
     x_std = std(data_naive(:,idx),0,1,'omitmissing')./sqrt(sum(idx));
-    y_std = std(data_trained(:,idx),0,1,'omitmissing');
+    y_std = std(data_trained(:,idx),0,1,'omitmissing')./sqrt(sum(idx));
     
     % Plot errorbars
     errorbar(x_mean, y_mean, y_std, y_std, x_std, x_std, '.', ...
@@ -128,6 +128,32 @@ hold off;
 axis square
 xlabel('naive iFR (Hz)');
 ylabel('trained iFR (Hz)')
+[~,p] = kstest2(data_naive(:),data_trained(:));
+disp(['2-s KS Test of naive vs trained firing rates - p-val: ',num2str(p)])
+
+
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.interval = odor_interval;
+v.dataFilter.subjectGroup = 'naïve';
+out = v.plotUnitActivityMetricHead('method','avg intensity');
+data_naive = cell2mat(out);
+v.dataFilter.subjectGroup = 'trained';
+out = v.plotUnitActivityMetricHead('method','avg intensity');
+data_trained = cell2mat(out);
+
+x = linspace(0,.6,1000);
+figure; plotSplitViolin(gca, data_naive(:),data_trained(:), ...
+    'show_median',true, ...
+    'show_mean',true, ...
+    'stats', true, ...
+    'edges',x);
+xlim([.5 1.5]); ylim([-.1 max(ylim)])
+xticks([]); xlabel('naive | trained'); ylabel('iFR [Hz]')
+set(gcf,'Color','w')
+y = median(data_trained(:),'omitmissing') - median(data_naive(:),'omitmissing');
+disp(['Trained - naive difference in median iFR: ' num2str(y), ' Hz'])
+y = mean(data_trained(:),'omitmissing') - mean(data_naive(:),'omitmissing');
+disp(['Trained - naive difference in mean iFR: ' num2str(y), ' Hz'])
 
 % unit firing distributions (repetitions)
 baseline_interval = [-22 -2];
