@@ -106,6 +106,82 @@ cfg.saveFigure(gcf,'naive base intertrial corr', saveType)
 cfg = v.plotConfig;
 v.dataFilter = dft;
 
+%% corr between stimulus activity and post - prestimulus activity
+post_interval = [115.5 135];
+pre_interval = [-22.5 -2];
+stim_interval = [.5 20];
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.trial_sorting = 'chronological';
+
+% post vs pre
+v.dataFilter.interval = post_interval;
+[~,post_activity,all_labs] = ModeSelector(v).extract;
+labs = all_labs{1};
+post_activity = cellfun(@(x) squeeze(mean(x,1,'omitmissing')),post_activity,'UniformOutput',false);
+v.dataFilter.interval = pre_interval;
+[~,pre_activity] = ModeSelector(v).extract;
+pre_activity = cellfun(@(x) squeeze(mean(x,1,'omitmissing')),pre_activity,'UniformOutput',false);
+nsubjects = numel(pre_activity);
+ntrials = width(pre_activity{1});
+y = zeros(ntrials,nsubjects);
+for i = 1:nsubjects
+    for j = 1:ntrials
+        prepattern = pre_activity{i}(:,j);
+        postpattern = post_activity{i}(:,j);
+        
+        c = corrcoef(prepattern,postpattern);
+        y(j,i) = c(2);
+    end
+end
+t = 1:ntrials;
+mu = mean(y,2,'omitmissing');
+err = std(y,[],2,'omitmissing');
+figure;
+subplot(221)
+plotLineNShade(t,mu,err,'k',cfg);
+xticks(1:ntrials); xticklabels(labs)
+axis tight; ylim([-1 1])
+ylabel('post vs pre')
+subplot(222)
+histogram(y(:),50,'FaceColor','k','EdgeAlpha',0,'Orientation','horizontal')
+hold on
+line([0 max(xlim)],mean(y(:),'omitmissing')*[1 1],'Color','r','LineWidth',2)
+ylabel('r')
+ylim([-1 1])
+
+% (post-pre) vs stim
+basediff = cellfun(@(a,b) b-a, pre_activity, post_activity, 'UniformOutput',false);
+v.dataFilter.interval = stim_interval;
+[~,stim_activity] = ModeSelector(v).extract;
+stim_activity = cellfun(@(x) squeeze(mean(x,1,'omitmissing')),stim_activity,'UniformOutput',false);
+y = zeros(ntrials,nsubjects);
+for i = 1:nsubjects
+    for j = 1:ntrials
+        diffpattern = basediff{i}(:,j);
+        stimpattern = stim_activity{i}(:,j);
+        
+        c = 1-pdist([diffpattern,stimpattern]','correlation');
+        y(j,i) = c;
+    end
+end
+t = 1:ntrials;
+mu = mean(y,2,'omitmissing');
+err = std(y,[],2,'omitmissing');
+subplot(223)
+plotLineNShade(t,mu,err,'k',cfg);
+xticks(1:ntrials); xticklabels(labs)
+axis tight; ylim([-1 1])
+ylabel('(post-pre) vs stim')
+subplot(224)
+histogram(y(:),50,'FaceColor','k','EdgeAlpha',0,'Orientation','horizontal')
+hold on
+line([0 max(xlim)],mean(y(:),'omitmissing')*[1 1],'Color','r','LineWidth',2)
+ylabel('r')
+ylim([-1 1])
+
+set(gcf,'color','w')
 
 
 %% naive corr with prestimulus in time
