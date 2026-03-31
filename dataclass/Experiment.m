@@ -289,16 +289,32 @@ classdef Experiment
             
         end
 
-        function obj = updateBehavior2pTraces(obj)
+        function obj = updateBehavior2pTraces(obj,respiration_PCs_fpath)
             disp('')
             disp('updating behavior 2p traces...')
+            respiration_PCs = [];
+            if nargin>1
+                disp('taking respiration PCs into account.')
+                try
+                    respiration_PCs = importdata(respiration_PCs_fpath);
+                    disp('done.')
+                catch
+                    disp('failed to load respiration PCs, not taking them into account.')
+                end
+            else
+                disp('not taking respiration PCs into account.')
+            end
             for i = 1:numel(obj.traces)
                 trace = obj.traces{i};
                 sid = trace.subject_locations.subject_ID;
                 disp(sid)
                 fpath = fullfiletol(trace.subject_locations.subject_datapath,'tail_movies');
+                rPC = [];
+                if ~isempty(respiration_PCs)
+                    rPC = respiration_PCs(i);
+                end
                 try
-                    trace.behavior2p = Behavior2PTraces(fpath);
+                    trace.behavior2p = Behavior2PTraces(fpath,[],[],[],'respiration_PC',rPC);
                     disp('done.')
                 catch
                     trace.behavior2p = [];

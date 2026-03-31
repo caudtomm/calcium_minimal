@@ -166,20 +166,11 @@ function hf = compareModeMetricsFigure(v)
     end
 
     function [lme,r_rm,pVal] = doLMEfit(metric1,metric2)
-        subjectID = [];
-        for i=1:nsubjects
-            insert = i .* ones(numel(metric1{i}),1);
-            subjectID = [subjectID; insert];
-        end
-        metric1 = cell2mat(metric1); metric2 = cell2mat(metric2);
-        data = table(subjectID,metric1,metric2);
-        lme = fitlme(data, 'metric2 ~ 1 + metric1 + (1|subjectID)');
-        % disp(lme);
-        pVal = lme.Coefficients.pValue(2); 
-        % estimate the within-subject correlation coefficient (r_rm) by looking at the t-statistic of the fixed effect 'metric1'
-        tStat = lme.Coefficients.tStat(2);
-        dfError = lme.DFE;
-        r_rm = sign(tStat) * sqrt(tStat^2 / (tStat^2 + dfError));
+        % metric1 = predictor (x), metric2 = response (y), both {nsubjects} cells
+        result = statsUtils.lmeRegress(metric2, metric1);
+        lme  = result.lme;
+        r_rm = result.r_rm;
+        pVal = result.p;
     end
     
     function hf = ExamplesFigure(idx)

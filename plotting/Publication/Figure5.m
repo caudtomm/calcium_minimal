@@ -42,6 +42,8 @@ dft = v.dataFilter;
 %% FIGURE 5
 
 %% dPCA decomposition
+v.plotConfig.custom.crange = [.2 1];
+
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'all';
@@ -56,10 +58,23 @@ outMat_up = v.plotDistancesHead;
 v.dataFilter.mode_OI = 'non-stimulus';
 hf = figure;
 outMat_up = v.plotDistancesHead;
+v.dataFilter.mode_OI = 'stimulus';
+hf = figure;
+outMat_up = v.plotDistancesHead;
 v.dataFilter.mode_OI = 'novelty';
 v.dataFilter.interval = [0 3];
 hf = figure;
 c = v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions');
+v.dataFilter.interval = [-1 3];
+[~,events,labs] = ModeSelector(v).extract;
+events = cellfun(@squeeze,events,'UniformOutput',false);
+events = cell2mat(permute(events,[2,3,1]));
+t = linspace(v.dataFilter.interval(1),v.dataFilter.interval(2),height(events));
+labs = labs{1};
+hf = figure;
+imagesc(t,1:numel(labs),mean(events,3,'omitmissing')')
+yticks(1:numel(labs)); yticklabels(labs);
+colormap(cfg.colormapName)
 %
 v.dataFilter = dft;
 
@@ -308,6 +323,7 @@ v.dataFilter.mode_file = 'dpca_naive.mat';
 m = ModeSelector(v).extract;
 nsubjects = numel(m.fullout);
 data = nan(3,20,nsubjects);
+n = zeros(nsubjects,1);
 for i=1:nsubjects
     thisdata = m.fullout{i}.explVar;
     data(1,:,i) = thisdata.cumulativePCA;
@@ -315,11 +331,13 @@ for i=1:nsubjects
     idx = m.parseModeOI(i);
     idx_novelty = find(idx,1);
     idx(idx_novelty)=false;
+    n(i) = sum(idx);
 
     data(2,1:sum(idx),i) = cumsum(thisdata.componentVar(idx));
     data(3,1,i) = thisdata.componentVar(idx_novelty);
     
 end
+disp(['# of identity dPCs: ',num2str(min(n)),'-',num2str(max(n))])
 hf = figure; clear b
 t = 1:20;
 mu = squeeze(mean(data(1,:,:),3,'omitmissing'))'; % PCs

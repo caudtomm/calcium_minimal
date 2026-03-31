@@ -79,20 +79,34 @@ sham = [0.002280994	-0.349049613	-0.451239238	0.679384635	0.181407895	0.10340684
 0.115357772	-0.221965549	-0.690901277	0.613619401	0.270900151	1.019793548
 ];
 
+y = mean(ablated(:,3:5),2,'omitmissing');
+ablated = ablated(y>.5,:);
+ablated(:,5) = y(y>.5);
+y = mean(sham(:,3:5),2,'omitmissing');
+sham = sham(y>.5,:);
+sham(:,5) = y(y>.5);
+
 figure;
 subplot(121) % ablated
 boxplot(ablated(:,5:6))
 hold on
 plot(ablated(:,5:6)','k')
 xticks([1 2]);
-xticklabels({'before surgery','after surgery'});
-ylabel('Learning index (a.u.)')
+% xticklabels({'before surgery','after surgery'});
+% ylabel('Learning index (a.u.)')
+yline(0,'r--')
+ylim([-2 3])
 subplot(122) % sham
 boxplot(sham(:,5:6))
 hold on
 plot(sham(:,5:6)','k')
 xticks([1 2]);
-xticklabels({'before surgery','after surgery'});
+yline(0,'r--')
+ylim([-2 3])
+[~,p] = ttest(ablated(:,5), ablated(:,6), 'Tail', 'right')
+[~,p] = ttest(sham(:,5), sham(:,6), 'Tail', 'right')
+%xticklabels({'before surgery','after surgery'});
+cfg.figSize = 'small';
 cfg.setFigure
 cfg.saveFigure(gcf,'ablation learning index', saveType)
 

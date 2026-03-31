@@ -253,17 +253,16 @@ classdef Behavior2PTraces
             end
             
          end
+
          function visualizeBreathing(traceStruct)
             % VISUALIZEBREATHING  Quick visual QC for breathing event detection.
             % Input:
             %   traceStruct.resampled   - raw respiration trace
-            %   traceStruct.processed   - filtered/processed trace
-            %   traceStruct.eventsRF    - event timestamps (s)
-            %   traceStruct.rateRF      - instantaneous rate (Hz)
+            %   traceStruct.eventsFP    - event timestamps (s)
+            %   traceStruct.rateFP      - instantaneous rate (Hz)
             %   traceStruct.fs          - sampling frequency (Hz)
 
             raw = traceStruct.resampled(:);
-            proc = traceStruct.processed(:);
             fs = traceStruct.fs;
             t = (0:numel(raw)-1)/fs;
 
@@ -272,19 +271,19 @@ classdef Behavior2PTraces
             subplot(2,1,1)
             hold on
             plot(t,raw,'Color',[0.7 0.7 0.7])
-            plot(t,proc,'b','LineWidth',1)
-            if isfield(traceStruct,'eventsRF') && ~isempty(traceStruct.eventsRF)
-                xline(traceStruct.eventsRF,'r--','LineWidth',1)
+            if isfield(traceStruct,'eventsFP') && ~isempty(traceStruct.eventsFP)
+                %xline(find(traceStruct.eventsFP(:))./fs)
             end
             xlabel('Time (s)')
             ylabel('Amplitude')
-            title('Raw and Processed Traces with Detected Events')
+            title('Raw and Processed Traces with Detected EvSents')
             legend({'Raw','Processed','Events'},'Location','best')
             axis tight
+            ax(1) = gca;
 
             subplot(2,1,2)
-            if isfield(traceStruct,'rateRF') && ~isempty(traceStruct.rateRF)
-                plot(traceStruct.rateRF(:,1), traceStruct.rateRF(:,2),'k','LineWidth',1.2)
+            if isfield(traceStruct,'rateFP') && ~isempty(traceStruct.rateFP)
+                plot(t, traceStruct.rateFP(:),'k','LineWidth',1.2)
                 xlabel('Time (s)')
                 ylabel('Rate (Hz)')
                 title('Instantaneous Breathing Rate')
@@ -293,7 +292,9 @@ classdef Behavior2PTraces
                 text(0.5,0.5,'No rate data available','HorizontalAlignment','center')
                 axis off
             end
+            ax(2) = gca;
 
+            linkaxes(ax,'x')
             sgtitle('Breathing Signal Overview')
 
             disp('Press ENTER to continue...')
@@ -421,6 +422,9 @@ classdef Behavior2PTraces
                 warning('PCA results file for head motion not found.');
                 obj.headPCA = struct();
             end
+            if exist('headPC_fpath','var') && isfile(headPC_fpath)
+                obj.respiration_PC = load(headPC_fpath).respiration_PC;
+            end
 
             % read traces from FiJI output CSVs or summary MATs
             obj.Breathing = obj.extractTraces(fullfiletol(fpath,'rot','Head_vals'));
@@ -461,8 +465,9 @@ classdef Behavior2PTraces
             % resample traces to 2p framerate
             [obj.LED.t_resampled2p,obj.LED.resampled2p] = ...
                 obj.resample(obj.LED.raw,obj.LED.trials,170,1300);
+            resampled_trials = obj.defResampledTrials(size(obj.Breathing.resampled));
             [obj.Breathing.t_resampled2p,obj.Breathing.resampled2p] = ...
-                obj.resample(obj.Breathing.raw,obj.LED.trials,170,1300);
+                obj.resample(obj.Breathing.resampled(:),resampled_trials,170,1300);
             [obj.Tail.t_resampled2p,obj.Tail.resampled2p] = ...
                 obj.resample(obj.Tail.raw,obj.LED.trials,170,1300);
 
@@ -486,6 +491,13 @@ classdef Behavior2PTraces
             obj.Breathing.rate2p_FP = tmp(2:end,:);
 
 
+        end
+
+        function trials = defResampledTrials(obj,sz)
+            L = sz(1); ntrials = sz(2);
+            frame_start = 1 + ([1:ntrials]'-1).*L;
+            frame_end = frame_start + L-1;
+            trials = table(frame_start,frame_end);
         end
 
         function [rawtrace, t] = mergeHeadPCtrace(obj)

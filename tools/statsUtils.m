@@ -205,6 +205,93 @@ classdef statsUtils
             end
         end
 
+        function result = lmeRegress(y, x, subject_ids)
+            % LMEREGRESS  Fit y ~ 1 + x + (1|subject) and return key summaries.
+            %
+            % Two calling conventions:
+            %
+            %   result = statsUtils.lmeRegress(y_cell, x_cell)
+            %       y_cell, x_cell  - {n_subjects} cell arrays of column vectors.
+            %                         Subject IDs are assigned automatically by index.
+            %
+            %   result = statsUtils.lmeRegress(y_vec, x_vec, subject_ids)
+            %       y_vec, x_vec    - flat numeric column vectors (all observations)
+            %       subject_ids     - per-row subject identifier; numeric, categorical,
+            %                         or cell-of-strings are all accepted.
+            %
+            % Output struct fields:
+            %   .intercept    - fixed-effect intercept estimate
+            %   .slope        - fixed-effect slope estimate (predictor x)
+            %   .p            - p-value for slope
+            %   .t_stat       - t-statistic for slope
+            %   .dfe          - error degrees of freedom
+            %   .r_rm         - repeated-measures correlation coefficient
+            %                   (Bakdash & Marusich 2017)
+            %   .r2_marginal  - marginal R² from fixed effects only
+            %                   (Nakagawa & Schielzeth 2013)
+            %   .lme          - raw LinearMixedModel object from fitlme
+
+            if nargin < 3
+                subject_ids = [];
+            end
+
+            % --- Flatten cell-array inputs --------------------------------
+            if iscell(y)
+                n_subj = numel(y);
+                y_flat = [];
+                x_flat = [];
+                sid    = [];
+                for i = 1:n_subj
+                    yi = y{i}(:);
+                    xi = x{i}(:);
+                    n  = numel(yi);
+                    y_flat = [y_flat; yi];   %#ok<AGROW>
+                    x_flat = [x_flat; xi];   %#ok<AGROW>
+                    sid    = [sid; i * ones(n, 1)]; %#ok<AGROW>
+                end
+                y           = y_flat;
+                x           = x_flat;
+                subject_ids = sid;
+            end
+
+            y = y(:);
+            x = x(:);
+
+            % --- Encode subject column ------------------------------------
+            if isnumeric(subject_ids)
+                subj_col = subject_ids(:);
+            elseif iscell(subject_ids)
+                subj_col = categorical(subject_ids(:));
+            else
+                subj_col = subject_ids(:);   % already categorical / other
+            end
+
+            % --- Fit model ------------------------------------------------
+            tbl     = table(y, x, subj_col, ...
+                'VariableNames', {'y_var', 'x_var', 'subject'});
+            lme_obj = fitlme(tbl, 'y_var ~ 1 + x_var + (1|subject)');
+
+            coefs = lme_obj.Coefficients;
+
+            result.intercept = coefs.Estimate(1);
+            result.slope     = coefs.Estimate(2);
+            result.p         = coefs.pValue(2);
+            result.t_stat    = coefs.tStat(2);
+            result.dfe       = lme_obj.DFE;
+
+            % Repeated-measures correlation
+            t          = result.t_stat;
+            result.r_rm = sign(t) * sqrt(t^2 / (t^2 + result.dfe));
+
+            % Marginal R² (fixed effects only)
+            y_fit = fitted(lme_obj, 'Conditional', false);
+            ss_res = sum((y - y_fit).^2);
+            ss_tot = sum((y - mean(y)).^2);
+            result.r2_marginal = max(0, 1 - ss_res / ss_tot);
+
+            result.lme = lme_obj;
+        end
+
         function [means, sems, ns] = groupStats(data_cell)
             % Compute mean and SEM for each group
             %

@@ -151,9 +151,10 @@ classdef ExperimentViewer
 
                 for i_trial = 1:ntrials
                     subplot(nsubjects,ntrials,(i-1)*ntrials+i_trial)
-                    imagesc(t, 1:N, M(:,idx,i_trial)')
+                    c = M(:,idx,i_trial)';
+                    imagesc(t, 1:N, c);
 
-                    colormap(flipud(gray)); clim([0 1]);
+                    colormap(flipud(gray)); clim([0 quantile(c(:),.99)]);
                     
                     xlabel('Time from stim. onset (s)'); ylabel('Cell #')
                     set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);

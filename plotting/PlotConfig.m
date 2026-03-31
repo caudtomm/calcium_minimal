@@ -6,6 +6,7 @@ classdef PlotConfig
         % Visual appearance
         theme char = 'light'         % plotting theme ('light', 'dark', etc.)
         colormapName char = 'lapaz'  % MATLAB colormap name
+        useNatureColors = false;     % Nature colors (associated with odor identity)
         showGrid logical = false     % display grid in internal plots
         axWidth double = 0.5         % default axis line width
         lineWidth double = 1         % default line width
@@ -143,6 +144,29 @@ classdef PlotConfig
         function colors = get.c(obj)
             % Some well-visible line/scatter colors adapted to theme
         
+            if obj.useNatureColors
+                % Nature standard (colorblind friendly)
+                rgb_vals = [
+                    25 100 176; % dark blue (Arg)
+                    0 138 105; % teal (Ala)
+                    244 166 55; % orange (His)
+                    219 88 41; % vermillion (Trp)
+                    136 45 113; % dark purple (Ser)
+                    233 220 109; % yellow (Leu)
+                    182 219 255; % light blue (ACSF)
+                    222 222 222; % grey (spont.)
+                    0 0 0; % black
+                    123 176 223; % mid blue
+                    0 201 146; % light teal
+                    56 99 80; % dark teal
+                    137 75 69; % maroon
+                    210 187 215; % light purple
+                    174 117 162; % purple
+                ];
+                colors = rgb_vals / 255; % normalize to [0, 1]
+                return
+            end
+            
             try
                 colors = obj.getColormap('categorical');
                 if ~strcmp(obj.theme, 'many colors')
@@ -171,27 +195,9 @@ classdef PlotConfig
                     jitter = 0.05 * randn(size(colors)); % small variation
                     colors = min(max(colors + jitter, 0), 1); % clamp between 0 and 1
                 case 'light'
-                    % Nature standard (colorblind friendly)
-                    rgb_vals = [
-                        0 0 0; % black
-                        182 219 255; % light blue
-                        123 176 223; % mid blue
-                        25 100 176; % dark blue
-                        0 201 146; % light teal
-                        0 138 105; % teal
-                        56 99 80; % dark teal
-                        233 220 109; % yellow
-                        244 166 55; % orange
-                        219 88 41; % vermillion
-                        137 75 69; % maroon
-                        210 187 215; % light purple
-                        174 117 162; % purple
-                        136 45 113; % dark purple
-                        222 222 222; % grey
-                    ];
-                    colors = rgb_vals / 255; % normalize to [0, 1]
+                    colors = lines(100); % MATLAB default
                 case 'many colors'
-                    colors = colorcube(100); % fallback
+                    colors = colorcube(100);
                 otherwise
                     colors = lines(100); % MATLAB default
             end

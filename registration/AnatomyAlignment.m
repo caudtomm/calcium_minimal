@@ -54,7 +54,7 @@ classdef AnatomyAlignment < handle
             for i = 1:N
                 loc    = obj.experiment.traces{i}.subject_locations;
                 nt_dir = fullfiletol(loc.subject_datapath, 'not_trials');
-                files   = dir(fullfiletol(nt_dir, '*anatomy_*'));
+                files   = dir(fullfiletol(nt_dir, '*anatomy_R*'));
 
                 if isempty(files)
                     warning('AnatomyAlignment:noFile', ...

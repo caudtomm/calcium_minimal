@@ -1,4 +1,4 @@
-function R = driftMetricsFigure(v, varargin)
+function [R,ira_vals] = driftMetricsFigure(v, varargin)
 %DRIFTMETRICSFIGURE Compute and visualize repetition drift metrics.
 %
 % This wraps your analysis into a single call that:
@@ -45,6 +45,28 @@ dft = v.dataFilter;
 
 % -------- load data: out{sj} -> [units x stims x reps]
 out = v.plotUnitActivityMetricHead('method','tuning curves');
+
+% % repetition scramble
+% for i = 1:numel(out)
+%     dt = out{i};
+%     [N,nstims,nreps] = size(dt);
+%     for j = 1:nstims
+%         idx = randperm(nreps);
+%         dt(:,j,:) = dt(:,j,idx);
+%     end
+%     out{i} = dt;
+% end
+
+% % cell scramble
+% for i = 1:numel(out)
+%     dt = out{i};
+%     [N,nstims,nreps] = size(dt);
+%     for j = 1:nreps
+%         idx = randperm(N);
+%         dt(:,:,j) = dt(idx,:,j);
+%     end
+%     out{i} = dt;
+% end
 
 % -------- per-unit scaling (mean across stims & reps, NaN-safe)
 sf = cellfun(@(x) mean(x,[2,3],"omitmissing"), out, 'UniformOutput', false);
@@ -95,6 +117,14 @@ for r = 1:nr
     isc(:,r) = thismat(:);
 end
 
+% -------- inter-repetition angles for each stim (per subject)
+ira_vals = nan(ns,nr_d-1,nsj); % [stims x nreps-2 x nsub]
+for sj = 1:nsj
+    for s = 1:ns
+        X = squeeze(out{sj}(:,s,:));       % [units x reps] trajectory over reps
+        ira_vals(s,:,sj) = triplet_angles(X);
+    end
+end
 
 % -------- inter-repetition angles for each stim (per subject)
 ira = [];
@@ -132,6 +162,7 @@ R.corrMat        = cm;
 R.driftStrength3d = ds3;
 R.driftStrength  = reshape(ds3,[],nr_d);   % [units x stims x rep-steps]
 R.interStimdist  = isd;
+R.interStimcorr  = isc;
 R.interRepAngle  = ira;
 R.anglecorr      = ac;
 R.edges          = edges;

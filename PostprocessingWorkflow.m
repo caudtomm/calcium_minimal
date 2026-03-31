@@ -262,7 +262,7 @@ compareModeMetricsFigure(v);
 
 v.dataFilter.subjectGroup = 'trained';
 % v.dataFilter.mode_file = 'dpca_trained.mat';
-compareModeMetricsFigure(v);
+vals = compareModeMetricsFigure(v);
 
 v.dataFilter.subjectGroup = 'uncoupled';
 % v.dataFilter.mode_file = 'dpca_uncoupled.mat';

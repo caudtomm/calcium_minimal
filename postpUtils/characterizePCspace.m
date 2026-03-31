@@ -1,4 +1,4 @@
-function out = characterizePCspace(a, coef,explained, cfg, nshuffle)
+function [out, ax1, ax2] = characterizePCspace(a, coef,explained, cfg, nshuffle)
 arguments
     a double
     coef double
@@ -21,12 +21,13 @@ pcthr = movmean(shufflemean + shufflestd*2,5)';
 out.maxPC = find(explained<=pcthr,1)-1;
 
 out.hf = figure; hold on
-y = shufflemean; t = 1:length(y);
+y = shufflemean; t = 1:length(y); x2 = t./length(y).*100;
 curve1 = y + shufflestd; curve2 = y - shufflestd;
-h = patch([t,fliplr(t)],[curve1, fliplr(curve2)],'g','FaceAlpha',.3,'EdgeColor','none');
+shc = [1 1 1] .* .8;
+h = patch([t,fliplr(t)],[curve1, fliplr(curve2)],shc,'FaceAlpha',.3,'EdgeColor','none');
 h.Annotation.LegendInformation.IconDisplayStyle = 'off';
-plot(t,y,'Color','g','LineWidth',2)
-plot(t,explained,'Color','b','LineWidth',2)
+plot(t,y,'Color',shc,'LineWidth',2)
+plot(t,explained,'Color','k','LineWidth',2)
 plot(t,pcthr,'Color','r','LineStyle','--','LineWidth',1)
 xlim([t(1),t(end)])
 axis square
@@ -36,4 +37,20 @@ legend({'shuffle','data','thres (2 STD)'},'Box','on','color',cfg.bgcol,'Location
 ylabel('Variance explained')
 xlabel('PC #')
 
+ax1 = gca;    
+ax2 = axes('Position', ax1.Position, ...
+             'XAxisLocation', 'top', ...                                                                                                                                                                                        
+             'YAxisLocation', 'right', ...
+             'Color',  'none', ...
+             'YTick',  [], ...
+             'YColor', 'none', ...
+             'XColor', cfg.axcol, ...
+             'XLim',   [x2(1), x2(end)]);
+axis square
+xlabel(ax2, '% N');
+linkprop([ax1, ax2], 'Position');
+axes(ax1);   % return focus to original axes
+set(ax1,"Color",'none')
+addlistener(ax1, 'XLim', 'PostSet', @(~,~) set(ax2, 'XLim', ...                                                                                                                                                               
+    interp1([t(1), t(end)], [x2(1), x2(end)], ax1.XLim, 'linear', 'extrap'))); 
 end

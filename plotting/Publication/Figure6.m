@@ -25,7 +25,7 @@ end
 
 %% initialize output figure saving
 cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73,86:99]); % (test1, test2, ctrl)
-cfg.custom.crange = [.3 .7];
+cfg.custom.crange = [.1 .7];
 cfg.savePath = savepath;
 
 v = ExperimentViewer(experiment);
@@ -41,18 +41,60 @@ dft = v.dataFilter;
 %% FIGURE 6
 
 %% stimulus dPCs except #1
+grouptag = 'trained';
+
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'stimulus';
 v.dataFilter.mode_method = 'subtract';
-v.dataFilter.subjectGroup = 'naïve';
-v.dataFilter.mode_file = 'dpca_naive.mat';
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.mode_file = ['dpca_',grouptag,'.mat'];
 hf = figure;
 outMat_dn = v.plotDistancesHead;
+title([]); xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
+cfg.figSize = 'large';
+cfg.aspRatioType = 'square';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' identity subtract intertrial corr'], saveType)
+hf = figure;
+outMat_dn = v.plotDistancesHead('plotType','repetitions');
+title([]); xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
+cfg.figSize = 'medium';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' identity subtract intertrial corr repetitions'], saveType)
+
 v.dataFilter.mode_method = 'isolate';
 hf = figure;
 outMat_up = v.plotDistancesHead;
-%
+title([]); xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
+cfg.figSize = 'large';
+cfg.aspRatioType = 'square';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' identity isolate intertrial corr'], saveType)
+hf = figure;
+outMat_dn = v.plotDistancesHead('plotType','repetitions');
+title([]); xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
+cfg.figSize = 'medium';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' identity isolate intertrial corr repetitions'], saveType)
+
+v.dataFilter.mode_method = 'mode_values';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+title([]); xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
+cfg.figSize = 'large';
+cfg.aspRatioType = 'square';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' identity mode values intertrial corr'], saveType)
+hf = figure;
+outMat_dn = v.plotDistancesHead('plotType','repetitions');
+title([]); xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
+cfg.figSize = 'medium';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' identity mode values intertrial corr repetitions'], saveType)
+
+
+cfg = v.plotConfig;
 v.dataFilter = dft;
 
 %% stimulus dPCs except #1 (lower triangle = subtract, upper triangle = isolate)
@@ -103,8 +145,8 @@ v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'novelty';
 v.dataFilter.mode_method = 'isolate';
 v.dataFilter.interval = [];
-v.dataFilter.subjectGroup = 'trained';
-v.dataFilter.mode_file = 'dpca_trained.mat';
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = 'dpca_naive.mat';
 % v.dataFilter.stims_allowed = {'Ala','His','Trp','Ser','Leu'};
 closeup_interval = [-1 3];
 [~,events,labs] = ModeSelector(v).extract;

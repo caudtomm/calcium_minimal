@@ -53,7 +53,7 @@ function h = plotScatter(embedding,labs,params,cfg)
     scalefact = 500;
     sizesc = 10+scalefact/(L*ntrials);
 
-    stims = unique(labs);
+    stims = unique(labs,'stable');
 
     h = gobjects(1, ntrials); % Preallocate h array for better performance
     for i_trial = 1:ntrials
@@ -114,7 +114,7 @@ function h = plotLines(embedding,labs,params,cfg)
     scalefact = 5;
     sizesc = 10+scalefact/(L*ntrials);
 
-    stims = unique(labs);
+    stims = unique(labs, 'stable');
 
     for i_trial = 1:ntrials
         thisStim = labs(i_trial);

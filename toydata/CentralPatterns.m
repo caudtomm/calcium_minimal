@@ -47,6 +47,9 @@ classdef CentralPatterns
         drift_offsets    double  % [R_max x 1]  gamma*(r-1)
         rho_e_schedule   double  % [R_max x 1]  rho_e+eta*(1-exp(-(r-1)/tau_A))
 
+        % Per-trial baseline amplitude (indexed by trial number, length T_trials)
+        baseline_weights double  % [T_trials x 1]  C-lambda_C*(1-exp(-(t-1)/tau_C))
+
     end
 
     % --------------------------------------------------------------------- %
@@ -80,6 +83,10 @@ classdef CentralPatterns
             obj.drift_offsets    = params.gamma * r_idx;
             obj.rho_e_schedule   = params.rho_e + params.eta * (1 - exp_decay_id);
 
+            % Pre-compute per-trial baseline amplitude: decays over trials (not reps)
+            t_idx                = (0 : T_trials-1)';
+            obj.baseline_weights = params.C - params.lambda_C * (1 - exp(-t_idx / params.tau_C));
+
             % Allocate output: [N x T_trials]
             obj.mu    = zeros(N, T_trials);
 
@@ -107,9 +114,10 @@ classdef CentralPatterns
                 n_k = geom.n(:, k);     % [N x 1]
                 d_k = geom.d(:, k);     % [N x 1]
 
-                % Baseline: rotates in (u_s, v_s) plane at angular speed omega
+                % Baseline: rotates in (u_s, v_s) plane at angular speed omega,
+                % with amplitude attenuating over trials via baseline_weights(t).
                 phase = omega * (t - 1);
-                s_t   = params.C * (cos(phase) * geom.u_s + sin(phase) * geom.v_s);
+                s_t   = obj.baseline_weights(t) * (cos(phase) * geom.u_s + sin(phase) * geom.v_s);
 
                 obj.mu(:, t) = iw * e_k + nw * n_k + dw * d_k + s_t;
             end
@@ -141,6 +149,11 @@ classdef CentralPatterns
             for r = 1:R_max
                 fprintf('    rep %d:  %.4f Hz\n', r, obj.drift_offsets(r));
             end
+
+            fprintf('  Baseline weights  C-lambda_C*(1-exp(-(t-1)/tau_C)):\n');
+            bw = obj.baseline_weights;
+            fprintf('    trial 1: %.4f Hz,  trial %d: %.4f Hz  (target floor: C-lambda_C)\n', ...
+                    bw(1), numel(bw), bw(end));
 
             fprintf('  Per-trial mean pattern norm  ||mu(:,t)||:\n');
             norms = vecnorm(obj.mu, 2, 1);   % [1 x T_trials]

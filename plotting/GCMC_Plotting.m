@@ -12,9 +12,9 @@ methods (Static)
 
         n_points_range = [1:10:151];
 
-        minCvg = GCMC_Analysis.estimateManifoldCoverage(manifold_size_range(2), n_points_range);
-        maxCvg = GCMC_Analysis.estimateManifoldCoverage(manifold_size_range(1), n_points_range);
-        BoCvg = GCMC_Analysis.estimateManifoldCoverage(Bo_manifold_size, n_points_range);
+        minCvg = GCMC_Plotting.estimateManifoldCoverage(manifold_size_range(2), n_points_range);
+        maxCvg = GCMC_Plotting.estimateManifoldCoverage(manifold_size_range(1), n_points_range);
+        BoCvg = GCMC_Plotting.estimateManifoldCoverage(Bo_manifold_size, n_points_range);
 
         estCvg = minCvg; % arbitrary
 
@@ -22,9 +22,9 @@ methods (Static)
         imagesc(estCvg.X,estCvg.Y,maxCvg.expectedCoverage-minCvg.expectedCoverage)
         hold on
 
-        scatter(minCvg.full_coverage,estCvg.Y,50,'g','filled')
-        scatter(maxCvg.full_coverage,estCvg.Y,50,'r','filled')
-        scatter(BoCvg.full_coverage,estCvg.Y,50,'k','filled')
+        scatter(minCvg.full_coverage,estCvg.Y,15,'g','filled')
+        scatter(maxCvg.full_coverage,estCvg.Y,15,'r','filled')
+        scatter(BoCvg.full_coverage,estCvg.Y,15,'k','filled')
         
         b(1) = plot(minCvg.full_coverage,estCvg.Y,'g-','LineWidth',1.5);
         b(2) = plot(maxCvg.full_coverage,estCvg.Y,'r-','LineWidth',1.5);
@@ -562,7 +562,7 @@ methods (Static)
         close all;
     end
 
-    function plotAndSaveRepLines(group_data, cfg, filter, metrics, labels, savedir, saveType, opts)
+    function stats = plotAndSaveRepLines(group_data, cfg, filter, metrics, labels, savedir, saveType, opts)
         % Plot and save line plots across repetitions for multiple metrics
         %
         % Inputs:
@@ -604,8 +604,9 @@ methods (Static)
 
             ylabel(labels{i});
             title('');
-            cfg.figSize = 'small';
-            cfg.aspRatioType = 'square';
+            legend off
+            cfg.figSize = 'tiny';
+            cfg.aspRatioType = 'tall';
             cfg.setFigure;
             cfg.savePath = savedir;
             cfg.saveFigure(gcf, [labels{i}, ' by rep'], saveType);

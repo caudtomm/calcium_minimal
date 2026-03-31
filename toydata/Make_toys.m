@@ -1,16 +1,17 @@
 p = ToyParams;
 
-p.D = 30;
+p.D = 80;
 p.A = 1;
-p.lambda_A = 6;
+p.lambda_A = 3;
 p.tau_A = 1.5;
-p.B = 9;
+p.B = 4;
 p.tau = 1;
 p.gamma = 0;
-p.C = 2.5;
+p.C = 5;
+p.lambda_C = 4;
+p.tau_C = 10;
 p.theta = .06;
-p.alpha = 0;
-p.rho = .1;
+p.alpha =  0;
 p.rho_e = .2;
 p.eta = 0;
 p.rho_d = 0;
@@ -20,6 +21,7 @@ p.fano_factor = 1.2;
 p.fr_mean = .07;
 p.fr_cv = .9;
 p.noise_corr = .1;
+p.rng_seed = 42;
 
 p.stim_idx = [1 2 3 4 5 1 2 3 4 5 1 2 3 4 5 1 2 3 4 5 6 1 2 3 4 5 6 6 6 6];
 p.stimulus_names = {'Arg','Ala','His','Trp','Ser','Leu'};
@@ -30,6 +32,7 @@ tg = ToyDataGenerator(p);
 [labs, idx, mus, fr_avg] = getPatterns(tg);
 
 plotPatterns(labs, idx, mus, fr_avg)
+colormap(cfg.colormapName)
 
 % helper functions
 
@@ -47,7 +50,7 @@ L = length(t);
 % labels and indices
 ntrials = p.K*p.R;
 labs = p.stimulus_names(p.stim_idx);
-[~,idx] = sort(labs);
+[~,idx] = sort(p.stim_idx);
 
 % central patterns
 mus = reshape(tg.cp.mu,p.N,ntrials);
@@ -84,7 +87,6 @@ subplot(348); imagesc(corrs(idx,idx)); axis square; % by stim
 % euclidean distance among firing rates
 corrs = squareform(pdist(fr_avg',"euclidean"));
 subplot(3,4,12); imagesc(corrs(idx,idx)); axis square; % by stim
-
 set(gcf,'Color','w')
 end
 

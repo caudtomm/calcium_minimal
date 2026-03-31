@@ -124,7 +124,7 @@ function [hf, cell_metrics] = compareTraceTypes(v)
     % sort order of fish by group
     [sorted_groups,idxbygroup] = sort(v.subjectTab.group);
     cell_metrics_sorted = cell_metrics(idxbygroup);
-    grouplabels = v.subjectTab.group;
+    grouplabels = sorted_groups;
     
     % cell metrics boxplots
     labels = cell_metrics{1}.Properties.VariableNames;

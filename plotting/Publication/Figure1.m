@@ -26,6 +26,7 @@ end
 
 %% initialize output figure saving
 cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73]); % (test1, test2, ctrl)
+cfg.custom.crange = [.1 .7];
 cfg.savePath = savepath;
 
 v = ExperimentViewer(experiment);
@@ -39,6 +40,23 @@ dft = v.dataFilter;
  
 
 %% FIGURE 1
+
+%% iFR per frame
+
+v.dataFilter = dft;
+v.dataFilter.interval = [];
+[~,events] = ModeSelector(v).extract;
+events = cellfun(@(x) x(:),events,'UniformOutput',false);
+events = cell2mat(events);
+x = 0:.1:40;
+y = nan(numel(events),numel(x)-1);
+for i = 1:numel(events)
+    y(i,:) = histcounts(events{i},x);
+end
+y = y./sum(y,2,'omitmissing');
+hf = figure; plot(x(1:end-1),log(y'), 'k')
+xscale log; axis square tight
+xlabel('iFR (Hz)'); ylabel('Log portion of frames')
 
 %% topography of the activity
 
@@ -60,6 +78,7 @@ for n = 1:42
     res{n} = ta.quantify(data,'cosine',100,10);
     title(['fish #',num2str(n)])
 end
+res_stim = res;
 mantelRs = cellfun(@(x) x.mantelR,res);
 figure; histogram(mantelRs,10)
 
@@ -73,18 +92,20 @@ for n = 1:42
     res{n} = ta.quantify(data,'cosine',100,10);
     title(['fish #',num2str(n)])
 end
+res_pre = res;
 mantelRs = cellfun(@(x) x.mantelR,res);
 figure; histogram(mantelRs,10)
 
 %% naive intertrial baseline correlation
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'all';
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.interval = [-22 -2];
 v.dataFilter.trial_sorting = 'chronological';
 hf = figure;
 subplot(121)
 C = v.plotDistancesHead;
+xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
 C= 1-C.distMat3d;
 [~,ntrials,nsubjects] = size(C);
 y = [];
@@ -102,7 +123,7 @@ xlabel('Distance (trials)'); ylabel('r')
 cfg.figSize = 'large';
 cfg.aspRatioType = 'wide';
 cfg.setFigure;
-cfg.saveFigure(gcf,'naive base intertrial corr', saveType)
+cfg.saveFigure(gcf,'uncoupled base intertrial corr', saveType)
 cfg = v.plotConfig;
 v.dataFilter = dft;
 
@@ -124,7 +145,7 @@ v.dataFilter.interval = pre_interval;
 [~,pre_activity] = ModeSelector(v).extract;
 pre_activity = cellfun(@(x) squeeze(mean(x,1,'omitmissing')),pre_activity,'UniformOutput',false);
 nsubjects = numel(pre_activity);
-ntrials = width(pre_activity{1});
+ntrials = size(pre_activity{1},2);
 y = zeros(ntrials,nsubjects);
 for i = 1:nsubjects
     for j = 1:ntrials
@@ -139,12 +160,12 @@ t = 1:ntrials;
 mu = mean(y,2,'omitmissing');
 err = std(y,[],2,'omitmissing');
 figure;
-subplot(221)
+subplot(321)
 plotLineNShade(t,mu,err,'k',cfg);
 xticks(1:ntrials); xticklabels(labs)
 axis tight; ylim([-1 1])
 ylabel('post vs pre')
-subplot(222)
+subplot(322)
 histogram(y(:),50,'FaceColor','k','EdgeAlpha',0,'Orientation','horizontal')
 hold on
 line([0 max(xlim)],mean(y(:),'omitmissing')*[1 1],'Color','r','LineWidth',2)
@@ -169,19 +190,69 @@ end
 t = 1:ntrials;
 mu = mean(y,2,'omitmissing');
 err = std(y,[],2,'omitmissing');
-subplot(223)
+subplot(323)
 plotLineNShade(t,mu,err,'k',cfg);
 xticks(1:ntrials); xticklabels(labs)
 axis tight; ylim([-1 1])
 ylabel('(post-pre) vs stim')
-subplot(224)
+subplot(324)
 histogram(y(:),50,'FaceColor','k','EdgeAlpha',0,'Orientation','horizontal')
 hold on
 line([0 max(xlim)],mean(y(:),'omitmissing')*[1 1],'Color','r','LineWidth',2)
 ylabel('r')
 ylim([-1 1])
 
+
+% r(post vs stim) vs r(pre vs stim)
+v.dataFilter.interval = post_interval;
+[~,post_activity,all_labs] = ModeSelector(v).extract;
+labs = all_labs{1};
+post_activity = cellfun(@(x) squeeze(mean(x,1,'omitmissing')),post_activity,'UniformOutput',false);
+v.dataFilter.interval = stim_interval;
+[~,stim_activity] = ModeSelector(v).extract;
+stim_activity = cellfun(@(x) squeeze(mean(x,1,'omitmissing')),stim_activity,'UniformOutput',false);
+nsubjects = numel(stim_activity);
+ntrials = size(stim_activity{1},2);
+y_post = zeros(ntrials,nsubjects);
+for i = 1:nsubjects
+    for j = 1:ntrials
+        stimpattern = stim_activity{i}(:,j);
+        postpattern = post_activity{i}(:,j);
+        
+        c = corrcoef(stimpattern,postpattern);
+        y_post(j,i) = c(2);
+    end
+end
+v.dataFilter.interval = pre_interval;
+[~,pre_activity] = ModeSelector(v).extract;
+pre_activity = cellfun(@(x) squeeze(mean(x,1,'omitmissing')),pre_activity,'UniformOutput',false);
+y_pre = zeros(ntrials,nsubjects);
+for i = 1:nsubjects
+    for j = 1:ntrials
+        stimpattern = stim_activity{i}(:,j);
+        prepattern = pre_activity{i}(:,j);
+        
+        c = corrcoef(stimpattern,prepattern);
+        y_pre(j,i) = c(2);
+    end
+end
+subplot(325)
+scatter(y_pre(:),y_post(:),5,'k','filled')
+hold on
+plot([-.2 1],[-.2 1], 'r--')
+axis tight square
+xlabel('r(pre vs stim)')
+ylabel('r(post vs stim)')
+subplot(326); clear b
+edges = linspace(-1,1,30);
+b(1) = histogram(y_pre(:),edges); hold on
+b(2) = histogram(y_post(:),edges);
+legend(b,{'stim vs pre','stim vs post'})
+
 set(gcf,'color','w')
+
+%%
+
 
 
 %% naive corr with prestimulus in time
@@ -299,21 +370,47 @@ cfg.saveFigure(gcf,'naive corr with prestimulus', saveType)
 cfg = v.plotConfig;
 
 
-%%
+%% single trial correlations in time
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.subjectGroup = 'naïve';
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.interval = [-5 35];
 v.dataFilter.repetitions = [1:5];
 [~,events,all_labs] = ModeSelector(v).extract;
-% events = cellfun(@(x) movmean(x,3,1,'omitmissing'),events,'UniformOutput',false);
 events = cellfun(@(x) permute(x,[3,2,1]),events,'UniformOutput',false);
 events = separateTrials(events);
 T = size(events{1},3);
 figure; C = plotDistances(events,'full','correlation',1:T,cfg);
-clim([0 1])
-xlabel('Time from stim.onset (s)')
-ylabel('Time from stim.onset (s)')
+t = -5:5:35;
+x = linspace(1,T,numel(t));
+xticks(x);xticklabels(t)
+yticks(x);yticklabels(t)
+clim([.1 .7])
+xlabel('Time (s)')
+ylabel('Time (s)')
+
+cfg = v.plotConfig;
+cfg.figSize = 'medium';
+cfg.setFigure;
+cfg.saveFigure(gcf,'naive singletrial corr in time imagesc', saveType)
+
+
+hasnan = squeeze(sum(isnan(C),[1,2]));
+C(:,:,hasnan>0) = [];
+
+figure;
+ncols = 6; nrows = 5;
+n = ncols*nrows;
+N = size(C,3);
+for i = 1:n
+    subplot(nrows,ncols,i);
+    j = randi(N);
+    imagesc(t,t,1-C(:,:,j));
+    axis square
+    colormap(cfg.colormapName)
+    clim(cfg.custom.crange)
+    title(num2str(j));
+end
 
 function out = separateTrials(data)
 n = numel(data);
@@ -340,20 +437,147 @@ ylim([0 .2])
 cfg.saveFigure(gcf,'naive average response trace', saveType)
 cfg = v.plotConfig;
 
-%% naive individual response traces (pooled imagesc)
-Nshow = 1000; % n of cells to randomly subsample for visualization
+
+%% motion responsiveness vs odor responsiveness
+resp_by_odor = false;
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'all';
+has_beh2p_data = ~cellfun(@(x) isempty(x.behavior2p),v.filtered_traces);
+idx = find(has_beh2p_data); idx([4,17])=[];
+v.dataFilter.subjectIDs = v.subjectTab.name(idx);
 v.dataFilter.interval  = [.5 20]; % get intensity during odor window
 iFR_odor = v.plotUnitActivityMetricHead('method','avg intensity');
-N = cellfun(@height,iFR_odor); N = cumsum(N);
-iFR_odor = cell2mat(iFR_odor);
 v.dataFilter.interval = []; % get cellwise mean and std from all data
 iFR_var = v.plotUnitActivityMetricHead('method','variance');
 iFR_var = cell2mat(iFR_var);
 iFR_std = sqrt(iFR_var); % variance to std
 iFR_mu = v.plotUnitActivityMetricHead('method','avg intensity');
 iFR_mu = cell2mat(iFR_mu);
+if resp_by_odor
+    % responsiveness of the cell is the highest single-odor responsiveness.
+    % since mu and std are in common, we just take the maximum average
+    % activity across odors
+    [~,labs] = v.dataFilter.filterData(v);
+    nsubj = numel(labs);
+    for i = 1:nsubj
+        data = iFR_odor{i}; lbl = labs{i};
+        [n,ntrials] = size(data);
+        stims = unique(lbl);
+        newdata = nan(n,numel(stims));
+        for j = 1:numel(stims)
+            responses = data(:,ismember(lbl,stims(j)));
+            newdata(:,j) = mean(responses,2,'omitmissing'); % average response to a single odor
+        end
+        iFR_odor{i} = max(newdata,[],2,"omitmissing"); % maximum response across odors
+    end
+end
+n_cells_per_subj = cellfun(@(x) size(x,1), iFR_odor); % per-subject cell count, used later for LME
+iFR_odor = cell2mat(iFR_odor);
+iFR_odor = mean(iFR_odor,2,'omitmissing'); % avg over trials
+iFR_std = mean(iFR_std,2,'omitmissing'); % avg over trials
+iFR_mu = mean(iFR_mu,2,'omitmissing'); % avg over trials
+resp = (iFR_odor-iFR_mu)./iFR_std; % responsiveness score
+
+v.dataFilter.traceType = 'pSpike';
+v.dataFilter.interval  = [50 140];
+bpp = Behavior2PPlotter(v);
+bpp.n_std    = 2;                                                                                                     bpp.buffer_s = 1;
+                                                                                                                  
+[onsets,  ~] = bpp.getTailMotionOnsets();
+[offsets, ~] = bpp.getTailMotionOffsets();
+
+% Full [T x N x n_trials] data for every subject (used for event-free baseline)
+[~, full_nd, ~] = ModeSelector(v).extract;
+
+% --- motion tuning ---
+[snips, ~, pre_fr] = bpp.getMotionSnippets(onsets, [-10 10]);
+ps  = v.dataFilter.interval;
+
+clear tuning
+for i = 1:numel(snips)
+    if isempty(snips{i}); continue; end
+    fs = v.filtered_traces{i}.framerate;
+    tuning{i} = extractActivityMetric(snips{i}, 'motion tuning', 'cells', ...
+        'PreEventFrames', pre_fr,      ...
+        'FullData',       full_nd{i},  ...
+        'EventOnsets',    onsets{i},   ...
+        'EventOffsets',   offsets{i},  ...
+        'FrameRate',      fs,          ...
+        'PsLim',          ps);
+    % tuning{i}: [n_units x 1]
+end
+hf = figure;
+for i = 1:numel(snips)
+    if isempty(tuning{i}) || sum(~ismissing(tuning{i}))<10
+        continue
+    end
+    cdfplot(tuning{i}); hold on
+end
+xlabel('Motion responsiveness (STD)'); ylabel('CDF'); title('')
+cfg.setFigure
+cfg.saveFigure(gcf,'motion responsiveness CDF', saveType)
+
+% LME: motion responsiveness ~ odor responsiveness + (1|subject)
+% split flat resp back into per-subject cells; exclude subjects with no motion data
+valid_subj = ~cellfun(@isempty, tuning);
+resp_cell  = mat2cell(resp, n_cells_per_subj);
+lme_result = statsUtils.lmeRegress(tuning(valid_subj), resp_cell(valid_subj));
+
+tuning = cell2mat(tuning');
+
+hf = figure;
+scatter(resp,tuning,1,'k','filled');
+axis square tight
+rangemin = min([min(ylim), min(xlim)]);
+rangemax = max([max(ylim), max(xlim)]);
+hold on; plot([rangemin rangemax],[rangemin rangemax],'r-')
+xlabel('R (STD)'); ylabel('Motion responsiveness (STD)')
+[r,p] = corrcoef(resp,tuning,'Rows','complete');
+disp(['Pearson corr: ', num2str(r(2)),' - p-value: ', num2str(p(2))])
+fprintf('LME (motion ~ odor): slope = %.3g,  r_rm = %.3f,  p = %s\n', ...
+    lme_result.slope, lme_result.r_rm, statsUtils.pvalToStars(lme_result.p))
+cfg.setFigure
+cfg.saveFigure(gcf,'odor vs motion responsiveness', saveType)
+
+
+
+%% naive individual response traces (pooled imagesc)
+
+has_beh2p_data = ~cellfun(@(x) isempty(x.behavior2p),v.filtered_traces);
+
+
+resp_by_odor = false;
+Nshow = 1000; % n of cells to randomly subsample for visualization
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'all';
+v.dataFilter.interval  = [.5 20]; % get intensity during odor window
+iFR_odor = v.plotUnitActivityMetricHead('method','avg intensity');
+N = cellfun(@height,iFR_odor); N = cumsum(N);
+v.dataFilter.interval = []; % get cellwise mean and std from all data
+iFR_var = v.plotUnitActivityMetricHead('method','variance');
+iFR_var = cell2mat(iFR_var);
+iFR_std = sqrt(iFR_var); % variance to std
+iFR_mu = v.plotUnitActivityMetricHead('method','avg intensity');
+iFR_mu = cell2mat(iFR_mu);
+if resp_by_odor
+    % responsiveness of the cell is the highest single-odor responsiveness.
+    % since mu and std are in common, we just take the maximum average
+    % activity across odors
+    [~,labs] = v.dataFilter.filterData(v);
+    nsubj = numel(labs);
+    for i = 1:nsubj
+        data = iFR_odor{i}; lbl = labs{i};
+        [n,ntrials] = size(data);
+        stims = unique(lbl);
+        newdata = nan(n,numel(stims));
+        for j = 1:numel(stims)
+            responses = data(:,ismember(lbl,stims(j)));
+            newdata(:,j) = mean(responses,2,'omitmissing'); % average response to a single odor
+        end
+        iFR_odor{i} = max(newdata,[],2,"omitmissing"); % maximum response across odors
+    end
+end
+iFR_odor = cell2mat(iFR_odor);
 iFR_odor = mean(iFR_odor,2,'omitmissing'); % avg over trials
 iFR_std = mean(iFR_std,2,'omitmissing'); % avg over trials
 iFR_mu = mean(iFR_mu,2,'omitmissing'); % avg over trials
@@ -430,6 +654,7 @@ cfg.setFigure
 cfg.saveFigure(gcf,'naive firing rate distributions', saveType)
 cfg = v.plotConfig;
 v.dataFilter = dft;
+
 
 %% 
 close all

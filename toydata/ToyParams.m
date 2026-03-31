@@ -76,13 +76,24 @@ classdef ToyParams
         %        Set to 0 for the null model (no drift).
         gamma double = 1
 
-        % C: modulus (Hz) of the trial-specific baseline vector s_t.
-        %    ||s_t|| = C exactly at every trial.
+        % C: initial modulus (Hz) of the trial-specific baseline vector s_t.
+        %    ||s_t|| = C at trial 1, then attenuates if lambda_C > 0.
         %    0 = no baseline term (default).
         C double = 0
 
+        % lambda_C: total attenuation of the baseline amplitude across trials.
+        %           C_eff(t) = C - lambda_C*(1 - exp(-(t-1)/tau_C))
+        %           At t=1: C_eff = C.  As t->inf: C_eff -> C - lambda_C.
+        %           0 = constant amplitude (default).
+        %           Constraint: 0 <= lambda_C <= C.
+        lambda_C double = 0
+
+        % tau_C: time constant of the baseline amplitude attenuation (units: trials).
+        %        Governs how fast C_eff decays from C toward C - lambda_C.
+        tau_C double = 1.5
+
         % theta: baseline drift rate across trials (rotation speed).
-        %        s_t = C*[cos(theta*pi/2*(t-1))*u_s + sin(theta*pi/2*(t-1))*v_s]
+        %        s_t = C_eff(t)*[cos(theta*pi/2*(t-1))*u_s + sin(theta*pi/2*(t-1))*v_s]
         %        0 = constant across trials (global offset).
         %        1 = consecutive trials are orthogonal (no correlation).
         %        Values in (0,1): linear angular drift, partial correlation.
@@ -293,6 +304,10 @@ classdef ToyParams
                 'ToyParams: lambda_A must be non-negative.');
             assert(obj.C >= 0, ...
                 'ToyParams: C must be non-negative.');
+            assert(obj.lambda_C >= 0 && obj.lambda_C <= obj.C, ...
+                'ToyParams: lambda_C (%.3f) must be in [0, C] (C=%.3f).', obj.lambda_C, obj.C);
+            assert(obj.tau_C > 0, ...
+                'ToyParams: tau_C must be positive.');
             assert(obj.theta >= 0, ...
                 'ToyParams: theta must be non-negative.');
 

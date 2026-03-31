@@ -22,6 +22,8 @@ classdef Behavior2PPlotter
 %     [onsets, thr] = bpp.getTailMotionOnsets();
 %     hf            = bpp.plotPSTH(onsets, [-2 5]);
 %     hf            = bpp.regressByBreathingRate();
+%     hf            = bpp.plotBreathingEventPSTH([-0.5 1.5]);
+%     hf            = bpp.plotBreathingCyclePSTH(100);
 %
 %   NOTE ON THRESHOLD
 %     Thresholds are always computed from the FULL tail_motion_2p trace
@@ -232,13 +234,20 @@ classdef Behavior2PPlotter
         %  PERI-EVENT NEURAL PSTH
         % -------------------------------------------------------------------
 
-        function hf = plotPSTH(obj, events, trange)
+        function [hf, snippets, t_psth] = plotPSTH(obj, events, trange)
         % PLOTPSTH  Plot peri-event neural PSTH with tail-motion underlay.
         %
         %   Cuts windows of mean neural activity (averaged over units) and the
         %   corresponding tail_motion_2p signal around each detected event.
         %   Mean ± SEM across all pooled events is plotted for both signals
         %   on a dual y-axis so that the independent scales are preserved.
+        %
+        %   OPTIONAL OUTPUTS
+        %     snippets  [n_psth_frames x n_events] raw neural snippets
+        %               (one column per event, pooled across all subjects)
+        %               Suitable for passing to extractActivityMetric as
+        %               'motion tuning' with 'PreEventFrames'.
+        %     t_psth    [1 x n_psth_frames] time axis in seconds
         %
         %   INPUTS
         %     events  cell output from getTailMotionOnsets / getTailMotionOffsets
@@ -386,6 +395,121 @@ classdef Behavior2PPlotter
         end
 
         % -------------------------------------------------------------------
+        %  PER-UNIT MOTION SNIPPETS
+        % -------------------------------------------------------------------
+
+        function [snippets, t_psth, pre_event_frames] = getMotionSnippets(obj, events, trange)
+        % GETMOTIONSNIPPETS  Extract per-unit peri-event neural snippets.
+        %
+        %   Unlike plotPSTH (which collapses over units for visualisation),
+        %   this method preserves the unit dimension and returns one snippet
+        %   per unit per event, suitable for per-unit 'motion tuning' scoring
+        %   via extractActivityMetric.
+        %
+        %   INPUTS
+        %     events  cell from getTailMotionOnsets / getTailMotionOffsets
+        %     trange  [pre_s, post_s] window in seconds (default [-2 5])
+        %
+        %   OUTPUTS
+        %     snippets         {n_subjects} cell of [n_frames x n_units x n_events]
+        %     t_psth           [1 x n_frames] common time axis (seconds)
+        %     pre_event_frames integer — number of frames before t = 0;
+        %                      pass directly as 'PreEventFrames' to
+        %                      extractActivityMetric('motion tuning', ...).
+        %
+        %   EXAMPLE
+        %     [onsets, ~]        = bpp.getTailMotionOnsets();
+        %     [offsets, ~]       = bpp.getTailMotionOffsets();
+        %     [snips, ~, pre_fr] = bpp.getMotionSnippets(onsets, [-2 5]);
+        %     [~, full_nd, ~]    = ModeSelector(bpp.v).extract;
+        %     ps = bpp.v.dataFilter.interval;
+        %     fs = bpp.v.filtered_traces{i}.framerate;
+        %     for i = 1:numel(snips)
+        %         tuning{i} = extractActivityMetric(snips{i}, ...
+        %             'motion tuning', 'cells', ...
+        %             'PreEventFrames', pre_fr, ...
+        %             'FullData',       full_nd{i}, ...
+        %             'EventOnsets',    onsets{i}, ...
+        %             'EventOffsets',   offsets{i}, ...
+        %             'FrameRate',      fs, ...
+        %             'PsLim',          ps);
+        %     end
+            arguments
+                obj
+                events cell
+                trange (1,2) double = [-2, 5]
+            end
+
+            v      = obj.v;
+            ps_lim = v.dataFilter.interval;
+            traces = v.filtered_traces;
+            n      = numel(events);
+
+            % Raw neural data [T x N x n_trials] per subject (no unit averaging)
+            [~, raw_data, ~] = ModeSelector(v).extract;
+
+            % Reference framerate from first usable subject
+            fs_ref = [];
+            for i = 1:n
+                if ~isempty(raw_data{i})
+                    fs_ref = traces{i}.framerate;
+                    break;
+                end
+            end
+            if isempty(fs_ref)
+                warning('Behavior2PPlotter:getMotionSnippets: no neural data.');
+                snippets = {}; t_psth = []; pre_event_frames = 0;
+                return;
+            end
+
+            n_psth_fr        = floor(diff(trange) * fs_ref);
+            t_psth           = trange(1) + (0:n_psth_fr-1) / fs_ref;
+            pre_event_frames = floor(abs(trange(1)) * fs_ref);
+
+            snippets = cell(n, 1);
+
+            for i = 1:n
+                if isempty(events{i}) || isempty(raw_data{i}); continue; end
+
+                ev     = events{i};
+                nd     = raw_data{i};    % [T x N x n_trials]
+                fs     = traces{i}.framerate;
+                N      = size(nd, 2);
+                n_fr_i = floor(diff(trange) * fs);
+
+                snips_i = nan(n_psth_fr, N, 0);
+
+                for k = 1:numel(ev.time_s)
+                    t_on = ev.time_s(k);
+                    j    = ev.trial_idx(k);
+                    if j > size(nd, 3); continue; end
+
+                    trial_nd = nd(:, :, j);   % [T x N]
+
+                    if isempty(ps_lim)
+                        f_on = round(t_on * fs) + 1;
+                    else
+                        f_on = round((t_on - ps_lim(1)) * fs) + 1;
+                    end
+                    f_start = f_on + round(trange(1) * fs);
+                    f_end   = f_start + n_fr_i - 1;
+
+                    if f_start < 1 || f_end > size(nd, 1); continue; end
+
+                    snippet = trial_nd(f_start:f_end, :);   % [n_fr_i x N]
+                    if n_fr_i ~= n_psth_fr
+                        % interp1 on matrix Y interpolates each column
+                        snippet = interp1(linspace(0,1,n_fr_i), ...
+                            double(snippet), linspace(0,1,n_psth_fr));
+                    end
+                    snips_i(:, :, end+1) = snippet;   %#ok<AGROW>
+                end
+
+                snippets{i} = snips_i;   % [n_psth_fr x N x n_events_i]
+            end
+        end
+
+        % -------------------------------------------------------------------
         %  BRAIN ACTIVITY vs. BREATHING RATE REGRESSION
         % -------------------------------------------------------------------
 
@@ -469,19 +593,11 @@ classdef Behavior2PPlotter
             end
 
             % --- Fit LME: brain_activity ~ 1 + breathing_rate + (1|subj) -
-            tbl = table(all_y, all_x, categorical(all_subj), ...
-                'VariableNames', {'brain_activity', 'breathing_rate', 'subject'});
-            lme = fitlme(tbl, 'brain_activity ~ 1 + breathing_rate + (1|subject)');
-
-            coefs   = lme.Coefficients;
-            slope   = coefs.Estimate(2);
-            slope_p = coefs.pValue(2);
-
-            % Marginal R² (fixed-effects only)
-            y_fit  = fitted(lme, 'Conditional', false);
-            ss_res = sum((all_y - y_fit).^2);
-            ss_tot = sum((all_y - mean(all_y)).^2);
-            r2_marg = max(0, 1 - ss_res / ss_tot);
+            lme_result = statsUtils.lmeRegress(all_y, all_x, all_subj);
+            lme     = lme_result.lme;
+            slope   = lme_result.slope;
+            slope_p = lme_result.p;
+            r2_marg = lme_result.r2_marginal;
 
             % --- Plot scatter + trend line --------------------------------
             hf = figure;
@@ -502,8 +618,7 @@ classdef Behavior2PPlotter
 
             % Fixed-effects trend line
             x_rng = linspace(min(all_x), max(all_x), 200);
-            fe    = fixedEffects(lme);
-            y_rng = fe(1) + fe(2) * x_rng;
+            y_rng = lme_result.intercept + lme_result.slope * x_rng;
             plot(x_rng, y_rng, '-', 'Color', cfg.axcol, 'LineWidth', 2, ...
                 'DisplayName', 'LME fit');
 

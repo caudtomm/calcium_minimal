@@ -25,7 +25,7 @@ end
 
 %% initialize output figure saving
 cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73,86:99]); % (test1, test2, ctrl)
-cfg.custom.crange = [.3 .7];
+cfg.custom.crange = [.1 .7];
 cfg.savePath = savepath;
 
 v = ExperimentViewer(experiment);
@@ -67,16 +67,22 @@ proj = computeLDE(events,labs,'pooldata',true,'nans2zeros',true, 'method','pca')
 
 emb = proj.embedding{1};
 dt = proj.inputData{1};
-out = characterizePCspace(dt.traces,emb.coeff,emb.explained,cfg,50);
+[out, ax1, ax2] = characterizePCspace(dt.traces,emb.coeff,emb.explained,cfg,50);
+axes(ax1)
 xscale log; yscale log;
 xlim([min(xlim) out.maxPC+100])
+axes(ax2)
+xscale log; yscale log;
+% xlim([min(xlim) out.maxPC+100])
+axes(ax1)
+ylim([0.01 max(ylim)*2])
 cfg.setFigure;
 cfg.saveFigure(gcf,'allgroups PC variance explained', saveType)
 
 
 %% plot PCA lines
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'all';
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.interval = [.5, 20];
 v.dataFilter.repetitions = 1:5;
@@ -85,15 +91,16 @@ v.dataFilter.repetitions = 1:5;
 proj = computeLDE(events,labs,'pooldata',true,'nans2zeros',true, 'method','pca');
 figure; out = plotLDE(proj.embedding{1}.reduction(:,1:2,:),'lines',proj.labs{1},cfg, 'ldetype',proj.name); % plot
 xlabel('PC 1'); ylabel('PC 2');
+legend off
 cfg.setLines = false;
-cfg.figSize = 'medium';
+cfg.figSize = 'small';
 cfg.setFigure;
-cfg.saveFigure(gcf,'naive PCA 2d', saveType)
+cfg.saveFigure(gcf,'allgroups PCA 2d raw', saveType)
 
 
 %% plot UMAP lines
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.subjectGroup = 'all';
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.interval = [1, 20];
 v.dataFilter.repetitions = 1:5;
@@ -103,24 +110,25 @@ v.dataFilter.repetitions = 1:5;
 % v.dataFilter.mode_method = 'isolate';
 % v.dataFilter.mode_file = 'dpca_trained.mat';
 
-% [~,events,labs] = ModeSelector(v).extract;
+[~,events,labs] = ModeSelector(v).extract;
 
-[~,odor_events,all_labs] = ModeSelector(v).extract;
-L = height(odor_events{1});
-v.dataFilter.interval = [-22 -2];
-[~,base_events] = ModeSelector(v).extract;
-base_events = cellfun(@(x) repmat(mean(x,1,'omitmissing'),L,1,1),base_events,'UniformOutput',false);
-events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
+% [~,odor_events,all_labs] = ModeSelector(v).extract;
+% L = height(odor_events{1});
+% v.dataFilter.interval = [-22 -2];
+% [~,base_events] = ModeSelector(v).extract;
+% base_events = cellfun(@(x) repmat(mean(x,1,'omitmissing'),L,1,1),base_events,'UniformOutput',false);
+% events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
 
 proj = computeLDE(events,labs,'pooldata',true,'nans2zeros',true, ...
     'method','umap','n_components',2, 'metric','euclidean');
 figure; out = plotLDE(proj.embedding{1}.reduction,...
     'lines',proj.labs{1},cfg, 'ldetype',proj.name); % plot
 xlabel('UMAP 1'); ylabel('UMAP 2');
+legend off
 cfg.setLines = false;
-cfg.figSize = 'medium';
+cfg.figSize = 'small';
 cfg.setFigure;
-cfg.saveFigure(gcf,'uncoupled UMAP 2d', saveType)
+cfg.saveFigure(gcf,'allgroups UMAP 2d raw', saveType)
 
 
 %%
@@ -161,25 +169,27 @@ cfg.saveFigure(gcf,[grouptag, ' interrep vector corr boxplot'], saveType)
 
 %% GCMC
 close all
+exp_name = 'odorexp004_IC1_130625';
 
 % Metrics to plot
 metrics_to_plot = {'Fun_capacity', 'Fun_dimension', 'Fun_radius', ...
                    'Fun_center_alignment', 'Fun_axis_alignment'};
 metric_labels = {'Capacity', 'Dimension', 'Radius', 'Center alignment', 'Axis alignment'};
-metric_yranges = {[0 .15], [0 30], [0 2], [0 1], [0 .5]};
+metric_yranges = {[0 .15], [0 30], [0 2], [0 1], [0 .5]}; % for odor manifolds
+%metric_yranges = {[.3 .6], [3 4.5], [0.8 1.1], [.4 .7], [.1 .2]}; % for sliding windows
 
 % Stimulus sets
 familiar_stims = {'Arg', 'Ala', 'His'};
 novel_stims = {'Trp', 'Ser', 'Leu'};
 
 %% ========== ODOR MANIFOLDS (boxplots by group) ==========
-folder_tag = 'odors';
+folder_tag = 'repetitions';
 gcmc_savepath = fullfiletol(savepath, 'gcmc', folder_tag);
 if ~isfolder(gcmc_savepath); mkdir(gcmc_savepath); end
 
 % Load data once
-exp_name = 'odorexp004_IC1_130625';
 [group_data, ~] = GCMC_Plotting.loadAndPrepareData(v, folder_tag, exp_name);
+group_data = group_data(1:2)
 
 % --- All vs All odor manifolds ---
 subdir = fullfiletol(gcmc_savepath, 'allvsall');
@@ -213,7 +223,7 @@ if ~isfolder(subdir); mkdir(subdir); end
 f = GCMCResultsFilter('shuffle', false);
 f.pairFilters.manifold_name = 'different';  % different stimulus only
 f.pairFilters.manifold_rep = 'same';   % same repetition only
-GCMC_Plotting.plotAndSaveRepLines(group_data_trials, cfg, f, metrics_to_plot, metric_labels, subdir, saveType,'average_by_subject',true);
+stats = GCMC_Plotting.plotAndSaveRepLines(group_data_trials, cfg, f, metrics_to_plot, metric_labels, subdir, saveType,'average_by_subject',true);
 
 % --- Same rep trial manifolds (familiar stimuli only) ---
 subdir = fullfiletol(gcmc_savepath, 'familiar_samerep');
@@ -250,7 +260,7 @@ f = GCMCResultsFilter('shuffle', false);
 f.pairFilters.manifold_name = 'different';
 f.pairFilters.manifold_rep = 'same';
 [hf_sw, pf_sw] = GCMC_Plotting.plotSlidingWindowMetrics(sw, cfg, f, metrics_to_plot, ...
-    'clim', sw_clim,'relative',true);
+    'clim', sw_clim,'relative',false);
 
 % Display Friedman p-values
 for i_m = 1:numel(metrics_to_plot)
@@ -267,7 +277,25 @@ for i = 1:numel(hf_sw)
         cfg.saveFigure(hf_sw(i), get(get(gca,'Title'),'String'), saveType);
     end
 end
-close all;
+close all; clear hf_sw
+
+% Plot p-values as lines and save
+for i_g = 1:numel(sw.groups)
+    for i_m = 1:numel(metrics_to_plot)
+        thisdt = pf_sw(i_g,:,i_m);
+        hf = figure; plot(thisdt,'k-');
+        hold on; yline(0.05,'r-')
+        yscale log
+        xticks(1:numel(sw.windows)); xticklabels(sw.t_centers)
+        ylabel('Friedman p-value')
+        ttlstr = [sw.groups{i_g},' - ' metric_labels{i_m}];
+        title(ttlstr)
+        cfg.savePath = subdir;
+        cfg.setFigure
+        cfg.saveFigure(gcf, ['pval - ',ttlstr], saveType);
+        close
+    end
+end
 
 % --- All stimuli, same-rep, different-stim (RELATIVE to pre-stimulus) ---
 subdir = fullfiletol(gcmc_savepath, 'allstims_samerep_rel');
@@ -318,13 +346,13 @@ end
 close all;
 
 
-%% template matching lines
-classifier = 'qda';
+%% decoding lines
+classifier = 'template_match';
 v.dataFilter = dft;
 grouptag = 'naive';
-stimtag = 'allstims';
+stimtag = 'all';
 v.dataFilter.subjectGroup = 'naïve';
-v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.stims_allowed = 'all stimuli'; %{'Trp','Ser','Leu'};
 v.dataFilter.interval = [.5, 20];
 v.dataFilter.repetitions = 1:5;
 method = 'correlation';
@@ -336,21 +364,25 @@ c = v.plotDiscriminationHead(...
     'method',method, ...
     'focus_stims', focus_stims, ...
     'classifier',classifier,...
-    'trainblockmode','2blocks',...
+    'trainblockmode','single',...
     'separatetestset',true,...
     'zscore',false);
 for i = 2:width(c)
     p = signrank(c(:,1),c(:,i));
     disp(['Paired Wilcoxon signed-rank test - reps 1 vs ', num2str(i),': ',num2str(p)])
 end
+fr_trained = statsUtils.friedman(c);
+fprintf('Friedman test: chi2=%.2f, df=%d, p=%.4g\n', ...
+    fr_trained.chi2, fr_trained.df, fr_trained.p);
 xlabel('Template trial #')
 ylabel('Performance')
 ylim([0 1])
 title(classifier)
+legend off
 cfg.figSize = "tiny";
 cfg.aspRatioType = "tall";
 cfg.setFigure;
-cfg.saveFigure(gcf,['template ',grouptag, ' ',stimtag,' lines'], saveType)
+cfg.saveFigure(gcf,[classifier,' ',grouptag, ' ',stimtag,' lines'], saveType)
 
 
 %% template matching mats
@@ -378,3 +410,23 @@ cfg.figSize = "small";
 cfg.aspRatioType = "square";
 cfg.setFigure;
 cfg.saveFigure(gcf,['template ',grouptag, ' ',stimtag,' mat'], saveType)
+
+%%
+
+v.plotConfig.theme = 'many colors';
+v.dataFilter.subjectGroup = 'all';
+[R, ira] = driftMetricsFigure(v);
+close all
+angdiff_sham = getAngleDiff(ira);
+
+function y = getAngleDiff(ira)
+    [nstims, nangles, nsubj] = size(ira);
+    x = nchoosek(1:nstims,2);
+    npairs = height(x);
+    y = [];
+    for i = 1:npairs
+        dt = ira(x(i,:),:,:); % [odor1;odor2 x angles x subj]
+        dtd = diff(dt,[],1);
+        y = [y; dtd(:)];
+    end
+end

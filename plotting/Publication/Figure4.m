@@ -25,7 +25,7 @@ end
 
 %% initialize output figure saving
 cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73,86:99]); % (test1, test2, ctrl)
-cfg.custom.crange = [.3 .7];
+cfg.custom.crange = [.1 .7];
 cfg.savePath = savepath;
 
 v = ExperimentViewer(experiment);
@@ -42,10 +42,10 @@ dft = v.dataFilter;
 
 
 %% intertrial euclidean distances
-grouptag = 'naive';
+grouptag = 'trained3';
 
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'trained1 (T-R-S-H-A-ACSF/L)';
 
 % full matrix
 hf = figure;
@@ -198,10 +198,10 @@ disp(array2table(pvals,'VariableNames',names,'RowNames',names));
 
 
 %% intertrial correlations
-grouptag = 'trained';
+grouptag = 'allgroups';
 
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'all';
 
 % full matrix
 hf = figure;
@@ -210,7 +210,7 @@ xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
 cfg.figSize = 'small';
 cfg.aspRatioType = 'square';
 cfg.setFigure;
-cfg.saveFigure(gcf,[grouptag,' stim intertrial corr full'], saveType)
+cfg.saveFigure(gcf,[grouptag,' stim intertrial corr full raw'], saveType)
 
 % repetitions
 hf = figure;
@@ -219,8 +219,9 @@ xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
 cfg.figSize = 'small';
 cfg.aspRatioType = 'wide';
 cfg.setFigure;
-cfg.saveFigure(gcf,[grouptag,' stim intertrial corr reps'], saveType)
+cfg.saveFigure(gcf,[grouptag,' stim intertrial corr reps raw'], saveType)
 v.dataFilter = dft;
+
 
 
 %% intertrial correlations, without pre-stimulus correlations
@@ -258,6 +259,11 @@ v.dataFilter = dft;
 
 
 %% intertrial correlations, without pre-stimulus correlations
+
+shuffle_trials_base = true;
+
+grouptag = 'trained';
+
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.stims_allowed = 'all stimuli';
@@ -267,25 +273,96 @@ v.dataFilter.interval = [1 20];
 [~,odor_events,all_labs] = ModeSelector(v).extract;
 L = height(odor_events{1});
 base_events = cellfun(@(x) repmat(mean(x,1,'omitmissing'),L,1,1),base_events,'UniformOutput',false);
+if shuffle_trials_base
+    shuf_tag = 'shuffled ';
+    for i = 1:numel(base_events)
+        thisevent = base_events{i};
+        N = size(thisevent,2);
+        idx = randperm(N);
+        base_events{i} = thisevent(:,idx,:);
+    end
+else
+    shuf_tag = '';
+end
 diff_events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
 figure; plotDistances(diff_events,'full','correlation',all_labs{1},cfg);
-clim([0 .5])
-cfg.figSize = "medium";
+colorbar off; xticks([]); yticks([]); xlabel(''); ylabel('');
+cfg.figSize = "large";
 cfg.setFigure;
-cfg.saveFigure(gcf,'uncoupled stim-prestim intertrial corr', saveType)
-v.dataFilter = dft;
+cfg.saveFigure(gcf,[grouptag,' ',shuf_tag,'stim-prestim intertrial corr'], saveType)
 
 figure; plotDistances(diff_events,'repetitions','correlation',all_labs{1},cfg);
-clim([0 .5])
+colorbar off; xticks([]); yticks([]); xlabel(''); ylabel('');
 cfg.figSize = "small";
 cfg.setFigure;
-cfg.saveFigure(gcf,'uncoupled stim-prestim intertrial corr repetitions', saveType)
+cfg.saveFigure(gcf,[grouptag,' ',shuf_tag,'stim-prestim intertrial corr repetitions'], saveType)
+
+figure;
+C_odor = 1-plotDistances(odor_events,'full','correlation',all_labs{1},cfg);
+C_diff = 1-plotDistances(diff_events,'full','correlation',all_labs{1},cfg);
+close;
+[~,ntrials,nsubj] = size(C_odor);
+idx = repmat(triu(true(ntrials),1),1,1,nsubj);
+C_odor = C_odor(idx); C_diff = C_diff(idx);
+figure;
+cdfplot(C_odor(:)); hold on
+cdfplot(C_diff(:))
+axis square; xlim([-1 1])
+xlabel('r'); ylabel('CDF')
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' ',shuf_tag,'stim-prestim intertrial corr cdf'], saveType)
+
+[~,p] = kstest2(C_odor,C_diff);
+disp(['2-sample KS test for native units vs baseline-subtr. intertrial corrs - pval: ',num2str(p)])
+results = statsUtils.pairwiseMannWhitney({C_odor,C_diff},{'native','subtr.'},false)
+
+
+% correlation decay over repetitions of the same odor (native data vs baseline-subtr)
+figure;
+C_odor = 1-plotDistances(odor_events,'repetitions','correlation',all_labs{1},cfg);
+C_diff = 1-plotDistances(diff_events,'repetitions','correlation',all_labs{1},cfg);
+close;
+[~,nreps,n] = size(C_odor);
+y_odor = nan(n,nreps-1); y_diff = nan(n,nreps-1);
+for i = 1:nreps-1
+    idx = triu(true(nreps),i)-triu(true(nreps),i+1);
+    idx = logical(idx);
+    y = [];
+    for j = 1:n
+        thisdt = C_odor(:,:,j);
+        y = [y; mean(thisdt(idx),'omitmissing')];
+    end
+    y_odor(:,i) = y;
+    y = [];
+    for j = 1:n
+        thisdt = C_diff(:,:,j);
+        y = [y; mean(thisdt(idx),'omitmissing')];
+    end
+    y_diff(:,i) = y;
+end
+figure; clear b
+y_mean = mean(y_odor,'omitmissing'); y_err = std(y_odor,[],'omitmissing');
+b(1) = plotLineNShade(1:nreps-1,y_mean,y_err,cfg.c(1,:),cfg);
+hold on
+y_mean = mean(y_diff,'omitmissing'); y_err = std(y_diff,[],'omitmissing');
+b(2) = plotLineNShade(1:nreps-1,y_mean,y_err,cfg.c(2,:),cfg);
+y = diff(y_diff,[],2)-diff(y_odor,[],2);
+y_mean = mean(y,'omitmissing'); y_err = std(y,[],'omitmissing');
+b(3) = plotLineNShade(2:nreps-1,y_mean,y_err,'k',cfg);
+ylim([-.1 1])
+xlabel('Distance (repetitions)'); ylabel('r')
+legend(b,{'native','BS','d(BS)-d(native)'})
+cfg.figSize = "tiny";
+cfg.aspRatioType = 'tall';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' ',shuf_tag,'stim-prestim intertrial corr decay'], saveType)
+
+
+
 v.dataFilter = dft;
-
-
 %% intertrial distances (novel or familiar stimuli)
 %
-stimclass = 'novel';
+stimclass = 'familiar';
 
 % naive
 v.dataFilter = dft;
@@ -432,12 +509,12 @@ cfg = v.plotConfig;
 
 v.dataFilter = dft;
 
-classifiers = {'template_match','svm','dbd','lda','qda'};
-classif_nicknames = {'TM','SVM','DBD','LDA','QDA'};
+classifiers = {'lda','template_match','qda','svm','dbd'};
+classif_nicknames = {'LDA','TM','QDA','SVM','DBD'};
 groups = {'naïve', 'trained'};
 focus_stims = {'Arg','Ala','His','Trp','Ser','Leu'};
 v.dataFilter.stims_allowed = {'Arg','Ala','His','Trp','Ser','Leu'};
-v.dataFilter.repetitions = [1:5];
+v.dataFilter.repetitions = [2:5];
 
 % v.dataFilter.mode_name = 'dpca';
 % v.dataFilter.mode_OI = 'stimulus';
@@ -487,13 +564,14 @@ for g = 1:ngroups
         'MarkerSize',2, 'CapSize',2);
     hold on
 end
+yline(chancelv,'r-')
 xticks(1:nclass); xticklabels(classif_nicknames); xtickangle(90); xlim([.5 nclass+.5])
 ylabel('Performance'); ylim([0 1.1])
 % legend(b,groups)
 cfg.figSize = "small";
 cfg.aspRatioType = 'square';
 cfg.setFigure;
-cfg.saveFigure(gcf,'upper bound classification performance - only novel', saveType)
+cfg.saveFigure(gcf,'upper bound classification performance - all stims 2-5', saveType)
 cfg = v.plotConfig;
 
 % Mann-Whitney U test: naive vs trained for each classifier
@@ -510,10 +588,10 @@ classif_tab = table(classif_nicknames', p_raw, p_adj, stars, ...
 disp('Mann-Whitney U (naive vs trained) per classifier:');
 disp(classif_tab);
 
-%%
+%% intertrial correlations for trials of the same and different odors, quantification
 v.dataFilter = dft;
 stimclass = 'all';
-% v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.stims_allowed = 'all stimuli';
 % v.dataFilter.stims_allowed = {'Arg','Ala','His'};
 % v.dataFilter.stims_allowed = {'Trp','Ser','Leu'};
 
@@ -550,6 +628,10 @@ g = [repmat({'naive'},numel(C_naive),1); ...
 hf = figure;
 boxplot(y,g);
 ylim([-1 1]); ylabel('r')
+cfg.figSize = 'tiny'; cfg.aspRatioType = 'tall'; cfg.setFigure;
+cfg.saveFigure(gcf,['same stim correlation ',stimclass], saveType);
+cfg = v.plotConfig;
+supp_stats = statsUtils.pairwiseMannWhitney({C_naive,C_trained}, {'naive','trained'}, true);
 [p,~,stats] = kruskalwallis(y,g,'off');
 figure;multcompare(stats,'Display','on')
 
@@ -650,20 +732,16 @@ function [C_vals_same, cv_per_slice] = prova(v, saveType, groupname, tag,stimcla
     xlim([-.2 1])
     view([90 -90])
     cfg.figSize = 'tiny';
-    cfg.aspRatioType = 'tall';
+    cfg.aspRatioType = 'square';
     cfg.setFigure;
     cfg.saveFigure(gcf,[groupname, ' intertrial corr ',stimclass,' pooled CDF',tag], saveType)
     cfg = v.plotConfig;
 
-    [~,p] = kstest2(C_vals_same,C_vals_diff);
-    disp(['2-sample KS test for ''same'' vs ''diff.'' stimuli - pval: ',num2str(p)])
-    [~,p] = kstest2(C_vals_same_noFTE,C_vals_same_FTE);
-    disp(['2-sample KS test for ''no FTE'' vs ''FTE'' (same stimulus) - pval: ',num2str(p)])
+    supp_stats = statsUtils.pairwiseMannWhitney({C_vals_same,C_vals_diff,C_vals_same_FTE}, {'same','diff','rep1'}, true);
     
 end
 
-%%
-% example traces for naive fish #6 (Trp and Leu)
+%% example traces for naive fish #6 (Trp and Leu)
 % sort by avg intensity of native units on rep 1
 v.dataFilter = dft;
 sid = v.subjectTab.name(v.subjectTab.group=="naïve"); sid = sid(6);
@@ -699,6 +777,7 @@ for i=1:numel(odors)
 
 end
 
+%%
 % stimulus dPCs except #1 (trained)
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';

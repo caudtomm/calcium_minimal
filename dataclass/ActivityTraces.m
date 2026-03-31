@@ -439,7 +439,8 @@ classdef ActivityTraces
         function [trace, t] = getBehavior2PTrace(obj, trace_tag)
             allowed_tags = {'breathing_events', 'breathing_ipis', ...
                             'breathing_inst_freq', 'tail_motion', ...
-                            'breathing_inst_freq_2p', 'tail_motion_2p'};
+                            'breathing_inst_freq_2p', 'tail_motion_2p', ...
+                            'breathing_raw'};
             
             % initialize output
             trace = [];
@@ -469,6 +470,11 @@ classdef ActivityTraces
                 case 'tail_motion_2p'
                     trace = obj.behavior2p.Tail.resampled2p;
                     t = obj.behavior2p.Tail.t_resampled2p;
+                case 'breathing_raw'
+                    if isfield(obj.behavior2p.Breathing, 'resampled2p')
+                        trace = obj.behavior2p.Breathing.resampled2p;
+                        t = obj.behavior2p.Breathing.t_rate2p;
+                    end
                 otherwise
                     error('Trace tag %s not recognized. Allowed tags are: %s', ...
                       trace_tag, strjoin(allowed_tags, ', '));
