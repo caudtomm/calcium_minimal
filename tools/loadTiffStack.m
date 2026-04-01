@@ -29,11 +29,14 @@ warningsBackOn = onCleanup(...
     @() warning('on', 'MATLAB:imagesci:tiffmexutils:libtiffWarning'));
 
 if ischar(tifffilename)
+    warning('off');
     tiff = Tiff(tifffilename, 'r');
     closeTiff = onCleanup(@() close(tiff));
+    warning('on');
 end
 
 if p.Results.option == 1
+    warning('off');
     w = tiff.getTag('ImageWidth');
     h = tiff.getTag('ImageLength');
     dataClass = class(read(tiff));
@@ -43,6 +46,7 @@ if p.Results.option == 1
         headers = cell(1, nFrames);
     end
     setDirectory(tiff, p.Results.firstIdx);
+    warning('on');
     for t = 1:nFrames
         stack(:,:,t) = read(tiff);
         

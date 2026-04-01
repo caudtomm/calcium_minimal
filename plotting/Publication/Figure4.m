@@ -1,0 +1,919 @@
+dbstop if error
+
+s = true; % save figures to files?
+savepath = 'bin4';
+saveType = 'vector'; % 'vector' or 'raster'
+
+% for sliding windows
+window_duration = .3; % [seconds]
+t_lim_sec = [-5 35]; % from 5 sec before to 35 seconds after stimulus onset
+overlap = .1; % [seconds]
+
+%% Load dataset
+filename = 'odorexp004_IC1_130625.mat';
+
+%
+experiment = load(filename).a; % Experiment object
+% or
+% experiment = a; clear a
+
+% avoid any spelling mismatches
+for i = 1:numel(experiment.traces)
+experiment.traces{i}.subject_group = experiment.subjectTab.group{i};
+end
+
+
+%% initialize output figure saving
+cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73,86:99]); % (test1, test2, ctrl)
+cfg.custom.crange = [.1 .7];
+cfg.savePath = savepath;
+
+v = ExperimentViewer(experiment);
+v.plotConfig = cfg; 
+cfg = v.plotConfig;
+
+v.dataFilter.traceType = 'pSpike';
+v.dataFilter.interval = [1,20];
+v.dataFilter.trial_sorting = 'stim_id';
+dft = v.dataFilter;
+ 
+
+%% FIGURE 4
+
+
+%% intertrial euclidean distances
+grouptag = 'trained3';
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained1 (T-R-S-H-A-ACSF/L)';
+
+% full matrix
+hf = figure;
+C = v.plotDistancesHead('method','euclidean');
+hold on; imagesc(mean(C.distMat3d,3,'omitmissing'))
+clim([1 2])
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
+cfg.figSize = 'small';
+cfg.aspRatioType = 'square';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' stim intertrial eucl full'], saveType)
+
+% repetitions
+hf = figure;
+C = v.plotDistancesHead('method','euclidean', 'plotType','repetitions');
+hold on; imagesc(mean(C.distMat3d,3,'omitmissing'))
+clim([1 2])
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
+cfg.figSize = 'small';
+cfg.aspRatioType = 'wide';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' stim intertrial eucl reps'], saveType)
+v.dataFilter = dft;
+close all
+
+grouptag = 'trained';
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained';
+
+% full matrix
+hf = figure;
+C = v.plotDistancesHead('method','euclidean');
+hold on; imagesc(mean(C.distMat3d,3,'omitmissing'))
+clim([1 2])
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
+cfg.figSize = 'small';
+cfg.aspRatioType = 'square';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' stim intertrial eucl full'], saveType)
+
+% repetitions
+hf = figure;
+C = v.plotDistancesHead('method','euclidean', 'plotType','repetitions');
+hold on; imagesc(mean(C.distMat3d,3,'omitmissing'))
+clim([1 2])
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
+cfg.figSize = 'small';
+cfg.aspRatioType = 'wide';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' stim intertrial eucl reps'], saveType)
+v.dataFilter = dft;
+close all
+
+% compare FTE across groups 
+nreps = 5;
+idx = false(5); idx(2:nreps)=true;
+idx_base = logical(triu(ones(nreps),1)); idx_base(idx') = false;
+
+v.dataFilter = dft;
+hf = figure;
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.stims_allowed = {'Ala','His','Trp','Ser'};
+C = v.plotDistancesHead('method','euclidean', 'plotType','repetitions');
+nslices = size(C.distMat3d,3);
+base = C.distMat3d; base(repmat(~idx_base,1,1,nslices)) = nan;
+base = mean(base,[1 2],'omitmissing');
+C.distMat3d = C.distMat3d-base;
+FTE_otherstims_naive = C.distMat3d(repmat(idx,1,1,nslices));
+v.dataFilter.stims_allowed = {'Leu'};
+C = v.plotDistancesHead('method','euclidean', 'plotType','repetitions');
+nslices = size(C.distMat3d,3);
+base = C.distMat3d; base(repmat(~idx_base,1,1,nslices)) = nan;
+base = mean(base,[1 2],'omitmissing');
+C.distMat3d = C.distMat3d-base;
+FTE_Leu_naive = C.distMat3d(repmat(idx,1,1,nslices));
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.stims_allowed = {'Ala','His','Trp','Ser'};
+C = v.plotDistancesHead('method','euclidean', 'plotType','repetitions');
+nslices = size(C.distMat3d,3);
+base = C.distMat3d; base(repmat(~idx_base,1,1,nslices)) = nan;
+base = mean(base,[1 2],'omitmissing');
+C.distMat3d = C.distMat3d-base;
+FTE_otherstims_trained = C.distMat3d(repmat(idx,1,1,nslices));
+v.dataFilter.stims_allowed = {'Leu'};
+C = v.plotDistancesHead('method','euclidean', 'plotType','repetitions');
+nslices = size(C.distMat3d,3);
+base = C.distMat3d; base(repmat(~idx_base,1,1,nslices)) = nan;
+base = mean(base,[1 2],'omitmissing');
+C.distMat3d = C.distMat3d-base;
+FTE_Leu_trained = C.distMat3d(repmat(idx,1,1,nslices));
+close;
+% prepare groups
+G1 = FTE_otherstims_naive(:);
+G2 = FTE_Leu_naive(:);
+G3 = FTE_otherstims_trained(:);
+G4 = FTE_Leu_trained(:);
+data = {G1,G2,G3,G4};
+names = {'other_naive','Leu_naive','other_trained','Leu_trained'};
+% split-violin plots (left = density, right = raw points + median)
+figure; hold on;
+ng = numel(data);
+width = 0.35;    % half-violin max width
+colors = cfg.c(1:ng,:);
+if ~isnumeric(colors), colors = lines(ng); end
+
+for k = 1:ng
+    vv = data{k};
+    vv = vv(~isnan(vv));
+    if isempty(vv), continue; end
+    
+    % density (left half)
+    if numel(unique(vv))>1
+        vgrid = linspace(min(vv), max(vv), 200);
+        [f, xi] = ksdensity(vv, vgrid);
+    else
+        xi = linspace(vv(1)-.1, vv(1)+.1, 3);
+        f = ones(size(xi));
+    end
+    f = f / max(f) * width;            % normalize to width
+    x_left = k - f;
+    patch([x_left, k*ones(size(x_left))], [xi, fliplr(xi)], ...
+        colors(k,:), 'FaceAlpha', .45, 'EdgeColor','none');
+end
+
+xlim([0.5 ng+0.5]);
+xticks(1:ng); xticklabels(names);
+ylabel('FTE (dE)'); title(''); hold off;
+cfg.figSize = 'small';
+cfg.aspRatioType = 'square';
+cfg.setFigure;
+cfg.saveFigure(gcf,'dE FTE stat', saveType)
+
+% pairwise Mann-Whitney U (ranksum) tests
+n = numel(data);
+pvals = nan(n);
+for i = 1:n
+    xi = data{i}; xi = xi(~isnan(xi));
+    for j = i+1:n
+        xj = data{j}; xj = xj(~isnan(xj));
+        p = ranksum(xi,xj);
+        pvals(i,j) = p;
+        pvals(j,i) = p;
+    end
+end
+
+% display p-values
+disp('Pairwise Mann-Whitney U (ranksum) p-values:');
+disp(array2table(pvals,'VariableNames',names,'RowNames',names));
+
+
+%% intertrial correlations
+grouptag = 'allgroups';
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'all';
+
+% full matrix
+hf = figure;
+C = v.plotDistancesHead;
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
+cfg.figSize = 'small';
+cfg.aspRatioType = 'square';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' stim intertrial corr full raw'], saveType)
+
+% repetitions
+hf = figure;
+C = v.plotDistancesHead('plotType','repetitions');
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
+cfg.figSize = 'small';
+cfg.aspRatioType = 'wide';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' stim intertrial corr reps raw'], saveType)
+v.dataFilter = dft;
+
+
+
+%% intertrial correlations, without pre-stimulus correlations
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.interval = [-22 -2];
+hf = figure;
+subplot(221)
+C = v.plotDistancesHead;
+C= 1-C.distMat3d;
+hold on
+v.dataFilter.trial_sorting = 'chronological';
+v.plotDistancesHead;
+v.dataFilter.trial_sorting = 'stim_id';
+subplot(222); v.dataFilter.interval = [1 20];
+C1 = v.plotDistancesHead;
+C1 = 1- C1.distMat3d;
+hold on
+imagesc(mean(C1-C,3,'omitmissing'))
+clim([-.2 .2])
+subplot(234)
+v.dataFilter.interval = [-22 -2];
+C = v.plotDistancesHead('plotType','repetitions');
+C= 1-C.distMat3d;
+subplot(235); v.dataFilter.interval = [1 20];
+v.plotDistancesHead('plotType','repetitions');
+subplot(236); v.dataFilter.interval = [1 20];
+C1 = v.plotDistancesHead('plotType','repetitions');
+C1 = 1- C1.distMat3d;
+hold on
+imagesc(mean(C1-C,3,'omitmissing'))
+clim([-.2 .2])
+v.dataFilter = dft;
+
+
+%% intertrial correlations, without pre-stimulus correlations
+
+shuffle_trials_base = true;
+
+grouptag = 'trained';
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.interval = [-22 -2];
+[~,base_events] = ModeSelector(v).extract;
+v.dataFilter.interval = [1 20];
+[~,odor_events,all_labs] = ModeSelector(v).extract;
+L = height(odor_events{1});
+base_events = cellfun(@(x) repmat(mean(x,1,'omitmissing'),L,1,1),base_events,'UniformOutput',false);
+if shuffle_trials_base
+    shuf_tag = 'shuffled ';
+    for i = 1:numel(base_events)
+        thisevent = base_events{i};
+        N = size(thisevent,2);
+        idx = randperm(N);
+        base_events{i} = thisevent(:,idx,:);
+    end
+else
+    shuf_tag = '';
+end
+diff_events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
+figure; plotDistances(diff_events,'full','correlation',all_labs{1},cfg);
+colorbar off; xticks([]); yticks([]); xlabel(''); ylabel('');
+cfg.figSize = "large";
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' ',shuf_tag,'stim-prestim intertrial corr'], saveType)
+
+figure; plotDistances(diff_events,'repetitions','correlation',all_labs{1},cfg);
+colorbar off; xticks([]); yticks([]); xlabel(''); ylabel('');
+cfg.figSize = "small";
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' ',shuf_tag,'stim-prestim intertrial corr repetitions'], saveType)
+
+figure;
+C_odor = 1-plotDistances(odor_events,'full','correlation',all_labs{1},cfg);
+C_diff = 1-plotDistances(diff_events,'full','correlation',all_labs{1},cfg);
+close;
+[~,ntrials,nsubj] = size(C_odor);
+idx = repmat(triu(true(ntrials),1),1,1,nsubj);
+C_odor = C_odor(idx); C_diff = C_diff(idx);
+figure;
+cdfplot(C_odor(:)); hold on
+cdfplot(C_diff(:))
+axis square; xlim([-1 1])
+xlabel('r'); ylabel('CDF')
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' ',shuf_tag,'stim-prestim intertrial corr cdf'], saveType)
+
+[~,p] = kstest2(C_odor,C_diff);
+disp(['2-sample KS test for native units vs baseline-subtr. intertrial corrs - pval: ',num2str(p)])
+results = statsUtils.pairwiseMannWhitney({C_odor,C_diff},{'native','subtr.'},false)
+
+
+% correlation decay over repetitions of the same odor (native data vs baseline-subtr)
+figure;
+C_odor = 1-plotDistances(odor_events,'repetitions','correlation',all_labs{1},cfg);
+C_diff = 1-plotDistances(diff_events,'repetitions','correlation',all_labs{1},cfg);
+close;
+[~,nreps,n] = size(C_odor);
+y_odor = nan(n,nreps-1); y_diff = nan(n,nreps-1);
+for i = 1:nreps-1
+    idx = triu(true(nreps),i)-triu(true(nreps),i+1);
+    idx = logical(idx);
+    y = [];
+    for j = 1:n
+        thisdt = C_odor(:,:,j);
+        y = [y; mean(thisdt(idx),'omitmissing')];
+    end
+    y_odor(:,i) = y;
+    y = [];
+    for j = 1:n
+        thisdt = C_diff(:,:,j);
+        y = [y; mean(thisdt(idx),'omitmissing')];
+    end
+    y_diff(:,i) = y;
+end
+figure; clear b
+y_mean = mean(y_odor,'omitmissing'); y_err = std(y_odor,[],'omitmissing');
+b(1) = plotLineNShade(1:nreps-1,y_mean,y_err,cfg.c(1,:),cfg);
+hold on
+y_mean = mean(y_diff,'omitmissing'); y_err = std(y_diff,[],'omitmissing');
+b(2) = plotLineNShade(1:nreps-1,y_mean,y_err,cfg.c(2,:),cfg);
+y = diff(y_diff,[],2)-diff(y_odor,[],2);
+y_mean = mean(y,'omitmissing'); y_err = std(y,[],'omitmissing');
+b(3) = plotLineNShade(2:nreps-1,y_mean,y_err,'k',cfg);
+ylim([-.1 1])
+xlabel('Distance (repetitions)'); ylabel('r')
+legend(b,{'native','BS','d(BS)-d(native)'})
+cfg.figSize = "tiny";
+cfg.aspRatioType = 'tall';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' ',shuf_tag,'stim-prestim intertrial corr decay'], saveType)
+
+
+
+v.dataFilter = dft;
+%% intertrial distances (novel or familiar stimuli)
+%
+stimclass = 'familiar';
+
+% naive
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'naïve';
+plotIntertrialDist(v,stimclass,'naive',cfg,saveType);
+% trained
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained';
+plotIntertrialDist(v,stimclass,'trained',cfg,saveType);
+% uncoupled
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'uncoupled';
+plotIntertrialDist(v,stimclass,'uncoupled',cfg,saveType);
+
+function plotIntertrialDist(v,stimclass,grouptag,cfg,saveType)
+    if strcmp(stimclass,'familiar')
+        v.dataFilter.stims_allowed = {'Arg','Ala','His'};
+    elseif strcmp(stimclass,'novel')
+        v.dataFilter.stims_allowed = {'Trp','Ser','Leu'};
+    end
+    hf = figure;
+    v.plotDistancesHead;
+    xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
+    cfg.setFigure;
+    cfg.saveFigure(gcf,[grouptag,' intertrial corr ',stimclass], saveType)
+end
+
+%% influence of valence on intertrial correlations
+
+% trained1: CS+ (Arg + Ala)
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained1';
+v.dataFilter.stims_allowed = 'all CS+';
+hf = figure;
+subplot(311);
+C1 = v.plotDistancesHead('plotType','diff_stimulus_repetitions');
+v.dataFilter = dft;
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('trained1')
+% trained2: same (Arg + Ala) <- CS- vs CS+
+v.dataFilter = dft;
+subplot(312);
+v.dataFilter.subjectGroup = 'trained2';
+v.dataFilter.stims_allowed = {'Arg','Ala'};
+C2 = v.plotDistancesHead('plotType','diff_stimulus_repetitions');
+v.dataFilter = dft;
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('trained2')
+subplot(313);
+C1 = 1 - C1.distMat3d(:);
+C2 = 1 - C2.distMat3d(:);
+y = [[C1 ones(length(C1),1)] ; [C2 2*ones(length(C2),1)]];
+boxplot(y(:,1),y(:,2)); axis square
+hold on; scatter([1,2],[mean(C1,'omitmissing'),mean(C2,'omitmissing')],15,'r','filled')
+xticks([1 2]);xticklabels({'trained1','trained2'}); ylabel('r')
+ylim([-.2 1])
+[~,p] = ttest2(C1,C2);
+cfg.figSize = "small";
+cfg.aspRatioType = 'tall';
+cfg.setFigure;
+cfg.saveFigure(gcf,'trained1 vs trained2 Arg-Ala intertrial corr', saveType)
+cfg = v.plotConfig;
+
+% trained1: CS+ (Ala + His)
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained1';
+v.dataFilter.stims_allowed = {'Ala','His'};
+hf = figure;
+subplot(311);
+C1 = v.plotDistancesHead('plotType','diff_stimulus_repetitions');
+v.dataFilter = dft;
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('trained1')
+% trained2: same (Arg + Ala) <- CS- vs CS+
+v.dataFilter = dft;
+subplot(312);
+v.dataFilter.subjectGroup = 'trained2';
+v.dataFilter.stims_allowed = 'all CS+';
+C2 = v.plotDistancesHead('plotType','diff_stimulus_repetitions');
+v.dataFilter = dft;
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('trained2')
+subplot(313);
+C1 = 1 - C1.distMat3d(:);
+C2 = 1 - C2.distMat3d(:);
+y = [[C1 ones(length(C1),1)] ; [C2 2*ones(length(C2),1)]];
+boxplot(y(:,1),y(:,2)); axis square
+hold on; scatter([1,2],[mean(C1,'omitmissing'),mean(C2,'omitmissing')],15,'r','filled')
+xticks([1 2]);xticklabels({'trained1','trained2'}); ylabel('r')
+ylim([-.2 1])
+[~,p] = ttest2(C1,C2);
+cfg.figSize = "small";
+cfg.aspRatioType = 'tall';
+cfg.setFigure;
+cfg.saveFigure(gcf,'trained1 vs trained2 Ala-His intertrial corr', saveType)
+cfg = v.plotConfig;
+
+% CS+ vsd CS+
+v.dataFilter = dft;
+hf = figure;
+subplot(311);
+v.dataFilter.subjectGroup = 'trained1';
+v.dataFilter.stims_allowed = {'Arg','Ala'};
+C1_1 = v.plotDistancesHead('plotType','diff_stimulus_repetitions');
+v.dataFilter.subjectGroup = 'trained2';
+v.dataFilter.stims_allowed = {'Ala','His'};
+C1_2 = v.plotDistancesHead('plotType','diff_stimulus_repetitions');
+n1 = size(C1_1.distMat3d,3);
+n2 = size(C1_2.distMat3d,3);
+C1 = zeros(5,5,n1+n2);
+C1(:,:,1:n1) = 1- C1_1.distMat3d;
+C1(:,:,(n1+1):end) = 1- C1_2.distMat3d;
+hold on
+imagesc(mean(C1,3,'omitmissing'));
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('CS+ vs CS+')
+% CS+ vs CS-
+v.dataFilter = dft;
+subplot(312);
+v.dataFilter.subjectGroup = 'trained1';
+v.dataFilter.stims_allowed = {'Ala','His'};
+C2_1 = v.plotDistancesHead('plotType','diff_stimulus_repetitions');
+v.dataFilter.subjectGroup = 'trained2';
+v.dataFilter.stims_allowed = {'Arg','Ala'};
+C2_2 = v.plotDistancesHead('plotType','diff_stimulus_repetitions');
+n1 = size(C2_1.distMat3d,3);
+n2 = size(C2_2.distMat3d,3);
+C2 = zeros(5,5,n1+n2);
+C2(:,:,1:n1) = 1- C2_1.distMat3d;
+C2(:,:,(n1+1):end) = 1- C2_2.distMat3d;
+hold on
+imagesc(mean(C2,3,'omitmissing'));
+xticks([]); yticks([]); xlabel(''); ylabel(''); title('CS+ vs CS-')
+subplot(313);
+C1 = C1(:); C2 = C2(:);
+y = [[C1 ones(length(C1),1)] ; [C2 2*ones(length(C2),1)]];
+boxplot(y(:,1),y(:,2)); axis square
+hold on; scatter([1,2],[mean(C1,'omitmissing'),mean(C2,'omitmissing')],5,'r','filled')
+xticks([1 2]);xticklabels({'CS+ vs CS+','CS+ vs CS-'}); ylabel('r')
+ylim([-.2 1])
+[~,p] = ttest2(C1,C2);
+cfg.figSize = "small";
+cfg.aspRatioType = 'tall';
+cfg.setFigure;
+cfg.saveFigure(gcf,'same vs diff valence intertrial corr', saveType)
+cfg = v.plotConfig;
+
+%% upper bound discrimination across groups (multiple classifier)
+
+v.dataFilter = dft;
+
+classifiers = {'lda','template_match','qda','svm','dbd'};
+classif_nicknames = {'LDA','TM','QDA','SVM','DBD'};
+groups = {'naïve', 'trained'};
+focus_stims = {'Arg','Ala','His','Trp','Ser','Leu'};
+v.dataFilter.stims_allowed = {'Arg','Ala','His','Trp','Ser','Leu'};
+v.dataFilter.repetitions = [2:5];
+
+% v.dataFilter.mode_name = 'dpca';
+% v.dataFilter.mode_OI = 'stimulus';
+% v.dataFilter.mode_method = 'mode_values';
+% v.dataFilter.mode_file = 'dpca_trained.mat';
+
+nclass = numel(classifiers); ngroups = numel(groups); noptions = numel(focus_stims);
+chancelv = 1/noptions;
+
+res = cell(ngroups,1);
+figure;
+for g = 1:ngroups
+    v.dataFilter.subjectGroup = groups{g};
+    for c = 1:nclass
+        out = v.plotDiscriminationHead('classifier',classifiers{c},...
+            'trainblockmode','all',...
+            'separatetestset',false,...
+            'focus_stims',focus_stims);
+        res{g}(:,c) = out;
+    end
+end
+close
+
+y = zeros(ngroups,nclass);
+err = zeros(ngroups,nclass);
+for g = 1:ngroups
+    y(g,:) = mean(res{g},1,'omitmissing');
+    err(g,:) = std(res{g},1,'omitmissing');
+end
+
+% sort by decreasing performance
+[~, idx] = sort(y(1,:),'descend');
+y = y(:,idx); err = err(:,idx); classifiers = classifiers(idx);
+classif_nicknames = classif_nicknames(idx);
+
+% turn performance to normalized performance (relative to chance)
+% y = ((y-chancelv)/(1-chancelv)); err = err/(1-chancelv);
+
+hf = figure;
+step = .2;
+clear b;
+for g = 1:ngroups
+    x = [1:nclass] + step*(g-1);
+    b(g) = errorbar(x,y(g,:)',err(g,:), ...
+        'LineStyle','none','Marker','o',...
+        'MarkerFaceColor',cfg.c(g,:),'Color',cfg.c(g,:), ...
+        'MarkerSize',2, 'CapSize',2);
+    hold on
+end
+yline(chancelv,'r-')
+xticks(1:nclass); xticklabels(classif_nicknames); xtickangle(90); xlim([.5 nclass+.5])
+ylabel('Performance'); ylim([0 1.1])
+% legend(b,groups)
+cfg.figSize = "small";
+cfg.aspRatioType = 'square';
+cfg.setFigure;
+cfg.saveFigure(gcf,'upper bound classification performance - all stims 2-5', saveType)
+cfg = v.plotConfig;
+
+% Mann-Whitney U test: naive vs trained for each classifier
+p_raw = nan(nclass,1);
+for c = 1:nclass
+    x1 = res{1}(:,c); x1 = x1(~isnan(x1));
+    x2 = res{2}(:,c); x2 = x2(~isnan(x2));
+    p_raw(c) = ranksum(x1,x2);
+end
+p_adj = statsUtils.fdr(p_raw);
+stars = arrayfun(@(p) statsUtils.pvalToStars(p), p_adj, 'UniformOutput', false);
+classif_tab = table(classif_nicknames', p_raw, p_adj, stars, ...
+    'VariableNames', {'Classifier','p_raw','p_adj','Significance'});
+disp('Mann-Whitney U (naive vs trained) per classifier:');
+disp(classif_tab);
+
+%% intertrial correlations for trials of the same and different odors, quantification
+v.dataFilter = dft;
+stimclass = 'all';
+v.dataFilter.stims_allowed = 'all stimuli';
+% v.dataFilter.stims_allowed = {'Arg','Ala','His'};
+% v.dataFilter.stims_allowed = {'Trp','Ser','Leu'};
+
+
+% native units repetition correlations for same and different stimuli
+v.dataFilter.subjectGroup = 'naïve';
+[C_naive, cv_naive] = prova(v,saveType,'naive','',stimclass);
+v.dataFilter.subjectGroup = 'trained';
+[C_trained, cv_trained] = prova(v,saveType,'trained','',stimclass);
+v.dataFilter.subjectGroup = 'uncoupled';
+[C_uncoupled, cv_uncoupled] = prova(v,saveType,'uncoupled','',stimclass);
+close all
+
+% correlation stability: compare CV across groups
+cv_groups = {cv_naive, cv_trained, cv_uncoupled};
+cv_names = {'naive','trained','uncoupled'};
+cv_stats = statsUtils.pairwiseMannWhitney(cv_groups, cv_names, true);
+disp('Correlation stability (CV) — pairwise Mann-Whitney:');
+disp(struct2table(cv_stats));
+hf = figure;
+cv_all = [cv_naive; cv_trained; cv_uncoupled];
+cv_labels = [repmat({'naive'},numel(cv_naive),1); repmat({'trained'},numel(cv_trained),1); ...
+     repmat({'uncoupled'},numel(cv_uncoupled),1)];
+boxplot(cv_all, cv_labels); hold on;
+ylabel('CV of intertrial correlations');
+cfg.figSize = 'small'; cfg.aspRatioType = 'square'; cfg.setFigure;
+cfg.saveFigure(gcf,['correlation stability CV ',stimclass], saveType);
+cfg = v.plotConfig;
+
+y = [C_naive;C_trained;C_uncoupled];
+g = [repmat({'naive'},numel(C_naive),1); ...
+    repmat({'trained'},numel(C_trained),1); ...
+    repmat({'uncoupled'},numel(C_uncoupled),1)];
+hf = figure;
+boxplot(y,g);
+ylim([-1 1]); ylabel('r')
+cfg.figSize = 'tiny'; cfg.aspRatioType = 'tall'; cfg.setFigure;
+cfg.saveFigure(gcf,['same stim correlation ',stimclass], saveType);
+cfg = v.plotConfig;
+supp_stats = statsUtils.pairwiseMannWhitney({C_naive,C_trained}, {'naive','trained'}, true);
+[p,~,stats] = kruskalwallis(y,g,'off');
+figure;multcompare(stats,'Display','on')
+
+%
+% native units repetition correlations for same and different stimuli (early peak interval)
+v.dataFilter.interval = [.5 3];
+v.dataFilter.subjectGroup = 'naïve';
+C_naive = prova(v,saveType,'naive','initpeak',stimclass);
+v.dataFilter.subjectGroup = 'trained';
+C_trained = prova(v,saveType,'trained','initpeak',stimclass);
+v.dataFilter.subjectGroup = 'uncoupled';
+C_uncoupled = prova(v,saveType,'uncoupled','initpeak',stimclass);
+close all
+
+%
+% native units repetition correlations for same and different stimuli (main response body interval)
+v.dataFilter.interval = [4 20];
+v.dataFilter.subjectGroup = 'naïve';
+C_naive = prova(v,saveType,'naive','body',stimclass);
+v.dataFilter.subjectGroup = 'trained';
+C_trained = prova(v,saveType,'trained','body',stimclass);
+v.dataFilter.subjectGroup = 'uncoupled';
+C_uncoupled = prova(v,saveType,'uncoupled','body',stimclass);
+close all
+
+%
+% native units repetition correlations for same and different stimuli (early peak interval)
+v.dataFilter.interval = [20.5 25];
+v.dataFilter.subjectGroup = 'naïve';
+prova(v,saveType,'naive','off',stimclass)
+v.dataFilter.subjectGroup = 'trained';
+prova(v,saveType,'trained','off',stimclass)
+v.dataFilter.subjectGroup = 'uncoupled';
+prova(v,saveType,'uncoupled','off',stimclass)
+
+
+function [C_vals_same, cv_per_slice] = prova(v, saveType, groupname, tag,stimclass)
+    if nargin<4; tag = ''; end
+    cfg = v.plotConfig;
+    hf = figure;
+    subplot(311);
+    C = v.plotDistancesHead('plotType','repetitions');
+    xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
+    % compute per-slice CV of same-stimulus correlations
+    nslices = size(C.distMat3d,3);
+    utri = logical(triu(ones(size(C.distMat3d,1)),1));
+    cv_per_slice = nan(nslices,1);
+    for k = 1:nslices
+        slice_corrs = 1 - C.distMat3d(:,:,k);
+        vals_k = slice_corrs(utri);
+        mu_k = mean(vals_k,'omitmissing');
+        if abs(mu_k) > eps
+            cv_per_slice(k) = std(vals_k,[],'omitmissing') / abs(mu_k);
+        end
+    end
+    idx = repmat(~triu(ones(size(C.distMat3d,1))),1,1,size(C.distMat3d,3));
+    C_vals_same = 1-C.distMat3d(idx);
+    idx(:,1,:) = false(size(idx,1),1,size(idx,3));
+    C_vals_same_noFTE = 1-C.distMat3d(idx);
+    idx = false(size(idx));
+    idx(2:end,1,:) = true(size(idx,1)-1,1,size(idx,3));
+    C_vals_same_FTE = 1-C.distMat3d(idx);
+    idx = logical(repmat(triu(ones(size(C.distMat3d,1)),1)-triu(ones(size(C.distMat3d,1)),2),1,1,size(C.distMat3d,3)));
+    C_vals_adj = 1-C.distMat3d(idx);
+    C_vals_adj = reshape(C_vals_adj,size(C.distMat3d,1)-1,[])';
+    subplot(312);
+    thisgroup = v.dataFilter.subjectGroup;
+    v.dataFilter.subjectGroup = 'naïve';
+    C_naive = v.plotDistancesHead('plotType','repetitions');
+    C = mean(C_naive.distMat3d,3,'omitmissing') - mean(C.distMat3d,3,'omitmissing');
+    hold on; imagesc(C);
+    clim([-.2 .2])
+    subplot(313);
+    C = v.plotDistancesHead('plotType','diff_stimulus_repetitions');
+    xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
+    C_vals_diff = 1-C.distMat3d(:);
+    cfg.setFigure;
+    cfg.saveFigure(gcf,[groupname, ' intertrial corr ',stimclass,' pooled',tag], saveType)
+    cfg = v.plotConfig;
+
+    hf = figure;
+    mu = mean(C_vals_adj,1,'omitmissing'); err = std(C_vals_adj,[],1,'omitmissing');
+    plotLineNShade(1:4, mu,err,'k', cfg)
+    xticks([1:4]); ylim([0 1]); xlabel('Repetition #'); ylabel('r')
+    cfg.figSize = 'tiny';
+    cfg.aspRatioType = 'square';
+    cfg.setFigure;
+    cfg.saveFigure(gcf,[groupname, ' intertrial corr ',stimclass,' pooled adjecent',tag], saveType)
+    cfg = v.plotConfig;
+
+    hf = figure;
+    cdfplot(C_vals_same);hold on
+    cdfplot(C_vals_same_noFTE)
+    cdfplot(C_vals_same_FTE)
+    cdfplot(C_vals_diff)
+    legend({'same stimulus','same stimulus (2>5)','same stimulus (1)','different stimuli'})
+    xlabel('r'); ylabel('CDF'); title('')
+    xlim([-.2 1])
+    view([90 -90])
+    cfg.figSize = 'tiny';
+    cfg.aspRatioType = 'square';
+    cfg.setFigure;
+    cfg.saveFigure(gcf,[groupname, ' intertrial corr ',stimclass,' pooled CDF',tag], saveType)
+    cfg = v.plotConfig;
+
+    supp_stats = statsUtils.pairwiseMannWhitney({C_vals_same,C_vals_diff,C_vals_same_FTE}, {'same','diff','rep1'}, true);
+    
+end
+
+%% example traces for naive fish #6 (Trp and Leu)
+% sort by avg intensity of native units on rep 1
+v.dataFilter = dft;
+sid = v.subjectTab.name(v.subjectTab.group=="naïve"); sid = sid(6);
+odors = {'Trp','Leu'};
+v.dataFilter.repetitions = [1 3 5];
+v.dataFilter.interval = [-5 35];
+v.dataFilter.subjectIDs = sid;
+for i=1:numel(odors)
+    thisodor = odors{i};
+    v.dataFilter.stims_allowed = {thisodor};
+    
+    % native units
+    v.dataFilter.mode_name = 'native_units';
+    v.dataFilter.mode_method = 'mode_values';
+    v.dataFilter.mode_OI = 'all';
+    v.dataFilter.mode_file = '';
+    [~,out] = v.plotExampleTraces;
+    idx = out.idx(1);
+    title([thisodor,' - ','units'])
+
+    % isolate stimulus dPCs
+    v.dataFilter.mode_name = 'dpca';
+    v.dataFilter.mode_OI = 'stimulus';
+    v.dataFilter.mode_method = 'isolate';
+    v.dataFilter.mode_file = 'dpca_naive.mat';
+    v.plotExampleTraces(idx);
+    title([thisodor,' - ','isolate stim dPCs'])
+
+    % subtract stimulus dPCs
+    v.dataFilter.mode_method = 'subtract';
+    v.plotExampleTraces(idx);
+    title([thisodor,' - ','subtract stim dPCs'])
+
+end
+
+%%
+% stimulus dPCs except #1 (trained)
+v.dataFilter = dft;
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'stimulus';
+v.dataFilter.mode_method = 'subtract';
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.mode_file = 'dpca_trained.mat';
+hf = figure;
+outMat_dn = v.plotDistancesHead;
+v.dataFilter.mode_method = 'isolate';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+v.dataFilter.mode_method = 'mode_values';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+%
+v.dataFilter = dft;
+
+
+% stimulus dPCs except #1 (uncoupled)
+v.dataFilter = dft;
+v.dataFilter.mode_name = 'dpca';
+v.dataFilter.mode_OI = 'stimulus';
+v.dataFilter.mode_method = 'subtract';
+v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.mode_file = 'dpca_uncoupled.mat';
+hf = figure;
+outMat_dn = v.plotDistancesHead;
+v.dataFilter.mode_method = 'isolate';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+v.dataFilter.mode_method = 'mode_values';
+hf = figure;
+outMat_up = v.plotDistancesHead;
+%
+v.dataFilter = dft;
+
+% plot interrep correlations and delta for trained fish
+v.dataFilter = dft;
+hf = figure;
+v.dataFilter.subjectGroup = 'trained';
+v.plotDistancesHead();
+hf = figure;
+v.dataFilter.subjectGroup = 'naïve';
+naive3d = v.plotDistancesHead('plotType','repetitions');
+v.dataFilter.subjectGroup = 'trained';
+trained3d = v.plotDistancesHead('plotType','repetitions');
+naive2d = 1-mean(naive3d.distMat3d,3,'omitmissing');
+trained2d = 1-mean(trained3d.distMat3d,3,'omitmissing');
+% lij
+inMat = trained2d-naive2d;
+triu_idx = logical(triu(true(size(inMat))));
+h = hf.Children(2).Children;
+set(h,'AlphaData',[~triu_idx]')
+hf = figure;
+h = imagesc(inMat,'AlphaData',~triu_idx);
+clim([-.2 .2])
+colormap('jet')
+n_repetitions = height(h.CData);
+axis square; hold on
+xticks(1:n_repetitions); xticklabels(1:n_repetitions); xtickangle(90)
+yticks(1:n_repetitions); yticklabels(1:n_repetitions)
+xlabel('Repetition')
+ylabel('Repetition')
+colormap(cfg.colormapName)
+a = colorbar('Color',cfg.axcol);
+a.Label.String = 'delta correlation';
+a.Label.FontSize= gca().FontSize;
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+set(gcf, 'color', cfg.bgcol); 
+hold off
+
+% plot interrep correlations and delta for uncoupled fish
+v.dataFilter = dft;
+hf = figure;
+v.dataFilter.subjectGroup = 'uncoupled';
+v.plotDistancesHead();
+hf = figure;
+v.dataFilter.subjectGroup = 'naïve';
+naive3d = v.plotDistancesHead('plotType','repetitions');
+v.dataFilter.subjectGroup = 'uncoupled';
+trained3d = v.plotDistancesHead('plotType','repetitions');
+naive2d = 1-mean(naive3d.distMat3d,3,'omitmissing');
+trained2d = 1-mean(trained3d.distMat3d,3,'omitmissing');
+% lij
+inMat = trained2d-naive2d;
+triu_idx = logical(triu(true(size(inMat))));
+h = hf.Children(2).Children;
+set(h,'AlphaData',[~triu_idx]')
+hf = figure;
+h = imagesc(inMat,'AlphaData',~triu_idx);
+clim([-.2 .2])
+colormap('jet')
+n_repetitions = height(h.CData);
+axis square; hold on
+xticks(1:n_repetitions); xticklabels(1:n_repetitions); xtickangle(90)
+yticks(1:n_repetitions); yticklabels(1:n_repetitions)
+xlabel('Repetition')
+ylabel('Repetition')
+colormap(cfg.colormapName)
+a = colorbar('Color',cfg.axcol);
+a.Label.String = 'delta correlation';
+a.Label.FontSize= gca().FontSize;
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+set(gcf, 'color', cfg.bgcol); 
+hold off
+
+
+% familiar (dn) vs novel (up) odors (trained fish)
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.stims_allowed = 'all novel';
+hf = figure;
+v.plotDistancesHead('plotType','repetitions');
+h = hf.Children(2).Children;
+n_repetitions = height(h.CData);
+triu_idx = logical(triu(true(n_repetitions)));
+set(h,'AlphaData',[~triu_idx]');
+v.dataFilter.stims_allowed = 'all familiar';
+hf = figure;
+v.plotDistancesHead('plotType','repetitions');
+h = hf.Children(2).Children;
+set(h,'AlphaData',~triu_idx);
+
+% familiar (dn) vs novel (up) odors (uncoupled fish)
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.stims_allowed = 'all novel';
+hf = figure;
+v.plotDistancesHead('plotType','repetitions');
+h = hf.Children(2).Children;
+n_repetitions = height(h.CData);
+triu_idx = logical(triu(true(n_repetitions)));
+set(h,'AlphaData',[~triu_idx]');
+v.dataFilter.stims_allowed = 'all familiar';
+hf = figure;
+v.plotDistancesHead('plotType','repetitions');
+h = hf.Children(2).Children;
+set(h,'AlphaData',~triu_idx);

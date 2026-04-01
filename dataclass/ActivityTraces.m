@@ -54,7 +54,7 @@ classdef ActivityTraces
         % only temporarily public
         goodNeuron_IDs double
         N double = 0
-        behavior2p Behavior2PTraces % should be inherited from Subject
+        behavior2p % should be inherited from Subject
         behavior2p_scaling double
         
         % currently not implemented #### TODO in separate ActivityTraces = Process(ActivityTraces)
@@ -399,6 +399,14 @@ classdef ActivityTraces
             obj = assignROIs(obj,subject);
         end
 
+        function val = get.N(obj)
+            try
+                val = width(obj.dFoverF_good);
+            catch
+                val = obj.N;
+            end
+        end
+
         function obj = setBadtrials(obj,value)
             arguments
                 obj 
@@ -410,7 +418,7 @@ classdef ActivityTraces
             obj = obj.elimBadTrials;
         end
 
-        % check behavior with partial arguments ################
+        % # TODO : check behavior with partial arguments ################
         function obj = loadMovieData(obj,subject,fname_PMToffmeta,fname_noLightmeta)
             arguments
                 obj
@@ -426,6 +434,51 @@ classdef ActivityTraces
             obj = obj.setNoLight(thisnoLight);
 
             % obj = obj.defineFundamentalProperties(subject);
+        end
+
+        function [trace, t] = getBehavior2PTrace(obj, trace_tag)
+            allowed_tags = {'breathing_events', 'breathing_ipis', ...
+                            'breathing_inst_freq', 'tail_motion', ...
+                            'breathing_inst_freq_2p', 'tail_motion_2p', ...
+                            'breathing_raw'};
+            
+            % initialize output
+            trace = [];
+            t = [];
+
+            if isempty(obj.behavior2p)
+                 % warning('Behavior2P data not available in this ActivityTraces object: returning empty trace.');
+                return;
+            end
+
+            switch trace_tag
+                case 'breathing_events'
+                    trace = obj.behavior2p.Breathing.eventsFP;
+                    t = obj.behavior2p.Breathing.t_resampled;
+                case 'breathing_ipis'
+                    trace = obj.behavior2p.Breathing.ipiFP;
+                    t = obj.behavior2p.Breathing.t_resampled;
+                case 'breathing_inst_freq'
+                    trace = obj.behavior2p.Breathing.rateFP;
+                    t = obj.behavior2p.Breathing.t_resampled;
+                case 'tail_motion'
+                    trace = obj.behavior2p.Tail.resampled;
+                    t = obj.behavior2p.Tail.t_resampled;
+                case 'breathing_inst_freq_2p'
+                    trace = obj.behavior2p.Breathing.rate2p_FP;
+                    t = obj.behavior2p.Breathing.t_rate2p;
+                case 'tail_motion_2p'
+                    trace = obj.behavior2p.Tail.resampled2p;
+                    t = obj.behavior2p.Tail.t_resampled2p;
+                case 'breathing_raw'
+                    if isfield(obj.behavior2p.Breathing, 'resampled2p')
+                        trace = obj.behavior2p.Breathing.resampled2p;
+                        t = obj.behavior2p.Breathing.t_rate2p;
+                    end
+                otherwise
+                    error('Trace tag %s not recognized. Allowed tags are: %s', ...
+                      trace_tag, strjoin(allowed_tags, ', '));
+            end
         end
 
         function obj = defineFundamentalProperties(obj,subject)

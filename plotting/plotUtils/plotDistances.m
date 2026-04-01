@@ -1,5 +1,19 @@
 function out = plotDistances(traces,plotType,method,labs,cfg)
-% Low level distance plotter
+% <Low level symmetric distance plotter>
+% plotDistances - Plots symmetric distance matrices for trial data
+% 
+% Usage:
+%   out = plotDistances(traces, plotType, method, labs, cfg)
+%
+% Inputs:
+%   traces   - cell array [nsubjects x 1] of double [t, cells, trials] (sorted)
+%   plotType - char, 'full' or 'repetitions'
+%   method   - char, distance metric for pdist (e.g., 'correlation')
+%   labs     - cell array, stimulus names (sorted)
+%   cfg      - PlotConfig object with plotting parameters
+%
+% Outputs:
+%   out      - distance matrix or similarity matrix depending on plotType
 arguments
     traces cell % cell array [nsubjects 1] of double [t, cells, trials] (sorted!)
     plotType char = 'full'
@@ -35,6 +49,10 @@ switch plotType
     case 'repetitions'
         distanceMAT3D = plotFullMat(false);
         out = plotRepetitionSimilarity(...
+            distanceMAT3D,unique(labs),true);
+    case 'diff_stimulus_repetitions'
+        distanceMAT3D = plotFullMat(false);
+        out = plotDiffStimSimilarity(...
             distanceMAT3D,unique(labs),true);
     otherwise
         error('Requested plot type is unknown.')
@@ -75,6 +93,50 @@ function [distanceMAT3D] = plotRepetitionSimilarity(C,stims,pl)
     set(gcf, 'color', cfg.bgcol); 
     hold off
 end
+
+
+function [distanceMAT3D] = plotDiffStimSimilarity(C,stims,pl)
+    nstims = numel(stims);
+    n_repetitions = 5; % # TODO : should be max available repetition
+    n_layers = max(cumsum([1:nstims]-1));
+    distanceMAT3D = nan(n_repetitions,n_repetitions,nsubjects*n_layers);
+
+    % isolate lower-triangle stimulus-pair squares
+    % idx = ones(nstims);
+    k = reshape(1:nstims^2,[nstims,nstims]);
+    ks = k(~triu(k));
+    k = repelem(k,n_repetitions,n_repetitions);
+
+    n=0;
+    for i_fish = 1:nsubjects
+        c = C(:,:,i_fish);
+    
+        for i_k = 1:numel(ks)
+            n=n+1;
+            distanceMAT3D(:,:,n) = reshape(c(k==ks(i_k)),n_repetitions,n_repetitions);
+        end
+    end
+
+
+    % (optional) plot average similarity matrix across repetitions
+    if ~pl; return; end
+    distanceMAT2D = mean(distanceMAT3D,3,'omitmissing');
+    imagesc(1-distanceMAT2D)
+    axis square; hold on
+    xticks(1:ntrials); xticklabels(1:n_repetitions); xtickangle(90)
+    yticks(1:ntrials); yticklabels(1:n_repetitions)
+    xlabel('Repetition')
+    ylabel('Repetition')
+    clim(crange)
+    colormap(cfg.colormapName)
+    a = colorbar('Color',cfg.axcol);
+    a.Label.String = method;
+    a.Label.FontSize= gca().FontSize;
+    set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+    set(gcf, 'color', cfg.bgcol); 
+    hold off
+end
+
 
 
 function [distanceMAT3D] = plotFullMat(pl)

@@ -1,0 +1,369 @@
+function [hf,data] = similarityDynamics(v,figs,windows,s)
+% v : ExperimentViewer object
+% figs : FigureSaver object
+% windows : double [n,2] in seconds
+% s : logical, saving option
+
+dft = v.dataFilter;
+cfg = v.plotConfig;
+
+
+nwindows = height(windows);
+out = cell(nwindows,1);
+for i = 1:nwindows
+    v.dataFilter.interval = windows(i,:);
+    [hf,out{i}, subject_groups, stim_groups] = plotRepetitionDistances(v,'correlation'); % outputs 2 figures
+    figs.title = ['Repetitions: sec', num2str(windows(i,1)), '-', num2str(windows(i,2))];
+    % if s; figs.append(hf); end
+    close(hf)
+end
+v.dataFilter = dft;
+
+% extract relevant data
+nplots = numel(out{1});
+data = nan(nwindows,nplots,3); % dim3: [mean, sem, std]
+for i_w = 1:nwindows
+    for i_p = 1:nplots
+        thisplot = out{i_w}{i_p};
+        if isempty(thisplot); continue; end
+        data(i_w,i_p,1) = mean(thisplot.data(:),'omitmissing'); % mean
+        data(i_w,i_p,2) = std(thisplot.data(:),[],'omitmissing')/numel(thisplot.data(:)); % sem
+        data(i_w,i_p,3) = std(thisplot.data(:),[],'omitmissing'); % std
+    end
+end
+
+%% plotting
+
+% make sure stim_groups entries are usable as labels
+for i = 1:numel(stim_groups)
+    if iscell(stim_groups{i})
+        stim_groups{i} = strjoin(stim_groups{i}, '');
+    end
+end
+
+% a couple useful vars
+n_stimgroups = numel(stim_groups);
+n_subject_groups = numel(subject_groups);
+idx_by_stimgroup = repmat(1:n_stimgroups,1,n_subject_groups);
+idx_by_subjectgroup = repelem(1:n_subject_groups,1,n_stimgroups);
+
+% all together
+hf = figure;
+b = plotCurves(data,windows,cfg);
+
+% one subplot per subject-group
+hf = figure;
+for i = 1:n_subject_groups
+    subplot(n_subject_groups,1,i)
+    b = plotCurves(data(:, idx_by_subjectgroup==i, :),windows,cfg);
+    if i==1; legend(b,stim_groups); end
+    title(subject_groups{i})
+end
+
+% one subplot per stim-group
+hf = figure;
+for i = 1:n_stimgroups
+    subplot(n_stimgroups,1,i)
+    b = plotCurves(data(:, idx_by_stimgroup==i, :),windows,cfg);
+    if i==1; legend(b,subject_groups); end
+    title(stim_groups{i})
+end
+
+
+%% per-time-bin pairwise group comparisons
+res = {};
+t_centers = mean(windows,2);
+for i_sg = 1:n_stimgroups
+    % build pair labels from subject_groups
+    pair_labels = {};
+    for a = 1:n_subject_groups
+        for b = a+1:n_subject_groups
+            pair_labels{end+1} = [subject_groups{a},' vs ',subject_groups{b}]; %#ok
+        end
+    end
+    npairs = numel(pair_labels);
+    p_matrix = nan(nwindows, npairs);
+
+    for i_w = 1:nwindows
+        % collect data per subject group for this stim group
+        grp_data = cell(n_subject_groups,1);
+        for g = 1:n_subject_groups
+            i_p = find(idx_by_stimgroup==i_sg & idx_by_subjectgroup==g);
+            if ~isempty(i_p) && ~isempty(out{i_w}{i_p(1)})
+                grp_data{g} = out{i_w}{i_p(1)}.data(:);
+            else
+                grp_data{g} = [];
+            end
+        end
+        % pairwise ranksum
+        pidx = 0;
+        for a = 1:n_subject_groups
+            for b = a+1:n_subject_groups
+                pidx = pidx + 1;
+                if ~isempty(grp_data{a}) && ~isempty(grp_data{b})
+                    p_matrix(i_w, pidx) = ranksum(grp_data{a}, grp_data{b});
+                end
+            end
+        end
+    end
+
+    % FDR correction per pair across time bins
+    p_adj_matrix = p_matrix;
+    for pidx = 1:npairs
+        p_adj_matrix(:,pidx) = statsUtils.fdr(p_matrix(:,pidx));
+    end
+
+    % build results table
+    T = table(t_centers, 'VariableNames', {'t_center'});
+    for pidx = 1:npairs
+        safe_name = matlab.lang.makeValidName(pair_labels{pidx});
+        T.(safe_name) = p_adj_matrix(:,pidx);
+    end
+    fprintf('\n=== Per-bin group comparison (stim group: %s) — FDR-adjusted p-values ===\n', stim_groups{i_sg});
+    disp(T);
+    res{i_sg} = T;
+end
+
+clear b;
+figure;
+b(1) = plot(res{1}.t_center,res{1}.na_veVsTrained,'Color',cfg.c(1,:));
+hold on;
+b(2) = plot(res{2}.t_center,res{2}.na_veVsTrained,'Color',cfg.c(2,:));
+b(3) = plot(res{3}.t_center,res{3}.na_veVsTrained,'Color',cfg.c(3,:));
+plot([min(xlim),max(xlim)],[.05 .05],'r--')
+yscale log
+xlabel('Time from stim. onset (s)')
+ylabel('P-value')
+legend(b,{'familiar','novel','all'})
+cfg.figSize = 'small'; cfg.aspRatioType = 'wide'; cfg.setFigure;
+cfg.saveFigure(gcf,'similarity dynamics - intergroup corr pvalues','vector')
+
+
+
+%% plot all familiar in trained vs all novel in trained vs all novel in naive
+
+mode = 'exponential';
+
+t = mean(windows,2);
+[~,tstart] = min(abs(t)); % t0 = stim onset
+% tstart = tstart + 1; % <- actually, the immediately following frame
+
+% idx = find(idx_by_stimgroup==6 & idx_by_subjectgroup==2); % all familiar & trained
+idx = find(idx_by_stimgroup==2 & idx_by_subjectgroup==2); % all familiar & trained
+p1 = getFitParams(out, idx, t, tstart, mode);
+
+% idx = find(idx_by_stimgroup==7 & idx_by_subjectgroup==2); % all novel & trained
+idx = find(idx_by_stimgroup==2 & idx_by_subjectgroup==3); % all familiar & uncoupled
+p2 = getFitParams(out, idx, t, tstart, mode);
+
+% idx = find(idx_by_stimgroup==7 & idx_by_subjectgroup==1); % all novel & naive
+idx = find(idx_by_stimgroup==2 & idx_by_subjectgroup==1); % all familiar & naive
+p3 = getFitParams(out, idx, t, tstart, mode);
+
+hf = figure;
+set(gcf, 'color', cfg.bgcol); 
+
+subplot(161); hold on; clear b % # ----------------------
+
+% trained and familiar
+b(1) = scatter(t, p1.y_avg,'b','filled');
+errorbar(t, p1.y_avg,p1.err, ...
+    'vertical', 'LineStyle', 'none','Color','b');
+plot(p1.avgfit.t, p1.avgfit.vals,'b--')
+
+% trained and novel
+b(2) = scatter(t, p2.y_avg,'r','filled');
+errorbar(t, p2.y_avg,p2.err, ...
+    'vertical', 'LineStyle', 'none','Color','r');
+plot(p2.avgfit.t, p2.avgfit.vals,'r--')
+
+b(3) = scatter(t, p3.y_avg,'g','filled');
+errorbar(t, p3.y_avg,p3.err, ...
+    'vertical', 'LineStyle', 'none','Color','g');
+plot(p3.avgfit.t, p3.avgfit.vals,'g--')
+
+% naive and novel
+axis tight
+% legend(b,{'familiar/trained','novel/trained','novel/naive'})
+legend(b,{'trained','uncoupled','naive'})
+xlabel('Time from stim. onset [s]');
+ylabel('Avg. intertrial similarity (same odor) + SEM');
+xlim([-1 3])
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+% # ----------------------
+data = [];
+clear p
+for i = 1:3
+    thisp = sprintf('p%s',num2str(i));
+    p.amp{i} = cellfun(@(x) x.p(1), eval([thisp,'.win_fits']));
+    p.tau{i} = cellfun(@(x) 1./x.p(2), eval([thisp,'.win_fits']));
+    p.offset{i} = cellfun(@(x) x.p(3), eval([thisp,'.win_fits']));
+    p.half_t{i} = cellfun(@(x) x.half_t, eval([thisp,'.win_fits']));
+    p.t2max{i} = cellfun(@(x) x.t2max, eval([thisp,'.win_fits']));
+
+    data = [data ; [p.amp{i},p.tau{i},p.offset{i},p.half_t{i},p.t2max{i}]];
+    % data = [data ; [p.amp{i},p.tau{i},p.half_t{i},p.t2max{i}]];
+end
+g = [repmat({'trained-familiar'},numel(p.amp{1}),1) ; ...
+    repmat({'trained-novel'},numel(p.amp{2}),1) ; ...
+    repmat({'naive'},numel(p.amp{3}),1)];
+labs = {'amplitude','tau','offset','half t','T'};
+% labs = {'g','offset','half t','T'};
+grouplabs = {'trained-familiar','trained-novel','naive'};
+
+avg_dt = [[p1.avgfit.p,p1.avgfit.half_t];
+          [p2.avgfit.p,p2.avgfit.half_t];
+          [p3.avgfit.p,p3.avgfit.half_t]];
+
+for i = 2:5
+    subplot(1,6,i)
+    boxplot(data(:,i-1),g);
+    hold on
+    scatter(1:3,avg_dt(:,i-1),50,'red','filled')
+    box off
+    ylabel(labs{i-1});
+    set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+
+    % figure; [~,~,stats] = kruskalwallis(data(:,i-1),g,"off");
+    % multcompare(stats,'display','on')
+end
+% 
+% subplot(162)
+% violin(p.amp)
+% box off
+% xticklabels(grouplabs)
+% ylabel(labs{1});
+% set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+% 
+% subplot(163)
+% violin(p.tau)
+% box off
+% xticklabels(grouplabs)
+% ylabel(labs{2});
+% set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+% 
+% subplot(164)
+% violin(p.offset)
+% box off
+% xticklabels(grouplabs)
+% ylabel(labs{3});
+% set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+% 
+% subplot(165)
+% violin(p.half_t)
+% box off
+% xticklabels(grouplabs)
+% ylabel(labs{4});
+% set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+
+subplot(166)
+bar([p.t2max{1}(1),p.t2max{2}(1),p.t2max{3}(1)])
+box off
+xticklabels(grouplabs)
+ylabel(labs{5});
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+
+
+end
+
+function b = plotCurves(data,windows,cfg)
+% plot onto provided axes
+
+% Get dimensions
+[n_time, n_vars, ~] = size(data);
+t = mean(windows,2)'; % time axis
+
+
+% Plot with SEM whiskers
+hold on;
+b = gobjects(n_vars,1);
+for i = 1:n_vars
+    mu = data(:, i, 1);
+    sem = data(:, i, 3);
+    
+    % Shaded error bars (optional, looks cleaner)
+    fill([t fliplr(t)], [mu - sem; flipud(mu + sem)]', ...
+         cfg.c(i,:), 'FaceAlpha', 0.2, 'EdgeColor', 'none'); % grey shade
+    
+    % Plot mean line
+    b(i) = plot(t, mu, 'LineWidth', cfg.lineWidth, 'Color', cfg.c(i,:));
+end
+axis tight
+xlabel('Time from stim. onset');
+ylabel('Avg. intertrial similarity (same odor)');
+title('Mean ± SEM');
+set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+set(gcf, 'color', cfg.bgcol); 
+end
+
+
+function params = getFitParams(out, idx, t, tstart, mode)
+
+% -----------------
+nwindows = numel(out);
+[ncomparisons,ndatapoints] = size(out{1}{idx}.data);
+G = nan(ncomparisons,ndatapoints,nwindows); % to permute later
+for i = 1:nwindows; G(:,:,i) = out{i}{idx}.data; end
+G = permute(G,[3,2,1]); % [windows, datapoints(odors*subjects), comparisons(intertrial corrs)]
+% -----------------
+g = mean(G,3,"omitmissing");
+
+y_avg = mean(g,2,'omitmissing');
+err = std(g,[],2,'omitmissing')./ndatapoints; % sem
+[~,tend] = max(y_avg);
+tend = tend+1;
+data_t = t(tstart:tend);
+
+win_fits = cell(ndatapoints,1);
+for i = 1:ndatapoints
+    [win_fits{i},model] = fitModel(data_t,g(:,i),t,tstart,tend,mode);
+end
+
+params.y_avg = y_avg;
+params.err = err;
+params.model = model;
+params.t = data_t;
+params.avgfit = fitModel(data_t,y_avg,t,tstart,tend,mode);
+params.win_fits = win_fits;
+
+end
+
+
+function [fit,model] = fitModel(data_t,y,t,tstart,tend,mode)
+switch mode
+    case 'exponential'
+        [p, ~, model] = fitExpSaturation(data_t, y(tstart:tend), 0);
+    case '2-point line'
+        [p, ~, model] = lineThrough2Points(data_t, y(tstart:tend));
+    otherwise
+        error('Model class not recognized.')
+end
+
+t_fit = t(tstart):.01:t(tend);
+yfit = model(p,t_fit);
+[~,half_t] = min(abs(yfit-(min(yfit)+(max(yfit)-min(yfit))/2))); half_t = t_fit(half_t);
+t2max = t(tend);
+
+fit.p = p;
+fit.t = t_fit;
+fit.vals = yfit;
+fit.half_t = half_t;
+fit.t2max = t2max;
+
+end
+
+function [params, y_fit, model] = lineThrough2Points(t, y)
+% Fit a line through the first and last points of the data
+
+% linear model
+model = @(p, x) p(1) * x + p(2);
+
+% slope and intercept can be calculated directly
+p1 = (y(end) - y(1)) / (t(end) - t(1)); % slope
+p2 = y(1) - p1 * t(1);                  % intercept
+params = [p1, p2];
+
+% fitted values
+y_fit = model(params, t);
+
+end

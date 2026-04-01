@@ -1,0 +1,168 @@
+dbstop if error
+
+s = true; % save figures to files?
+savepath = 'bin2';
+saveType = 'vector'; % 'vector' or 'raster'
+
+% for sliding windows
+window_duration = .3; % [seconds]
+t_lim_sec = [-5 35]; % from 5 sec before to 35 seconds after stimulus onset
+overlap = .1; % [seconds]
+
+%% Load dataset
+filename = 'odorexp004_IC1_130625.mat';
+
+%
+experiment = load(filename).a; % Experiment object
+% or
+% experiment = a; clear a
+
+% avoid any spelling mismatches
+for i = 1:numel(experiment.traces)
+experiment.traces{i}.subject_group = experiment.subjectTab.group{i};
+end
+
+
+%% initialize output figure saving
+cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73]); % (test1, test2, ctrl)
+cfg.savePath = savepath;
+
+v = ExperimentViewer(experiment);
+v.plotConfig = cfg;
+cfg = v.plotConfig;
+
+v.dataFilter.traceType = 'pSpike';
+v.dataFilter.interval = [1,20];
+v.dataFilter.trial_sorting = 'stim_id';
+dft = v.dataFilter;
+ 
+
+%% FIGURE
+
+%% ablation effect on learning index boxplots
+ablated = [0.616298266	0.338911506	0.428071173	0.679814693	0.622756572	0.240895412
+-0.495218428	0.028456877	0.686186308	1.701018712	-1.703680242	0.899411313
+0.411452856	0.758444602	1.588974263	-0.418026808	0.689017721	-1.107686791
+nan	0.74878912	0.685331161	0.880144864	1.254936151	-0.120063145
+nan	1.008393226	2.991364766	1.224634038	2.57730252	-0.321253945
+0.459185961	0.955030989	2.500303087	2.739045443	2.262422116	0.734014876
+1.397978886	1.388186214	1.138534664	0.633049727	0.5609519	1.36259256
+1.073731637	-0.267724267	-0.197074658	0.277168472	0.808400821	-0.315031336
+0.184023215	-0.029898621	-1.05635376	0.883311866	0.547259826	-0.158546787
+-0.197027149	1.042856841	-0.185905381	-0.713131617	-0.179576812	1.094442034
+0.409275655	-1.556337684	0.532205754	-1.052777143	1.476777403	-0.115310612
+0.192295717	0.72710953	-0.176194302	-0.233203165	nan	-0.06979792
+0.191843417	-0.37145929	0.073542231	-0.464769515	0.641496428	1.590958225
+0.742367234	-1.021536789	0.104515276	-0.384144158	0.080454355	-0.341700536
+0.722937389	1.151106822	1.092432807	2.384875313	1.800359695	0.599829744
+2.336758188	1.225075391	0.431220057	0.801378409	0.421102196	-0.069524501
+1.916322046	0.980627835	-0.429112006	0.330240686	-0.474196551	3.306287591
+0.163963642	0.230161434	nan	0.888260751	0.381294455	1.128215881
+];
+
+sham = [0.002280994	-0.349049613	-0.451239238	0.679384635	0.181407895	0.103406844
+0.86041906	0.297856584	-1.11102339	nan	0.070352221	-0.162699107
+0.527653506	0.328758912	0.489360776	nan	0.015442721	0.20990269
+0.0182983	1.534574398	-0.367252937	1.018955066	1.723071933	1.610789278
+0.101857188	0.74797887	-1.024771959	-0.9464722	0.416344748	0.389852815
+-0.901889854	0.332162652	1.290234405	0.32719078	0.898822979	1.025745857
+0.49462535	0.520628881	1.498346239	0.703796451	nan	-0.923992705
+-0.535336469	-0.288728637	-0.510937795	0.871028082	1.170200512	0.388940113
+0.811122302	0.474746769	-0.166603833	0.075049004	0.252025236	-0.863005653
+0.196945918	0.877602929	1.52986913	0.30977966	-0.280694136	0.389083253
+0.033337442	0.584068646	-0.911339462	0.18137044	0.508663114	0.538740603
+0.486858341	1.239785006	0.90698248	1.222521839	2.3313133	0.655914867
+0.577987393	1.728743886	1.695917044	0.887809026	2.81910309	0.713928454
+-0.200191967	0.129329822	1.545112362	-0.885714202	1.608400641	0.867309824
+-0.842793025	0.42869812	1.127411558	0.367127763	-0.417838546	3.303280859
+0.230905713	0.294005821	2.555671811	1.656803224	0.246368274	1.021937922
+0.115357772	-0.221965549	-0.690901277	0.613619401	0.270900151	1.019793548
+];
+
+y = mean(ablated(:,3:5),2,'omitmissing');
+ablated = ablated(y>.5,:);
+ablated(:,5) = y(y>.5);
+y = mean(sham(:,3:5),2,'omitmissing');
+sham = sham(y>.5,:);
+sham(:,5) = y(y>.5);
+
+figure;
+subplot(121) % ablated
+boxplot(ablated(:,5:6))
+hold on
+plot(ablated(:,5:6)','k')
+xticks([1 2]);
+% xticklabels({'before surgery','after surgery'});
+% ylabel('Learning index (a.u.)')
+yline(0,'r--')
+ylim([-2 3])
+subplot(122) % sham
+boxplot(sham(:,5:6))
+hold on
+plot(sham(:,5:6)','k')
+xticks([1 2]);
+yline(0,'r--')
+ylim([-2 3])
+[~,p] = ttest(ablated(:,5), ablated(:,6), 'Tail', 'right')
+[~,p] = ttest(sham(:,5), sham(:,6), 'Tail', 'right')
+%xticklabels({'before surgery','after surgery'});
+cfg.figSize = 'small';
+cfg.setFigure
+cfg.saveFigure(gcf,'ablation learning index', saveType)
+
+%% N over groups
+
+%% trained and uncoupled response traces
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.interval = [-5 40];
+v.plotAvgResponseTrace;
+ylim([0 .2])
+v.dataFilter = dft;
+cfg.setFigure
+cfg.saveFigure(gcf,'trained average response trace', saveType)
+cfg = v.plotConfig;
+
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'uncoupled';
+v.dataFilter.interval = [-5 40];
+v.plotAvgResponseTrace;
+ylim([0 .2])
+v.dataFilter = dft;
+cfg.setFigure
+cfg.saveFigure(gcf,'uncoupled average response trace', saveType)
+cfg = v.plotConfig;
+
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained1';
+v.dataFilter.interval = [-5 40];
+v.plotAvgResponseTrace;
+ylim([0 .2])
+v.dataFilter = dft;
+cfg.setFigure
+cfg.saveFigure(gcf,'trained1 average response trace', saveType)
+cfg = v.plotConfig;
+
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained2';
+v.dataFilter.interval = [-5 40];
+v.plotAvgResponseTrace;
+ylim([0 .2])
+v.dataFilter = dft;
+cfg.setFigure
+cfg.saveFigure(gcf,'trained2 average response trace', saveType)
+cfg = v.plotConfig;
+
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'trained1 (T-R-S-H-A-ACSF/L)';
+v.dataFilter.interval = [-5 40];
+v.plotAvgResponseTrace;
+ylim([0 .2])
+v.dataFilter = dft;
+cfg.setFigure
+cfg.saveFigure(gcf,'trained3 average response trace', saveType)
+cfg = v.plotConfig;

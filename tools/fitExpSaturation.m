@@ -1,4 +1,4 @@
-function [params, y_fit, hf] = fitExpSaturation(t, y, pl)
+function [params, y_fit, model, hf] = fitExpSaturation(t, y, pl)
 % FITEXPSATURATION Fit y = a*(1 - exp(-b*t)) + c using fminsearch (no toolboxes needed)
 % Inputs:
 %   t - time vector
@@ -24,6 +24,7 @@ c0 = min(y);
 p0 = [a0, b0, c0];
 
 % Fit using fminsearch
+% options = optimset('MaxFunEvals',1e30);
 params = fminsearch(loss, p0);
 
 % Compute fitted curve

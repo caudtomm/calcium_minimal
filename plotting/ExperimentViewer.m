@@ -12,6 +12,25 @@ classdef ExperimentViewer
         plotConfig PlotConfig
     end
 
+    methods (Static)
+        function out = overlayMats(Marray)
+            arguments
+                Marray cell % cell array of 2D matrices to overlay
+            end
+            
+            nrows = cellfun(@(x) size(x,1), Marray);
+            ncols = cellfun(@(x) size(x,2), Marray);
+            dimOut = [max(nrows), max(ncols)];
+            
+            n = numel(Marray);
+            out = zeros(dimOut(1),dimOut(2), n);
+            for i = 1:n
+                thisM = Marray{i};
+                out(1:size(thisM,1), 1:size(thisM,2), i) = thisM;
+            end
+        end
+    end
+
     methods
         function obj = ExperimentViewer(experiment)
             arguments
@@ -42,31 +61,163 @@ classdef ExperimentViewer
         function obj = setTheme(obj, themeName)
             obj.plotConfig.theme = themeName;
         end
+
+        %% quick plotters
+
+        function [hf, out] = plotAvgResponseTrace(obj,varargin)
+            arguments
+                obj
+            end
+            arguments (Repeating)
+                varargin
+            end
+
+            cfg = obj.plotConfig;
+            dft = obj.dataFilter;
+
+            T = diff(dft.interval);
+            baseline_trange = 120 + [-T 0];
+
+            events = extractData();
+
+            obj.dataFilter.interval = baseline_trange;
+            baseline = extractData();
+            obj.dataFilter = dft;
+
+            out.events = events;
+            out.baseline = baseline;
+
+            [N,L] = size(events);
+            t = linspace(dft.interval(1),dft.interval(2),L);
+            hf = figure;
+            mu = mean(baseline,'omitmissing')'; % baseline
+            err = std(baseline,[],1,'omitmissing')';%./sqrt(N);
+            b(1) = plotLineNShade(t, mu, err, cfg.c(3,:), cfg);
+            mu = mean(events,'omitmissing')'; % odor
+            err = std(events,[],1,'omitmissing')';%./sqrt(N);
+            b(2) = plotLineNShade(t, mu, err, cfg.c(1,:), cfg);
+            
+            xlabel('Time from stimulus onset (s)')
+            ylabel('iFR (Hz)')
+            axis tight; box off
+            legend(b,{'baseline', 'odor'})
+            set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+            set(gcf, 'color', cfg.bgcol);
+            set(gcf, 'Position', [50 50 400 280]);
+
+            function y = extractData()
+                [~,y] = ModeSelector(obj).extract;
+                y = cellfun(@(x) mean(x,[2,3],'omitmissing')', y,'UniformOutput',false); % avg over cellS and trials
+                
+                
+                y = cell2mat(y); % [fish x T]
+            end
+            
+        end
+
+        function [hf, out] = plotExampleTraces(obj,idx_in,varargin)
+            arguments
+                obj
+                idx_in = {}
+            end
+            arguments (Repeating)
+                varargin
+            end
+
+            out = [];
+
+            trange = obj.dataFilter.interval;
+            cfg = obj.plotConfig;
+
+            [~,events] = ModeSelector(obj).extract;
+            nsubjects = numel(events);
+            out.events = events;
+            out.idx = cell(size(events));
+            hf = figure;
+
+            for i = 1:nsubjects
+                M = events{i};
+
+                [L, N, ntrials] = size(M);
+                t = linspace(trange(1),trange(2),L);
+
+                % sorting indices
+                if isempty(idx_in)
+                    [~,idx] = sort(mean(M(:,:,1),1,'omitmissing'),'descend');
+                else
+                    idx = idx_in{i};
+                end
+                out.idx{i} = idx;
+
+                for i_trial = 1:ntrials
+                    subplot(nsubjects,ntrials,(i-1)*ntrials+i_trial)
+                    c = M(:,idx,i_trial)';
+                    imagesc(t, 1:N, c);
+
+                    colormap(flipud(gray)); clim([0 quantile(c(:),.99)]);
+                    
+                    xlabel('Time from stim. onset (s)'); ylabel('Cell #')
+                    set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
+                end
+                
+            end            
+            set(gcf, 'color', cfg.bgcol); 
+            
+        end
         
         %% intermediate-level plotting function headers 
         % (normally call external low level functions that don't rely on custom objects)
         % still output a single plot onto provided axes
 
-        function out = plotDistancesHead(obj, varargin)
-            % plotDistances - Plot similarity/distance metrics for peri-stimulus traces across subjects.
-            %
-            % Usage:
-            %   [hf, out] = obj.plotDistances('ps_lim', [start end], 'method', methodName, 'trial_sorting', sortingType)
-            %
-            % Inputs (as name-value pairs):
-            %   'ps_lim'        - 2-element vector specifying peri-stimulus window in seconds [default: [1 20]]
-            %   'plotType'      - String selecting which plot to produce
-            %                     opitons: {'full','repetitions'}
-            %   'method'        - String specifying similarity/distance metric (e.g., 'correlation') [default: 'correlation']
-            %                     options: see pdist
-            %   'trial_sorting' - String specifying trial sorting method (e.g., 'chronological') [default: 'chronological']
-            %                     options: {'chronological','random','stim_id'}
-            %   'stim_allowed'  - Cell array of strings containing labels of all stimuli to consider. (eg. {'Arg', 'Leu'})
-            %                     or stimulus group name [default: 'all trials']
-            %                     options: {'all trials','all stimuli','all CS+','all CS-','all familiar','all novel'}
-            %
-            % Outputs:
-            %   out  - Output structure
+
+        function out = plotBehavior2PTracesHead(obj, varargin)
+            arguments
+                obj
+            end
+            arguments (Repeating)
+                varargin
+            end
+
+            [beh_traces, labs] = obj.dataFilter.filterData(obj);
+            beh_traces = cellfun(@squeeze, beh_traces, 'UniformOutput', false);
+            out = plotBehavior2PTraces(obj.dataFilter.interval, ...
+                    beh_traces, labs, ...
+                    obj.plotConfig, varargin{:});
+        end
+
+
+        function out = plotDistancesHead(obj, varargin)        
+        % PLOTDISTANCESHEAD Plots distances between events in a 3D matrix.
+        %
+        %   out = plotDistancesHead(obj, varargin) generates a 3D distance matrix
+        %   plot based on the events extracted from the object `obj`. The function
+        %   allows customization of the plotting method and type through optional
+        %   name-value pair arguments.
+        %
+        %   INPUTS:
+        %       obj - The object containing the data and configuration for plotting.
+        %
+        %   OPTIONAL NAME-VALUE PAIR ARGUMENTS:
+        %       'method'   - (string) The method used to compute distances. Default
+        %                    is 'correlation'.
+        %       'plotType' - (string) The type of plot to generate. Default is 'full'.
+        %
+        %   OUTPUT:
+        %       out - A structure containing the following fields:
+        %           distMat3d - The 3D distance matrix generated by the plot.
+        %           all_labs  - Cell array of labels for all subjects.
+        %
+        %   NOTES:
+        %       - The function checks for consistency in labels across subjects. If
+        %         labels differ, a warning is issued, and mock labels are generated.
+        %       - The title of the plot includes the time interval used for filtering
+        %         the data.
+        %
+        %   EXAMPLE USAGE:
+        %       obj = ExperimentViewer(); % Assuming ExperimentViewer is a class
+        %       out = obj.plotDistancesHead('method', 'euclidean', 'plotType', 'repetitions');
+        %
+        %   See also: ModeSelector, plotDistances
             arguments
                 obj
             end
@@ -75,66 +226,30 @@ classdef ExperimentViewer
             end
 
             % Set default values
-            ps_lim = [1 20];
             plotType = 'full';
             method = 'correlation';
-            trial_sorting = 'chronological';
-            stim_allowed = 'all trials';
 
             % Parse name-value pairs
             if ~isempty(varargin)
                 for k = 1:2:length(varargin)
                     switch lower(varargin{k})
-                        case 'ps_lim'
-                            ps_lim = varargin{k+1};
-                        case 'plottype'
-                            plotType = varargin{k+1};
+                        % processing parameters
                         case 'method'
                             method = varargin{k+1};
-                        case 'trial_sorting'
-                            trial_sorting = varargin{k+1};
-                        case 'stims_allowed'
-                            stim_allowed = varargin{k+1};
+                        % plotting parameters
+                        case 'plottype'
+                            plotType = varargin{k+1};
                     end
                 end
             end
 
             % initialize output
             out = [];
-
+            
             % Isolating relevant data
-            nsubjects = numel(obj.filtered_traces);
-            events = cell(nsubjects,1);
-            all_labs = cell(nsubjects,1);
-            for i = 1:nsubjects
-                thistrace = obj.filtered_traces{i};
-
-                % Trial sorting
-                [~,trial_idx] = TraceViewer(thistrace).sortTrials(trial_sorting);
-
-                % get peri-stimulus data [t,N,trials]
-                M = thistrace.(obj.dataFilter.traceType)(:,:,trial_idx);
-                stim_on_frame = thistrace.stim_series.frame_onset(1);
-                fs = thistrace.framerate;
-                events{i} = TraceViewer.getPeriEventData(M,stim_on_frame,ps_lim,fs);
-
-                % Retrieve stimulus identity labels
-                all_labs{i} = thistrace.stim_series.stimulus(trial_idx);
-
-                % Stimulus filtering
-                thisgroup = thistrace.subject_group;
-                desired_stimuli = getStimuliByGroup(thisgroup,stim_allowed);
-                idx = ismember(all_labs{i}, desired_stimuli);
-                if ~isempty(desired_stimuli) && ~all(idx) && sum(idx)>0
-                    % If some trials are not in the desired stimuli, filter them out
-                    events{i} = events{i}(:,:,idx);
-                    all_labs{i} = all_labs{i}(idx);
-                elseif isempty(desired_stimuli) || sum(idx)==0
-                    % If no stimuli are accepted, return without trying to
-                    % plot ... nothing!
-                    return
-                end
-            end
+            dft = obj.dataFilter;
+            [~, events, all_labs] = ModeSelector(obj).extract;
+            if all(cellfun(@isempty,events)); return; end
 
             % by default, labels are applied based on subject 1
             labs = all_labs{1};
@@ -154,6 +269,7 @@ classdef ExperimentViewer
 
             % call low-level plotter
             out.distMat3d = plotDistances(events,plotType,method,labs,obj.plotConfig);
+            ps_lim = dft.interval; % actual interval used
             title([num2str(ps_lim(1)),'-',num2str(ps_lim(2)), ' s'], ...
                 'Color',obj.plotConfig.textcol)
 
@@ -164,23 +280,51 @@ classdef ExperimentViewer
 
 
         function out = plotDiscriminationHead(obj, varargin)
-            % plotDiscrimination - Plot classification performance / discriminability of a across subjects.
-            %
-            % Usage:
-            %   [hf, out] = obj.plotDistances('ps_lim', [start end], 'method', methodName, 'trial_sorting', sortingType)
-            %
-            % Inputs (as name-value pairs):
-            %   'ps_lim'        - 2-element vector specifying peri-stimulus window in seconds [default: [1 20]]
-            %   'plotType'      - String selecting which plot to produce
-            %                     opitons: {'full','repetitions'}
-            %   'method'        - String specifying similarity/distance metric (e.g., 'correlation') [default: 'correlation']
-            %                     options: see pdist
-            %   'stim_allowed'  - Cell array of strings containing labels of all stimuli to consider. (eg. {'Arg', 'Leu'})
-            %                     or stimulus group name [default: 'all trials']
-            %                     options: {'all trials','all stimuli','all CS+','all CS-','all familiar','all novel'}
-            %
-            % Outputs:
-            %   out  - Output structure
+        % PLOTDISCRIMINATIONHEAD Plots discrimination analysis results for the given object.
+        %
+        %   out = plotDiscriminationHead(obj, varargin) performs discrimination 
+        %   analysis and generates a plot based on the specified parameters.
+        %
+        %   INPUTS:
+        %       obj - The object containing the data and configuration for the analysis.
+        %
+        %   NAME-VALUE PAIR ARGUMENTS:
+        %       'method'       - (string) The method used for discrimination analysis. 
+        %                        Default is 'correlation'.
+        %       'plotType'     - (string) The type of plot to generate. 
+        %                        Default is 'performance_lines'.
+        %       'focus_stims'  - (string) Specifies the stimuli to focus on for plotting. 
+        %                        Default is 'all trials'.
+        %       'zscore'       - (logical) Whether to apply z-scoring to the data. 
+        %                        Default is false.
+        %
+        %   OUTPUT:
+        %       out - The output of the plotDiscrimination function, which contains 
+        %             the generated plot and associated data.
+        %
+        %   DESCRIPTION:
+        %       This function performs discrimination analysis on the data contained 
+        %       in the input object. It allows for customization of the analysis 
+        %       method, plot type, and stimuli focus through name-value pair arguments. 
+        %       The function filters and processes the data, performs the analysis, 
+        %       and generates the specified plot.
+        %
+        %   EXAMPLES:
+        %       % Example 1: Basic usage with default parameters
+        %       out = obj.plotDiscriminationHead();
+        %
+        %       % Example 2: Custom method and plot type
+        %       out = obj.plotDiscriminationHead('method', 'euclidean', 'plotType', 'bar');
+        %
+        %       % Example 3: Focus on specific stimuli and apply z-scoring
+        %       out = obj.plotDiscriminationHead('focus_stims', 'stimulus_A', 'zscore', true);
+        %
+        %   NOTES:
+        %       - The function skips subjects with empty data or no allowed stimuli.
+        %       - The low-level processing and plotting are handled by the 
+        %         doDiscrimination and plotDiscrimination functions, respectively.
+        %
+        %   See also: doDiscrimination, plotDiscrimination, getStimuliByGroup
             arguments
                 obj
             end
@@ -189,11 +333,11 @@ classdef ExperimentViewer
             end
 
             % Set default values
-            ps_lim = [1 20];
             plotType = 'performance_lines';
             method = 'correlation';
-            stim_allowed = 'all stimuli';
-            reps_touse = [];
+            classifier = 'template_match';
+            trainblockmode = 'single';
+            separatetestset = false;
             focus_stims = 'all trials'; % by default, no further filtering
             do_zscore = false;
 
@@ -201,16 +345,18 @@ classdef ExperimentViewer
             if ~isempty(varargin)
                 for k = 1:2:length(varargin)
                     switch lower(varargin{k})
-                        case 'ps_lim'
-                            ps_lim = varargin{k+1};
-                        case 'plottype'
-                            plotType = varargin{k+1};
+                        % processing parameters
                         case 'method'
                             method = varargin{k+1};
-                        case 'repetitions'
-                            reps_touse = varargin{k+1};
-                        case 'stims_allowed'
-                            stim_allowed = varargin{k+1};
+                        case 'classifier'
+                            classifier = varargin{k+1};
+                        case 'trainblockmode'
+                            trainblockmode = varargin{k+1};
+                        case 'separatetestset'
+                            separatetestset = varargin{k+1};
+                        % plotting parameters
+                        case 'plottype'
+                            plotType = varargin{k+1};
                         case 'focus_stims'
                             focus_stims = varargin{k+1};
                         case 'zscore'
@@ -221,63 +367,14 @@ classdef ExperimentViewer
 
             % initialize output
             out = [];
-
+            
             % Isolating relevant data
+            dft = obj.dataFilter;
+            [~, events, all_labs] = ModeSelector(obj).extract;
+            if all(cellfun(@isempty,events)); return; end
+
+            % useful metrics
             nsubjects = numel(obj.filtered_traces);
-            events = cell(nsubjects,1);
-            all_labs = cell(nsubjects,1);
-            for i = 1:nsubjects
-                thistrace = obj.filtered_traces{i};
-
-                % get peri-stimulus data [t,N,trials]
-                M = thistrace.(obj.dataFilter.traceType);
-                stim_on_frame = thistrace.stim_series.frame_onset(1);
-                fs = thistrace.framerate;
-                events{i} = TraceViewer.getPeriEventData(M,stim_on_frame,ps_lim,fs);
-
-                % Retrieve stimulus identity labels
-                all_labs{i} = thistrace.stim_series.stimulus;
-
-                % Stimulus filtering
-                thisgroup = thistrace.subject_group;
-                desired_stimuli = getStimuliByGroup(thisgroup,stim_allowed);
-                idx = ismember(all_labs{i}, desired_stimuli);
-                if ~isempty(desired_stimuli) && ~all(idx)
-                    % If some trials are not in the desired stimuli, filter them out
-                    events{i} = events{i}(:,:,idx);
-                    all_labs{i} = all_labs{i}(idx);
-                elseif isempty(desired_stimuli) || sum(idx)==0
-                    % If no stimuli are accepted, return without trying to
-                    % plot ... nothing!
-                    return
-                end
-
-                % Stimulus repetition filter
-                if isempty(reps_touse); continue; end % empty argument 'repetitions' leads to all repetitions being used
-                thisstims = unique(all_labs{i});
-                nstims = numel(thisstims);
-                idx_keep = false(1, numel(all_labs{i}));
-                for i_stim = 1:nstims
-                    idx_stim = find(ismember(all_labs{i}, thisstims{i_stim}));
-                    this_nreps = numel(idx_stim);
-                    % Select only allowed repetition indices
-                    reps_available = 1:this_nreps;
-                    reps_valid = reps_available(ismember(reps_available, reps_touse));
-                    if isempty(reps_valid)
-                        continue
-                    end
-                    idx_keep(idx_stim(reps_valid)) = true;
-                end
-                if ~all(idx_keep)
-                    % Filter events and labels to keep only desired repetitions
-                    events{i} = events{i}(:,:,idx_keep);
-                    all_labs{i} = all_labs{i}(idx_keep);
-                elseif sum(idx_keep)==0
-                    % If no trials are accepted, return without trying to
-                    % plot ... nothing!
-                    return
-                end
-            end
 
             % call low-level processor (perform discrimination analysis)
             all_out = cell(nsubjects,1);
@@ -290,7 +387,10 @@ classdef ExperimentViewer
 
                 % call post-processing function
                 all_out{i} = doDiscrimination(thisevents, thislabs, ...
-                                                       'method', method);
+                                                       'method', method, ...
+                                                       'classifier', classifier, ...
+                                                       'trainblockmode', trainblockmode, ...
+                                                       'separatetestset', separatetestset);
             end
 
             % focus on specific trials for plotting (without changing any of the values!)
@@ -314,7 +414,7 @@ classdef ExperimentViewer
                 plotType,obj.plotConfig, ...
                 'method',method, ...
                 'FocusTrials',focus_trials, ...
-                'actualreps', reps_touse, ...
+                'actualreps', dft.repetitions, ...
                 'zscore',do_zscore);
 
             % return
@@ -323,368 +423,309 @@ classdef ExperimentViewer
 
 
 
-        %% complex and idiosyncratic high-level plotters
-
-        function [hf, out, groups, odor_sets] = plotRepetitionDistances(obj, ps_lim, method)  
+        function out = plotTrialActivityMetricHead(obj, varargin)
+        % PLOTTRIALACTIVITYMETRICHEAD Plots activity metrics for trial data.
+        %
+        %   out = PLOTTRIALACTIVITYMETRICHEAD(obj, varargin) processes and plots
+        %   activity metrics for trial data using the specified method and plot type.
+        %
+        %   INPUTS:
+        %       obj - The object containing the data and configuration for plotting.
+        %
+        %   NAME-VALUE PAIR ARGUMENTS:
+        %       'method'    - (string) The method used to calculate the activity metric.
+        %                     Default is 'participation ratio'.
+        %       'n_equals'  - (string) Specifies the normalization method for the metric.
+        %                     Default is 'cells'.
+        %       'plotType'  - (string) The type of plot to generate. Default is 'boxplot'.
+        %       'normalize' - (logical) Whether to normalize the data before plotting.
+        %                     Default is false.
+        %
+        %   OUTPUT:
+        %       out - The output of the plotting function, which depends on the
+        %             implementation of the low-level plotter.
+        %
+        %   DESCRIPTION:
+        %       This function processes trial data to compute activity metrics using
+        %       the specified method. It then generates a plot of the metrics using
+        %       the specified plot type. The function supports optional normalization
+        %       of the data. The data is filtered and processed before plotting, and
+        %       empty data is excluded from the analysis.
+        %
+        %   EXAMPLE USAGE:
+        %       obj = ExperimentViewer();
+        %       out = obj.plotTrialActivityMetricHead('method', 'participation ratio', ...
+        %                                             'plotType', 'boxplot', ...
+        %                                             'normalize', true);
+        %
+        %   See also: extractActivityMetric, plotTrialMetric
             arguments
                 obj
-                ps_lim = [1 20]
-                method = 'correlation'
             end
-            
-            % Knobs
-            groups = {'naïve', ...
-                      'trained', ...
-                      'trained1', ...
-                      'trained2', ...
-                      'trained1 (T-R-S-H-A-ACSF/L)', ...
-                      'uncoupled'};
-            odor_sets = {'all stimuli', ...
-                         {'Arg','Ala','His','Trp','Ser'}, ...
-                         {'Leu'}, ...
-                         'all CS+', ...
-                         'all CS-', ...
-                         'all familiar', ...
-                         'all novel', ...
-                        };
+            arguments (Repeating)
+                varargin
+            end
 
-            % useful metrics
-            ngroups = numel(groups);
-            nodor_sets = numel(odor_sets);
-            nplots = ngroups*nodor_sets;
+            % Set default values
+            plotType = 'boxplot';
+            method = 'participation ratio';
+            n_equals = 'cells';
+            do_normalize = false;
 
-            % Initialize output
-            hf = gobjects(2,1);
-            out = cell(nplots,1);
-
-
-            %% Figure 1: comparison of distance matrices
-
-            % define figure size
-            ncols = nodor_sets;
-            nrows = ngroups;
-
-            hf(1) = figure; % [groups, odor_sets]
-            n = 1;
-            labs = cell(nplots,1);
-            for i_g = 1:ngroups
-                % filter data by group
-                thisgroup = groups{i_g};
-                obj.dataFilter.subjectGroup = thisgroup;
-
-                for i_o = 1:nodor_sets
-                    thisodorset = odor_sets{i_o};
-
-                    thisodorset_str = thisodorset;
-                    if iscell(thisodorset_str); thisodorset_str = strjoin(thisodorset, ', '); end
-                    msg = ['Plotting group ''',thisgroup,''' for odors: ',thisodorset_str];
-                    disp(msg)
-
-                    % build axes
-                    subplot(nrows,ncols,n);
-
-                    % call intermediate-level plotter
-                    out{n} = obj.plotDistancesHead('ps_lim',ps_lim, ...
-                                    'plotType', 'repetitions', ...
-                                    'method',method, ...
-                                    'stims_allowed',thisodorset);
-
-                    % override title and ylabel
-                    title(thisodorset_str)
-                    ylabel(thisgroup)
-
-                    % if there is no data, delete the subplot
-                    if isempty(out{n}); axis off; end
-
-                    % export label
-                    labs{n} = [thisgroup,' - ',thisodorset_str];
-
-                    % advance axis counter
-                    n = n+1;
+            % Parse name-value pairs
+            if ~isempty(varargin)
+                for k = 1:2:length(varargin)
+                    switch lower(varargin{k})
+                        % processing parameters
+                        case 'method'
+                            method = varargin{k+1};
+                        case 'n_equals'
+                            n_equals = varargin{k+1};
+                        % plotting parameters
+                        case 'plottype'
+                            plotType = varargin{k+1};
+                        case 'normalize'
+                            do_normalize = varargin{k+1};
+                    end
                 end
             end
-            set(gcf,'Position',[1 1 2000 1000])
 
-            %% Figure 2: comparison of distance distributions
-
-            % compute data
-            data = [];
-            for i = 1:nplots
-                % skip empty output
-                if isempty(out{i}); continue; end
-
-                thismat = 1 - out{i}.distMat3d; % convert distance to similarity
-                
-                % knobs # TODO : tunable param
-                repetitions = 1:5;
-
-                % crop and take out the diagonal and lower triangular
-                % matrix
-                thismat = thismat(repetitions,repetitions,:);
-                idx = triu(true(numel(repetitions)), 1); % only upper triangle idx
-                idx = repmat(idx,1,1,size(thismat,3));
-                thismat = thismat(idx); % column vector
-
-                % store
-                plot_idx = i * ones(numel(thismat),1);
-                data = [data; plot_idx, thismat];
-
-                % return
-                out{i}.data = thismat; % column vector
-            end
+            % initialize output
+            out = [];
             
-            % plot
-            cfg = obj.plotConfig;
-            hf(2) = figure;
-            boxplot(data(:,2),labs(data(:,1)),'Orientation','horizontal','PlotStyle','compact','Colors',cfg.textcol)
-            box off
-            set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol);
-            set(gcf, 'color', cfg.bgcol); 
-            xlabel(method,'Color',cfg.textcol)
-            set(gcf,'Position',[1 1 2000 1000])
-            hold off
+            % Isolating relevant data
+            dft = obj.dataFilter;
+            obj.dataFilter.repetitions = []; % always use all repetitions
+            [~, events, all_labs] = ModeSelector(obj).extract;
+            obj.dataFilter = dft; % restore
+            if all(cellfun(@isempty,events)); return; end
+
+            % useful metrics
+            nsubjects = numel(obj.filtered_traces);
+
+            % call low-level processor (perform discrimination analysis)
+            all_out = cell(nsubjects,1);
+            for i = 1:nsubjects
+                thisevents = events{i};
+
+                % call post-processing function
+                all_out{i} = extractActivityMetric(thisevents, method, n_equals);
+            end
+
+            % get rid of empty data
+            idx = cellfun(@isempty,all_out);
+            all_out(idx) = [];
+            if isempty(all_out); return; end
+
+            % if output metrics are not 1D, assume that the last available dimension is trials
+            for i = 1:numel(all_out)
+                sz = size(all_out{i});
+                if numel(sz) > 1 && sz(end) > 1
+                    % average along all other dimensions except the last (trials)
+                    dims_to_avg = 1:(numel(sz)-1);
+                    all_out{i} = squeeze(mean(all_out{i}, dims_to_avg));
+                    % ensure column vector
+                    if isrow(all_out{i})
+                        all_out{i} = all_out{i}';
+                    end
+                end
+            end
+
+            % call low-level plotter
+            out = plotTrialMetric(all_out,...
+                plotType, all_labs, ...
+                do_normalize, obj.plotConfig);
+
+            % return
+
         end
 
-        function [hf, out, groups, odor_sets] = plotDiscriminationPerformanceMats(obj, ps_lim, method,focus_stims,repetitions,do_zscore)  
+
+
+        function out = plotUnitActivityMetricHead(obj, varargin)
+        % PLOTUNITACTIVITYMETRICHEAD Plots unit activity metrics for experimental data.
+        %
+        %   OUT = PLOTUNITACTIVITYMETRICHEAD(OBJ, VARARGIN) processes and visualizes
+        %   unit activity metrics based on the provided experimental data. The function
+        %   supports various methods for processing and plotting the data.
+        %
+        %   INPUTS:
+        %       OBJ - The object containing experimental data and methods for processing.
+        %
+        %   OPTIONAL NAME-VALUE PAIR ARGUMENTS:
+        %       'method'   - (string) Specifies the method for processing activity metrics.
+        %                    Default is 'tuning curves'.
+        %       'n_equals' - (string) Specifies the normalization method for cells.
+        %                    Default is 'cells'.
+        %       'plotType' - (string) Specifies the type of plot to generate.
+        %                    Default is 'boxplot'.
+        %
+        %   OUTPUT:
+        %       OUT - A cell array containing processed activity metrics for each subject.
+        %             If no valid data is available, the function returns an empty array.
+        %
+        %   DESCRIPTION:
+        %       The function isolates relevant data from the provided object, processes
+        %       the data using the specified method, and generates plots based on the
+        %       selected plot type. It handles multiple subjects and filters out empty
+        %       or invalid data. The processed data is returned as output.
+        %
+        %   EXAMPLES:
+        %       % Example 1: Default usage
+        %       out = obj.plotUnitActivityMetricHead();
+        %
+        %       % Example 2: Custom method and plot type
+        %       out = obj.plotUnitActivityMetricHead('method', 'spike rates', 'plotType', 'scatter');
+        %
+        %   NOTE:
+        %       This function requires the ModeSelector and extractActivityMetric
+        %       methods to be implemented in the object.
             arguments
                 obj
-                ps_lim = [1 20]
-                method = 'correlation'
-                focus_stims = 'all trials' % by default no further filtering
-                repetitions = [];
-                do_zscore = false
             end
+            arguments (Repeating)
+                varargin
+            end
+
+            % Set default values
+            plotType = 'boxplot';
+            method = 'tuning curves';
+            n_equals = 'cells';
+
+            % Parse name-value pairs
+            if ~isempty(varargin)
+                for k = 1:2:length(varargin)
+                    switch lower(varargin{k})
+                        % processing parameters
+                        case 'method'
+                            method = varargin{k+1};
+                        case 'n_equals'
+                            n_equals = varargin{k+1};
+                        % plotting parameters
+                        case 'plottype'
+                            plotType = varargin{k+1};
+                    end
+                end
+            end
+
+            % initialize output
+            out = [];
             
-            % Knobs
-            groups = {'naïve', ...
-                      'trained', ...
-                      'trained1', ...
-                      'trained2', ...
-                      'trained1 (T-R-S-H-A-ACSF/L)', ...
-                      'uncoupled'};
-            odor_sets = {'all stimuli', ...
-                         {'Arg','Ala','His','Trp','Ser'}, ...
-                         'all familiar', ...
-                         'all novel', ...
-                        };
+            % Isolating relevant data
+            [~, events, all_labs] = ModeSelector(obj).extract;
+            if all(cellfun(@isempty,events)); return; end
 
             % useful metrics
-            ngroups = numel(groups);
-            nodor_sets = numel(odor_sets);
-            nplots = ngroups*nodor_sets;
+            nsubjects = numel(obj.filtered_traces);
 
-            % Initialize output
-            hf = gobjects(1,1);
-            out = cell(nplots,1);
+            % call low-level processor
+            all_out = cell(nsubjects,1);
+            for i = 1:nsubjects
+                thisevents = events{i};
+                thislabs = all_labs{i};
 
+                % if there are no allowed stimuli here, skip subject
+                if isempty(thislabs); continue; end
 
-            %% Figure 1: comparison of discrimination performance curves
-
-            % define figure size
-            ncols = nodor_sets;
-            nrows = ngroups;
-
-            hf(1) = figure; % [groups, odor_sets]
-            n = 1;
-            labs = cell(nplots,1);
-            for i_g = 1:ngroups
-                % filter data by group
-                thisgroup = groups{i_g};
-                obj.dataFilter.subjectGroup = thisgroup;
-
-                for i_o = 1:nodor_sets
-                    thisodorset = odor_sets{i_o};
-
-                    thisodorset_str = thisodorset;
-                    if iscell(thisodorset_str); thisodorset_str = strjoin(thisodorset, ', '); end
-                    msg = ['Plotting group ''',thisgroup,''' for odors: ',thisodorset_str];
-                    disp(msg)
-
-                    % build axes
-                    subplot(nrows,ncols,n);
-
-                    % call intermediate-level plotter
-                    out{n} = obj.plotDiscriminationHead('ps_lim',ps_lim, ...
-                                    'plotType', 'performance_mat', ...
-                                    'method',method, ...
-                                    'focus_stims', focus_stims, ...
-                                    'zscore',do_zscore, ...
-                                    'repetitions',repetitions, ...
-                                    'stims_allowed',thisodorset);
-
-                    % override title and ylabel
-                    title(thisodorset_str,'color',obj.plotConfig.textcol)
-                    ylabel(thisgroup)
-
-                    % if there is no data, delete the subplot
-                    if isempty(out{n}); axis off; end
-
-                    % export label
-                    labs{n} = [thisgroup,' - ',thisodorset_str];
-
-                    % advance axis counter
-                    n = n+1;
-                end
+                % call post-processing function
+                all_out{i} = extractActivityMetric(thisevents, method, n_equals, ...
+                    'StimTypes', thislabs);
             end
-            set(gcf,'Position',[1 1 2000 1000])
 
+            % get rid of empty data
+            idx = cellfun(@isempty,all_out);
+            all_out(idx) = [];
+            if isempty(all_out); return; end
+
+            % call low-level plotter
+
+            % return
+            out = all_out;
 
         end
-        
-        % compare dFoverF and pSpike
-        function [hf, cell_metrics] = compareTraceTypes(obj)
-            % knobs
-            nbins = 30; % for deviation from linearity (applied to pSpike)
-                        % and avg transfer function curve (applied to dF)
-            ncellscatterplots = 3;
-            sort_bygroup = true;
-            
-            % init vars
-            nfish = numel(obj.traces);
-            hf = gobjects(9,1);
-            
-            % figure init
-            hf(1) = figure;
-            ncols = floor(sqrt(nfish))+1;
-            nrows = ncols-1;
-            
-            cell_metrics = cell(nfish, 1);
-            dF_all = [];
-            pSpike_all = [];
-            for i = 1:nfish
-                disp(['fish #',num2str(i)])
-                
-                traces = obj.traces{i};
-                dF = traces.format(traces.dFoverF_good);
-                pSpike = traces.format(traces.pSpike);
-            
-                [T,N] = size(dF);
-                disp([num2str(T),' timepoints, ',num2str(N),' cells.'])
-                
-                % pSpike vs dF for each cell 
-                cells_toplot = randi(N,ncellscatterplots,1);
-                polycoef = zeros(N,2);      % linear fit coefficients
-                deviations = zeros(N,1);    % 'deviation from linearity' (see Rupprecht et al. 2025)
-                ndatapoints = zeros(N,1);
-                normr = zeros(N,1); 
-                curves = zeros(nbins,N);
-                for i_cell = 1:N
-                    thisdF = dF(:,i_cell);
-                    thispSpike = pSpike(:,i_cell);
-            
-                    % clean up nan values
-                    to_rem = isnan(thisdF) | isnan(thispSpike);
-                    thisdF = thisdF(~to_rem);
-                    thispSpike = thispSpike(~to_rem);
-                    ndatapoints(i_cell) = length(thisdF);
-                    dF_all = [dF_all; thisdF];
-                    pSpike_all = [pSpike_all; thispSpike];
-            
-                    % linear fit
-                    [p,S] = polyfit(thisdF, thispSpike, 1);
-                    polycoef(i_cell,:) = p;
-            
-                    % (debug) plot single cell scatter
-                    % if ismember(i_cell,cells_toplot)
-                    %     figure; scatter(thisdF,thispSpike,4,'k','filled')
-                    %     axis square tight;
-                    %     x = xlim; y = polyval(p,x);
-                    %     hold on; line(x,y,'Color','r','LineWidth',1.5)
-                    %     xlabel('dFoverF'); ylabel('inferred SR')
-                    %     title(['cell #',num2str(i_cell)])
-                    % end
-                    
-                    % deviation from linearity
-                    thispSpike_linear = arrayfun(@(x) p(1)*x+p(2),thisdF);
-                    bin_edges = linspace(min(thispSpike),max(thispSpike),nbins+1);
-                    deviations_bins = zeros(nbins,1);
-                    for i_bin = 1:nbins
-                        % get average values in the bin
-                        idx = thispSpike>=bin_edges(i_bin) & thispSpike<=bin_edges(i_bin+1);
-                        binpSpike = mean(thispSpike(idx));
-                        binpSpike_linear = mean(thispSpike_linear(idx));
-                        
-                        % get deviation
-                        deviations_bins(i_bin) = (binpSpike - binpSpike_linear)^2 / (binpSpike_linear^2);
-                    end
-                    deviations(i_cell) = sqrt(mean(deviations_bins,'omitmissing'));
-            
-                    % norm of fit residuals
-                    normr(i_cell) = S.normr;
-            
-                    % avg transfer function curve
-                    bin_edges = linspace(min(dF,[],'all'),max(dF,[],'all'),nbins+1); % bins over all cells
-                    for i_bin = 1:nbins
-                        % get average value in the bin
-                        idx = thisdF>=bin_edges(i_bin) & thisdF<=bin_edges(i_bin+1);
-                        curves(i_bin,i_cell) = mean(thispSpike(idx));
+
+        function out = plotTopographicHead(obj, varargin)
+        % PLOTTOPOGRAPHICHEAD Topographic analysis of unit activity metrics.
+        %
+        %   out = plotTopographicHead(obj, 'method', 'selectivity of tuning', ...
+        %                                  'plotType', 'maps')
+        %
+        %   NAME-VALUE PAIR ARGUMENTS:
+        %       'method'           - activity metric (default: 'selectivity of tuning')
+        %       'plotType'         - 'maps' or 'stats' (default: 'maps')
+        %       'similarityMetric' - for 'stats' mode (default: 'correlation')
+        %       'nShuffles'        - for 'stats' mode (default: 1000)
+        %       'nBins'            - for 'stats' mode (default: 10)
+            arguments
+                obj
+            end
+            arguments (Repeating)
+                varargin
+            end
+
+            % Set default values
+            plotType = 'maps';
+            method = 'selectivity of tuning';
+            n_equals = 'cells';
+            extraArgs = {};
+
+            % Parse name-value pairs
+            if ~isempty(varargin)
+                for k = 1:2:length(varargin)
+                    switch lower(varargin{k})
+                        case 'method'
+                            method = varargin{k+1};
+                        case 'n_equals'
+                            n_equals = varargin{k+1};
+                        case 'plottype'
+                            plotType = varargin{k+1};
+                        case {'similaritymetric', 'nshuffles', 'nbins'}
+                            extraArgs = [extraArgs, varargin(k:k+1)]; %#ok<AGROW>
                     end
                 end
-            
-                % store single-cell metrics to table
-                slopes = polycoef(:,1);
-                intercepts = polycoef(:,2);
-                noise_level_PR = traces.dFnoise(traces.goodNeuron_IDs);
-                pxVariance_overtime = traces.format(traces.Fnoise(:,traces.goodNeuron_IDs,:));
-                pxVariance = mean(pxVariance_overtime,'omitmissing');
-                pxVariance = pxVariance(:);
-                cell_metrics{i} = table( ...
-                    ndatapoints, ...
-                    deviations, ...
-                    slopes, ...
-                    intercepts, ...
-                    normr, ...
-                    noise_level_PR, ...
-                    pxVariance);
-            
-                % transfer function plot
-                figure(hf(1));
-                subplot(nrows,ncols,i)
-                x = repmat(bin_edges(2:end),N,1)'; % [nbins,N]
-                plot(x,curves,'k')
-                axis square tight; box off
-                xlabel('dFoverF'); ylabel('inferred SR');
-                title(['fish #',num2str(i)])
             end
-            
-            % sort order of fish by group
-            [sorted_groups,idxbygroup] = sort(obj.subjectTab.group);
-            cell_metrics_sorted = cell_metrics(idxbygroup);
-            grouplabels = obj.subjectTab.group;
-            
-            % cell metrics boxplots
-            labels = cell_metrics{1}.Properties.VariableNames;
-            for i = 1:numel(labels)
-                thislabel = labels{i};
-                values = [];
-                for i_fish = 1:nfish
-                    thisvalues = cell_metrics_sorted{i_fish}.(thislabel);
-                    N = numel(thisvalues);
-                    values = [values; thisvalues repelem(i_fish,N,1)];
+
+            % initialize output
+            out = [];
+
+            % Isolating relevant data
+            [~, events, all_labs] = ModeSelector(obj).extract;
+            if all(cellfun(@isempty,events)); return; end
+
+            % useful metrics
+            nsubjects = numel(obj.filtered_traces);
+
+            % call low-level processor (compute per-unit metric)
+            all_metrics = cell(nsubjects, 1);
+            for i = 1:nsubjects
+                thisevents = events{i};
+                thislabs = all_labs{i};
+                if isempty(thislabs); continue; end
+
+                m = extractActivityMetric(thisevents, method, n_equals, ...
+                    'StimTypes', thislabs);
+                % reduce to [units x 1] if needed
+                if ~isvector(m)
+                    m = mean(m, 2:ndims(m), 'omitmissing');
                 end
-                hf(1+i) = figure;
-                boxplot(values(:,1),values(:,2),'PlotStyle','compact','Symbol','');
-                xticks(1:nfish); xticklabels(grouplabels);xtickangle(90)
-                title(thislabel)
-                box off
+                all_metrics{i} = m(:);
             end
-            
-            % heatmap of inferred SR vs dFoverF over all data
-            hf(9) = figure;
-            subplot(131); h(1)=histogram(dF_all,50);
-            xlabel('dFoverF'); axis square; box off
-            subplot(132); h(2)=histogram(pSpike_all,50);
-            xlabel('inferred SR'); axis square; box off
-            x1 = h(1).BinEdges(2:end); x2 = h(2).BinEdges(2:end);
-            vals1 = h(1).Values; vals2 = h(2).Values;
-            hmap = vals2' * vals1;
-            subplot(133); imagesc(x1,x2,log(hmap));
-            axis square
-            b = colorbar; b.Label.String = 'Log Density';
-            xlabel('dFoverF'); ylabel('inferred SR');
 
+            % get rid of empty data
+            idx = cellfun(@isempty, all_metrics);
+            all_metrics(idx) = [];
+            events(idx) = [];
+            traces = obj.filtered_traces;
+            traces(idx) = [];
+            if isempty(all_metrics); return; end
 
+            % call low-level plotter
+            out = plotTopographic(all_metrics, traces, plotType, ...
+                events, obj.plotConfig, extraArgs{:});
         end
+
+        %% complex and idiosyncratic high-level plotters are saved in external files
+
 
     end
 end

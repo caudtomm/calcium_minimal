@@ -50,7 +50,7 @@ plot(t,pcthr,'Color','r','LineStyle','--','LineWidth',1)
 xlim([t(1),t(end)])
 set(gcf, 'color', 'none');    
 set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w');
-legend({'shuffle','data','thres (2 STD)'},'Box','on','color','none','Location','best','EdgeColor','w','TextColor','w')
+legend({'shuffle','data','thres (2 STD)'},'Box','on','color','none','Location','best','EdgeColor','k','TextColor','k')
 ylabel('explained variance')
 xlabel('PC #')
 
@@ -169,8 +169,8 @@ idx = isnan(mean(new_score,2));
 new_score(idx,:) = [];
 
 [reduction, umap, clusterIdentifiers, extras]=run_umap(new_score, ...
-    'metric','euclidean', ...
-    'min_dist',.25, ... % .8 for cosine, .25 for euclidean
+    'metric','cosine', ...
+    'min_dist',.8, ... % .8 for cosine, .25 for euclidean
     'n_components',2, ...
     'n_neighbors', 199, ...
     'init','spectral');

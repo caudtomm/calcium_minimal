@@ -8,7 +8,8 @@ if numel(stims2use) == 1
     c = parula;
     c = c(floor(linspace(1,size(c,1),ntrials)),:);
 else
-    c = C(X,:);
+    % c = C(X,:);
+    c = parula;
 end
 
 scalefact = 500;
@@ -30,7 +31,7 @@ for i_trial = 1:size(y,3)
     if numel(stims2use) == 1
         hs.DisplayName = ['trial #', num2str(trialn2use(i_trial))];
     else
-        hs.DisplayName = stims{X(i_trial)};
+        % hs.DisplayName = stims{X(i_trial)};
     end
     hold on
 end

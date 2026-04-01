@@ -1,0 +1,16 @@
+name: manifolds
+channels: [conda-forge]
+dependencies:
+  - python=3.13
+  - numpy
+  - scipy
+  - h5py
+  - pandas
+  - tqdm
+  - jupyterlab
+  - ipykernel
+  - pip
+  - pip:
+      - mat73
+      - hdf5storage
+      - git+ssh://git@github.com/chung-neuroai-lab/gcmc.gitcd

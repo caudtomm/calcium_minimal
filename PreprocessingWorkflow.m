@@ -70,7 +70,7 @@ p = p.selectROIs; % manual input required
 p.sj = p.sj.setManually; % manual input required
 p.sj.save2mat(p.autosave);
 
-tracesfolder = 'traces\raw';
+tracesfolder = 'traces\manICliberal';
 p = p.extractCalciumTraces(tracesfolder,true);
 
 p = p.TracesQC; % manual input required
@@ -98,7 +98,7 @@ a.locations = a.locations.setDataFolder(datafolder);
 % load 'light' traces (without single px values)
 a = a.loadSubjectTraces;
 
-a.name = "odorexp004_manICconservative_070725";
+a.name = "odorexp004_manICliberal_080825";
 save(a.name,'a','-v7.3')
 
 %% output backward compatible experiment structure and save to file

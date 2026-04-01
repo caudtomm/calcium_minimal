@@ -6,25 +6,44 @@ classdef DataFilter
                                      % options : {'all','familiarized','trained'}
                                      % or {'group1','group2','groupN'}
 
-        % % # TODO : for now, screw all of this. I suspect that individual
-        % % function calls are sufficiently idiosyncratic that this actually
-        % % makes things more complex, not less.
-        % stimuli = {'all_stims'}      % options : {'all_trials','all_stims',
-        %                              % 'all CS+','all CS-','all familiar','all novel'} 
-        %                              % or {'stim1','stim2','stimN'};
-        % time_range double = [0 20]   % time range : [from stim_on, from stim_on] (sec)
-        % only_top_variant_units logical = false  % use only top variant units? 
-        % order_trials_by char = 'stim_type'      % options: 
-        %                                         % {'stim_type' : A-A-A-B-B-B-C-C-C ,
-        %                                         % 'trial_num' : A1-A2-B1-A3-B2-B3 ,
-        %                                         % 'relative_trial_num' : A1-A2-A3-B1-B2-B3}
-        % todo_reltrialnum double = [1:5]
-
         traceType char = 'dFoverF_good'     % trace type to select (e.g., 'dFoverF_good' or 'pSpike')
                                             % - match name of ActivityTraces property
+
+        interval double = [1 20] % peristimulus limits [sec]
+        trial_sorting char = 'stim_id' % trial sorting method, options: {'stim_id', 'chronological', 'relative_trial_num'}
+        repetitions double = [] % stimulus repetitions to use (empty = all)
+        stims_allowed = 'all stimuli' % list of allowed stimuli, type cell or char vector, see accepted inputs to getStimuliByGroup()
+        trial_nums double = [] % specific trial numbers to use (empty = all)
+
+        % behavior2p related properties
+        behavior2p_trace char = 'tail_motion_2p' % behavior2p trace type to select{'breathing_events', 'breathing_ipis', ...
+                            % 'breathing_inst_freq', 'tail_motion', 'breathing_inst_freq_2p', 'tail_motion_2p'}
+        
+        % mode selection (unused here, but passed on to ModeSelector)
+        mode_name char = 'native_units' % {'native_units', 'pca', 'nmf', 'dpca'}
+        mode_method char = 'mode_values' % {'mode_values', 'isolate', 'subtract'}
+        mode_OI = 'all' % modes of interest: {'all', 'stimulus', 'non-stimulus', 'novelty'}
+        mode_file char = ''; % if empty, extracts by default. Else, it looks for coefficients in the file specified.
+        mode_params = struct(); % specify manually as needed
     end
 
     methods (Static)
+        function [M, t] = retrieveTraceData(thistrace, traceType)
+            % Static method to retrieve trace data based on traceType
+            if isprop(thistrace, traceType)
+                M = thistrace.(traceType);
+                t = thistrace.t;
+            else
+                try
+                    [M,t] = thistrace.getBehavior2PTrace(traceType); % [t,trials]
+                    % permute so trials are in 3rd dimension
+                    M = permute(M, [1, 3, 2]); % [t,1,trials]
+                catch
+                    error('Trace type "%s" not found in ActivityTraces properties or as behavior2p trace', traceType);
+                end
+            end
+        end
+
         function groups_to_use = parseGroupTag(group)
             % Static method to parse a group tag string
             % Group names can be char vectors, strings or cell arrays of
@@ -125,17 +144,19 @@ classdef DataFilter
 
         %% getters
 
-        function ids = getSubjectIDs(obj, subjectTab) 
+        function [ids, match] = getSubjectIDs(obj, subjectTab) 
             % Return list of subject IDs based on filter criteria
+            allIDs = subjectTab.name;
             if ~isempty(obj.subjectIDs)
                 ids = obj.subjectIDs;
+                match = ismember(subjectTab.name, ids);
             elseif ~isempty(obj.subjectGroup) && ...
                     ismember('group', subjectTab.Properties.VariableNames)
-                allIDs = subjectTab.name;
                 match = ismember(subjectTab.group, obj.subjectGroup);
                 ids = allIDs(match);
             else
                 ids = subjectTab.name;
+                match = true(numel(ids),1);
             end
         end
 
@@ -151,6 +172,92 @@ classdef DataFilter
 
         function obj = set.subjectGroup(obj, group)
             obj.subjectGroup = obj.parseGroupTag(group);
+        end
+
+        %% filtering
+
+        function [events, labs] = filterData(obj, v)
+            arguments
+                obj (1,1) DataFilter
+                v (1,1) ExperimentViewer
+            end
+            
+            % extract properties to vars
+            traceType = obj.traceType; % trace type to select (e.g., 'dFoverF_good' or 'pSpike')
+            ps_lim = obj.interval; % peristimulus limits [sec]
+            reps_touse = obj.repetitions;
+            stim_allowed = obj.stims_allowed;
+            trial_sorting = obj.trial_sorting;
+            trial_nums = obj.trial_nums;
+
+            % Filter data based on the properties of this DataFilter object
+            nsubjects = numel(v.filtered_traces);
+            events = cell(nsubjects,1);
+            labs = cell(nsubjects,1);
+            for i = 1:nsubjects
+                thistrace = v.filtered_traces{i};
+
+                % Trial sorting
+                [~,trial_idx] = TraceViewer(thistrace).sortTrials(trial_sorting);
+
+                % Trial number filtering
+                if isempty(trial_nums); trial_nums = 1:numel(trial_idx); end
+                idx = ismember(trial_idx, trial_nums);
+                trial_idx = trial_idx(idx);
+
+                % get peri-stimulus data [t,N,trials]
+                M = obj.retrieveTraceData(thistrace, traceType);
+                if isempty(M); continue; end
+                M = M(:,:,trial_idx);
+                stim_on_frame = thistrace.stim_series.frame_onset(1);
+                fs = thistrace.framerate;
+                events{i} = TraceViewer.getPeriEventData(M,stim_on_frame,ps_lim,fs);
+
+                % Retrieve stimulus identity labels
+                labs{i} = thistrace.stim_series.stimulus(trial_idx);
+
+                % Stimulus filtering
+                thisgroup = thistrace.subject_group;
+                desired_stimuli = getStimuliByGroup(thisgroup,stim_allowed);
+                idx = ismember(labs{i}, desired_stimuli);
+                if ~isempty(desired_stimuli) && ~all(idx)
+                    % If some trials are not in the desired stimuli, filter them out
+                    events{i} = events{i}(:,:,idx);
+                    labs{i} = labs{i}(idx);
+                elseif isempty(desired_stimuli) || sum(idx)==0
+                    % If no stimuli are accepted, return empty arrays!
+                    events{i} = [];
+                    labs{i} = [];
+                    return
+                end
+
+                % Stimulus repetition filter
+                if isempty(reps_touse); continue; end % empty argument 'repetitions' leads to all repetitions being used
+                thisstims = unique(labs{i});
+                nstims = numel(thisstims);
+                idx_keep = false(1, numel(labs{i}));
+                for i_stim = 1:nstims
+                    idx_stim = find(ismember(labs{i}, thisstims{i_stim}));
+                    this_nreps = numel(idx_stim);
+                    % Select only allowed repetition indices
+                    reps_available = 1:this_nreps;
+                    reps_valid = reps_available(ismember(reps_available, reps_touse));
+                    if isempty(reps_valid)
+                        continue
+                    end
+                    idx_keep(idx_stim(reps_valid)) = true;
+                end
+                if ~all(idx_keep)
+                    % Filter events and labels to keep only desired repetitions
+                    events{i} = events{i}(:,:,idx_keep);
+                    labs{i} = labs{i}(idx_keep);
+                elseif sum(idx_keep)==0
+                    % If no trials are accepted, return without trying to
+                    % plot ... nothing!
+                    return
+                end
+            end
+
         end
 
         %% export

@@ -1,30 +1,63 @@
 function out = doDiscrimination(data, labs, varargin)
-% doDiscriminate performs classification on neural response data using a specified
-% classifier and cross-validation scheme, and optionally computes a shuffle baseline.
+% doDiscrimination performs block-based multiclass decoding of neural
+% population activity using a template-matching classifier, with optional
+% within-trial neuron shuffling to estimate a chance-level baseline.
 %
 % INPUTS:
-%   data      - double matrix of neural activity, with one of the following shapes:
-%                 [variables x trials]        (e.g., cells x trials)
-%                 [time x variables x trials] (will be averaged across time)
-%   labs      - cell array {trials x 1} of string labels, one per trial
+%   data  - numeric array of neural activity with one of the following shapes:
+%             [cells x trials]
+%             [time x cells x trials]
+%           If time is present, activity is averaged across the time dimension
+%           using mean(...,'omitmissing').
+%
+%   labs  - cell array [trials x 1] of trial labels. Label identity and
+%           repetition structure are inferred from order of appearance.
 %
 % NAME-VALUE PAIRS (optional):
-%   'method'          - similarity metric for classification (default: 'correlation')
-%   'trainblockmode'  - cross-validation scheme: 'single' or '3blocks' (default: 'single')
-%   'classifier'      - classification method: 'template_match' (default) or 'SVM' (not implemented)
-%   'nshuffles'       - number of shuffle iterations for significance testing (default: 50)
+%   'method'         - distance metric passed to pdist for template matching
+%                      (default: 'correlation')
+%
+%   'trainblockmode' - training block definition based on label repetitions:
+%                        'single'  : train on one repetition index
+%                        '3blocks' : train on sliding windows of three
+%                                    consecutive repetition indices
+%                      (default: 'single')
+%
+%   'classifier'     - decoding method. Currently supported:
+%                        'template_match' (default)
+%                        'lda'             - linear discriminant analysis
+%                        'qda'             - quadratic discriminant analysis
+%                        'dbd'             - direct basis decoder
+%                        'svm'             - support vector machine
+%
+%   'nshuffles'      - number of shuffle iterations for baseline estimation
+%                      (default: 50)
+%
+% CLASSIFICATION PROCEDURE:
+%   - Trials are grouped into repetition blocks separately for each label.
+%   - Training trials are selected based on repetition index; all remaining
+%     trials are used for testing.
+%   - For each class, a template is computed as the mean activity vector
+%     across its training trials.
+%   - Each trial is assigned the label of the nearest template according to
+%     the chosen distance metric.
+%
+% SHUFFLE BASELINE:
+%   - For each shuffle iteration, neuron identities are randomly permuted
+%     independently within each trial, preserving trial-wise activity
+%     distributions.
 %
 % OUTPUT:
-%   out - structure containing classification results:
-%       .input_labs               - original trial labels
-%       .train_trials             - [nTrials x nSets] logical matrix of training indices
-%       .test_trials              - [nTrials x nSets] logical matrix of testing indices
-%       .predicted_labs           - [nTrials x nSets] cell array of predicted labels
-%       .predicted_labs_SH        - [nTrials x nSets x nShuffles] cell array of shuffled predictions
-%       .prediction_iscorrect     - [nTrials x nSets] array of correctness (1=correct, 0=incorrect, NaN=missing)
-%       .prediction_iscorrect_SH  - [nTrials x nSets x nShuffles] array of shuffled correctness
-%       .prediction_confidence    - [nTrials x nSets] array of prediction confidence values
-%
+%   out - structure containing decoding results:
+%       .input_labs              - original trial labels
+%       .train_trials            - [nTrials x nSets] logical training mask
+%       .test_trials             - [nTrials x nSets] logical test mask
+%       .predicted_labs          - [nTrials x nSets] predicted labels
+%       .predicted_labs_SH       - [nTrials x nSets x nShuffles] shuffled predictions
+%       .prediction_iscorrect    - correctness matrix (1/0/NaN)
+%       .prediction_iscorrect_SH - shuffled correctness matrix
+%       .prediction_confidence   - relative distance margin between best and
+%                                  second-best template (not a probability)
 % Notes:
 % - Trials are grouped into repetition blocks based on label repetition order.
 % - Shuffle testing permutes the neuron identity independently for each trial.
@@ -41,6 +74,7 @@ method = 'correlation';
 trainblockmode = 'single';
 classifier = 'template_match'; % 'SVM' or 'template_match'
 nshuffles = 50;
+SEPARATE_TEST_SET = true; % whether to use training trials only for training, or all trials for testing
 
 % Parse name-value pairs
 if ~isempty(varargin)
@@ -54,6 +88,10 @@ if ~isempty(varargin)
                 classifier = varargin{k+1};
             case 'nshuffles'
                 nshuffles = varargin{k+1};
+            case 'separatetestset'
+                SEPARATE_TEST_SET = varargin{k+1};
+            otherwise
+                error('Unknown parameter name: %s', varargin{k});
         end
     end
 end
@@ -77,10 +115,18 @@ end
 
 repetitions = 1:max(label_repetitions);
 switch trainblockmode % # TODO : this should be adaptive to the num of repetitions of each label found in the data
+    case '2blocks'
+        trainblocksets = arrayfun(@(x) x:x+1, 1:repetitions(end)-1, 'UniformOutput', false);
     case '3blocks'
         trainblocksets = arrayfun(@(x) x:x+2, 1:repetitions(end)-2, 'UniformOutput', false);
     case 'single'
         trainblocksets = num2cell(repetitions);
+    case 'all'
+        trainblocksets = {1:repetitions(end)};
+        if SEPARATE_TEST_SET
+            disp('Warning: training on all repetitions leaves no test set. Train and test sets are now identical.');
+            SEPARATE_TEST_SET = false;
+        end
     otherwise
         error('specified training blocks mode is unknown')
 end
@@ -102,7 +148,11 @@ out.prediction_confidence = nan(ntrials,nsets);
 for i_set = 1:nsets
     % specify trial indices to train and test on
     trials_train = ismember(label_repetitions, trainblocksets{i_set});
-    trials_test = ~trials_train;
+    if SEPARATE_TEST_SET
+        trials_test = ~trials_train;
+    else
+        trials_test = true(size(trials_train));
+    end
 
     % correct labels for training and testing
     trainlabs = labs(trials_train);
@@ -122,13 +172,28 @@ for i_set = 1:nsets
         trainData = tmp(:,trials_train);
         testData = tmp(:,trials_test);
 
-        switch classifier
-            % case "SVM"
-                % [yfit, predictions] = fit_SVM(trainData',trainlabs,testData',stims);
+        try
+            % perform classification
+        switch lower(classifier)
+            case "svm"
+                res = fit_SVM(trainData',trainlabs,testData',stims);
             case "template_match"
                 res = template_matching(trainData', trainlabs, testData', stims, method);
+            case 'lda'
+                res = lindiscrim(trainData',trainlabs,testData',stims,'linear'); % needs multiple train-examples per class
+            case 'qda'
+                res = lindiscrim(trainData',trainlabs,testData',stims,'quadratic'); % needs multiple train-examples per class
+            case 'dbd'
+                res = dbd(trainData',trainlabs,testData',stims);
             otherwise
                 error('unknown classifier')
+        end
+        catch ME
+            warning('Classification failed: %s', ME.message);
+            res.predictions_trainData = cell(sum(trials_train),1);
+            res.predictions_testData  = cell(sum(trials_test),1);
+            res.confidence_trainData  = nan(sum(trials_train),1);
+            res.confidence_testData   = nan(sum(trials_test),1);
         end
 
         % combine predictions for training and testing trials into one cell
@@ -165,18 +230,39 @@ for i_set = 1:nsets
 end
 
 
-%[p,h,stats] = ranksum(totFractionCorrectLab(:,1),totFractionCorrectLab(:,end))
-% y = totFractionCorrectLab(:,end-2:end);
-% [p,h,stats] = ranksum(totFractionCorrectLab(:,1),y(:))
-
 end
 
 
 %% Functions
 
-function [yfit, predictions] = fit_SVM(trainData,trainlabs,testData,stims)
-    [svm, accuracy, predictions] = postpUtils.trainSVM(trainData,trainlabs,stims);
-    yfit = svm.predictFcn(testData);
+% function [yfit, predictions] = fit_SVM(trainData,trainlabs,testData,stims)
+%     [svm, accuracy, predictions] = trainSVM(trainData,trainlabs,stims);
+%     yfit = svm.predictFcn(testData);
+% end
+
+function out = fit_SVM(trainData, trainlabs, testData, stims)
+    % ensure categorical labels for ECOC
+    trainlabs_cat = categorical(trainlabs, stims);
+
+    svm = fitcecoc(trainData, trainlabs_cat, ...
+        'Coding','onevsall', ...
+        'Learners','linear', ...
+        'Verbose',0);
+
+    [pred_train, score_train] = predict(svm, trainData);
+    [pred_test,  score_test ] = predict(svm, testData);
+
+    out.predictions_trainData = cellstr(pred_train);
+    out.predictions_testData  = cellstr(pred_test);
+
+    out.confidence_trainData = scoreMargin(score_train);
+    out.confidence_testData  = scoreMargin(score_test);
+
+    function conf = scoreMargin(scores)
+        % scores: [nSamples x nClasses]
+        scores = sort(scores,2,'descend');
+        conf = (scores(:,1) - scores(:,2)) ./ abs(scores(:,1));
+    end
 end
 
 function out = template_matching(trainData, trainlabs, testData, stims, method)
@@ -218,5 +304,81 @@ function out = template_matching(trainData, trainlabs, testData, stims, method)
         predictions(existing_data) = template_labels(idx(existing_data,1));
         confidence(existing_data) = ...
             (distances(existing_data,2) - distances(existing_data,1)) ./ (distances(existing_data,2));
+    end
+end
+
+function out = train_RNN(trainData, trainlabs, testData, stims)
+    % Placeholder for future RNN implementation
+end
+
+function out = lindiscrim(trainData, trainlabs, testData, stims, discrimType)
+    trainlabs_cat = categorical(trainlabs, stims);
+    % Ensure there are multiple entries for each category in trainlabs (required for this classifier)
+    if any(histcounts(trainlabs_cat) < 2)
+        error('Each category must have at least two training set entries for lda/qda.');
+    end
+
+    switch discrimType
+        case 'linear'
+            gamma = 0;
+        case 'quadratic'
+            gamma = 1;
+        otherwise
+            error('unknown discrimType for lindiscrim')
+    end
+
+    try
+        lda = fitcdiscr(trainData, trainlabs_cat, ...
+            'DiscrimType',discrimType, ... % lda if 'linear', qda is 'quadratic'
+            'Gamma', gamma); 
+    catch
+        if strcmp(discrimType,'linear')
+            discrimType = 'pseudoLinear';
+            disp('LDA failed; switching to PseudoLinear.');
+        elseif strcmp(discrimType,'quadratic')
+            discrimType = 'pseudoQuadratic';
+            disp('QDA failed; switching to PseudoQuadratic.');
+        end
+        lda = fitcdiscr(trainData, trainlabs_cat, ...
+            'DiscrimType',discrimType, ... % lda if 'linear', qda is 'quadratic'
+            'Gamma', gamma); 
+    end
+
+    [pred_train, score_train] = predict(lda, trainData);
+    [pred_test,  score_test ] = predict(lda, testData);
+
+    out.predictions_trainData = cellstr(pred_train);
+    out.predictions_testData  = cellstr(pred_test);
+
+    out.confidence_trainData = scoreMargin(score_train);
+    out.confidence_testData  = scoreMargin(score_test);
+
+    function conf = scoreMargin(scores)
+        scores = sort(scores,2,'descend');
+        conf = (scores(:,1) - scores(:,2)) ./ abs(scores(:,1));
+    end
+end
+
+function out = dbd(trainData, trainlabs, testData, stims)
+    nstims = numel(stims);
+    nvars  = size(trainData,2);
+
+    bases = nan(nstims, nvars);
+    for i = 1:nstims
+        bases(i,:) = mean(trainData(ismember(trainlabs,stims{i}),:),1,'omitmissing');
+    end
+
+    [out.predictions_trainData, out.confidence_trainData] = ...
+        predictLabels(trainData, bases, stims);
+
+    [out.predictions_testData, out.confidence_testData] = ...
+        predictLabels(testData, bases, stims);
+
+    function [predictions, confidence] = predictLabels(data, bases, labels)
+        scores = data * bases'; % projection
+        [scores, idx] = sort(scores,2,'descend');
+
+        predictions = labels(idx(:,1));
+        confidence  = (scores(:,1) - scores(:,2)) ./ abs(scores(:,1));
     end
 end

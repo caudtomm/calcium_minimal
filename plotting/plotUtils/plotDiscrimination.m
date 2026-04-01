@@ -194,15 +194,14 @@ function out = performanceLines()
     if do_zscore; performance = nanzscore(performance,[],2); end
     jit = .1*randn(size(performance));
     x = repmat(1:nsets,[nsubjects,1]) + jit;
-    scatter(x, performance,30,cfg.axcol,'filled')
-    plot(x',performance','Color',cfg.axcol,'DisplayName','data')
+    % scatter(x, performance,30,cfg.axcol,'filled')
+    % plot(x',performance','Color',cfg.axcol,'DisplayName','data')
 
     %% average performance over subjects
     x = 1:nsets;
     y = mean(performance,'omitmissing');
-    line(x,y,'Color','r','LineWidth',5)
-    err = std(performance);
-    errorbar(y,err,'r');
+    err = std(performance,[],1,'omitmissing') ./ sqrt(sum(~isnan(performance),1)); % sem
+    errorbar(x,y,err,'LineStyle','-','Color','r','LineWidth',1,'CapSize',10);
 
     %% cosmetics
     u = legendUnq();

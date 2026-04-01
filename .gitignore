@@ -1,9 +1,12 @@
 # ignore temporary files
 *.swp
 *.asv
+CLAUDE.md
+settings.*
 
 # ignore folders
 /temporary/
 /.vscode/
+/.envs/
 /libraries/
 /executable/

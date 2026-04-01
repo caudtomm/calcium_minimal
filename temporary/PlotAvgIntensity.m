@@ -1,6 +1,6 @@
 %%
 baseline_tag = {'noodor', 'baseline', 'spont.'};
-this_group = {'naive';'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'};
+this_group = {'naïve';'naive';'trained1';'trained2';'trained1 (T-R-S-H-A-ACSF/L)';'uncoupled'};
 cat.traces = [];
 todo_fish = [];
 for i_fish = 1:numel(experiment.series)
@@ -97,7 +97,7 @@ end
 % end
 
 avg = nanmean(cat.traces(1:floor(4*fs/ds),:),[1,2])
-% avg = 0;
+avg = 0;
 %% plot avg dFoverF
 t = linspace(-4,40,size(cat.traces,1))
 y = nanmean(cat.traces,2)-avg;
@@ -118,7 +118,7 @@ set(gca, 'color', 'none', 'XColor','w', 'YColor','w', 'ZColor','w');
 set(gcf, 'color', 'none'); 
 
 l = legend('baseline','odor','pos.','neg.'); legend('boxoff')
-l.TextColor = 'w';
+l.TextColor = 'k';
 
 
 %% across trials
@@ -262,18 +262,19 @@ end
 % end
 
 avg = nanmean(cat.traces(1:floor(4*fs/ds),:),[1,2])
+avg = 0;
 
 %% plot avg dFoverF
 figure; hold on
 t = linspace(-4,40,size(cat.traces,1))
-bias = (numel(blocktrials_idx)-i_block)*.03;
+bias = (numel(blocktrials_idx)-i_block)*.05;
 y = nanmean(cat.traces,2)-avg + bias;
 curve1 = y + std(cat.traces,[],2,'omitnan'); curve2 = y - std(cat.traces,[],2,'omitnan');
 h = patch([t,fliplr(t)],[curve1; fliplr(curve2')'],'b','FaceAlpha',.3,'EdgeColor','none')
 h.Annotation.LegendInformation.IconDisplayStyle = 'off';
 plot(t,y, 'LineWidth', 5, 'Color', 'b')
-line([0,0],[-.01,.2],'Color','r','LineWidth',2,'LineStyle','--')
-line([20,20],[-.01,.2],'Color','r','LineWidth',2,'LineStyle','--')
+% line([0,0],[-.01,.2],'Color','r','LineWidth',2,'LineStyle','--')
+% line([20,20],[-.01,.2],'Color','r','LineWidth',2,'LineStyle','--')
 
 xlabel('time from stimulus onset [s]')
 %ylabel('mean dF/F')
