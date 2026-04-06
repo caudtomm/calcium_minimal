@@ -106,14 +106,21 @@ classdef BaselineDriftAnalysis
                 ax = nexttile(k);
                 g  = ex_glob(k);
                 si = s_idx(g);  ci = c_idx(g);
-                y  = double(B{si}(ci, :));   % [1 x T]
+                y  = double(B{si}(ci, :));   % [1 x T], may contain NaN  
                 T  = numel(y);
                 t  = (1:T)';
 
-                t_c   = t - mean(t);
-                y_c   = y(:) - mean(y, 'omitmissing');
-                slope = (y_c' * t_c) / sum(t_c .^ 2);
-                intrc = mean(y, 'omitmissing') - slope * mean(t);
+                % Use only valid trials — consistent with olsSlope                                                                                                                                                                 
+                valid = ~isnan(y(:));                                                                                                                                                                                              
+                if sum(valid) >= 2                                                                                                                                                                                                 
+                   t_v   = t(valid);  y_v = y(valid);                                                                                                                                                                             
+                   t_c_v = t_v - mean(t_v);                                                                                                                                                                                       
+                   slope = (y_v(:)' * t_c_v) / sum(t_c_v .^ 2);                                                                                                                                                                   
+                   intrc = mean(y_v) - slope * mean(t_v);                                                                                                                                                                         
+                else                                                                                                                                                                                                               
+                   slope = 0;                                                                                                                                                                                                     
+                   intrc = mean(y, 'omitmissing');                                                                                                                                                                                
+                end                                 
                 y_fit = intrc + slope .* t;
 
                 scatter(ax, t, y, 18, ex_col{k}, 'filled', ...
@@ -162,7 +169,8 @@ classdef BaselineDriftAnalysis
 
             imagesc(ax_heat, 1:max_T, 1:N_valid, Z);
             colormap(ax_heat, obj.v.plotConfig.colormapName);
-            c_rng = prctile(abs(Z(~isnan(Z))), 95);
+            finite_z = Z(isfinite(Z));
+            c_rng    = max(eps, prctile(abs(finite_z), 95));   % guard empty / zero     
             clim(ax_heat, [-c_rng, c_rng]);
             cb = colorbar(ax_heat);
             cb.Label.String = 'z-score';
@@ -176,6 +184,9 @@ classdef BaselineDriftAnalysis
                   'LineWidth', 1, 'Alpha', 0.8);
             yline(ax_heat, N_valid - n10, '--', 'Color', ex_col{1}, ...
                   'LineWidth', 1, 'Alpha', 0.8);
+
+            % Swap x and y axes
+            view([-90 90])
 
             %% -- Row 3a: mean drift trajectory (tiles 9-11) ------------
             ax_traj = nexttile(9, [1 3]);
@@ -231,8 +242,8 @@ classdef BaselineDriftAnalysis
             if any(strcmp('name', obj.v.subjectTab.Properties.VariableNames)) && ~isempty(obj.v.subjectTab.name)
                 subj_names = obj.v.subjectTab.name(keep);
             end
-            xticklabels(ax_subj, subj_names);
-            xtickangle(ax_subj, 45);
+            % xticklabels(ax_subj, subj_names); % annoyingly long names
+            % xtickangle(ax_subj, 45);
             box(ax_subj, 'off');
 
             % Pairwise Mann-Whitney with FDR
@@ -307,6 +318,10 @@ classdef BaselineDriftAnalysis
         %
         % Sign convention: u is flipped so that mean_proj >= 0
         % (i.e., the first PC points in the direction of average drift).
+        %
+        % Missing values: NaN trials are mean-imputed per cell before SVD.
+        % Cells with < 2 valid trials are zeroed out (no drift contribution)
+        % and receive NaN scores via sigma = NaN.
 
             n_subj = numel(B);
             scores = cell(n_subj, 1);
@@ -319,20 +334,23 @@ classdef BaselineDriftAnalysis
                 sigma = std(b, [], 2, 'omitmissing');
                 sigma = safeStd(sigma);
 
-                delta = diff(b, 1, 2); % [N x (T-1)]
+                % Impute NaN with per-cell mean so diff/SVD are well-defined.
+                % Cells with < 2 valid trials are zeroed (contribute no drift).
+                b_imp = imputeMean(b);
+                delta = diff(b_imp, 1, 2); % [N x (T-1)]
 
                 % First left singular vector = dominant displacement direction
                 [U, ~, ~] = svd(delta, 'econ');
                 u = U(:, 1);           % [N x 1], unit norm
 
                 % Align sign with average drift direction
-                mean_delta = mean(delta, 2, 'omitmissing');  % [N x 1]
+                mean_delta = mean(delta, 2);   % [N x 1], no NaN after imputation
                 if dot(u, mean_delta) < 0
                     u = -u;
                 end
 
                 % Average per-trial displacement along drift direction
-                mean_proj = mean(u' * delta, 'omitmissing'); % [activity / trial]
+                mean_proj = mean(u' * delta); % [activity / trial]
 
                 scores{i} = u .* mean_proj ./ sigma;
             end
@@ -350,27 +368,37 @@ classdef BaselineDriftAnalysis
         %   arch geodesic: SLERP on L2 sphere, with linearly-interpolated norm.
         %
         %   Score = arch_slope_n / sigma_n_observed  [sigma / trial]
+        %
+        %   Missing values: path is built only from cells with valid endpoints
+        %   (>= 2 non-NaN trials). Invalid cells receive NaN scores.
 
             n_subj = numel(B);
             scores = cell(n_subj, 1);
             for i = 1:n_subj
                 b = B{i};                      % [N x T]
+                N = size(b, 1);
                 T = size(b, 2);
                 sigma = std(b, [], 2, 'omitmissing');
                 sigma = safeStd(sigma);
 
-                [A, Bend] = linearEndpoints(b);
+                [A_all, Bend_all] = linearEndpoints(b);  % NaN for cells with < 2 valid
 
-                switch archType
-                    case 'geodesic'
-                        path = computeSlerpPath(A, Bend, T);
-                    case 'sum'
-                        path = computeSumPath(A, Bend, T);
+                % Build path only from cells with valid (finite) endpoints.
+                % A single NaN endpoint would corrupt norm/dot-product computations.
+                valid = isfinite(A_all);       % [N x 1]
+                arch_slope = nan(N, 1);
+
+                if any(valid)
+                    switch archType
+                        case 'geodesic'
+                            path_v = computeSlerpPath(A_all(valid), Bend_all(valid), T);
+                        case 'sum'
+                            path_v = computeSumPath(A_all(valid), Bend_all(valid), T);
+                    end
+                    arch_slope(valid) = olsSlope(path_v);  % path is complete, no NaN
                 end
 
-                % OLS slope of arch path vs trial index
-                arch_slope = olsSlope(path);   % [N x 1]
-                scores{i}  = arch_slope ./ sigma;
+                scores{i} = arch_slope ./ sigma;
             end
         end
 
@@ -379,7 +407,7 @@ end % classdef
 
 
 % ======================================================================
-% File-private helpers (outside classdef)
+% File-private helpers
 % ======================================================================
 
 function score = computeLinearScore(b)
@@ -393,23 +421,39 @@ end
 
 % ----------------------------------------------------------------------
 function slope = olsSlope(b)
-% Vectorised OLS slope of rows of b against trial index 1..T.
+% Vectorised NaN-aware OLS slope of rows of b against trial index 1..T.
 % b: [N x T].  Returns slope [N x 1].
-    T     = size(b, 2);
-    t     = (1:T)';
-    t_c   = t - mean(t);                      % centred trial index
-    b_c   = b - mean(b, 2, 'omitmissing');    % centred per cell
-    slope = (b_c * t_c) ./ sum(t_c .^ 2);    % [N x 1]
+% Each row uses only its own non-NaN columns; rows with < 2 valid trials
+% return NaN.
+    T      = size(b, 2);
+    t      = (1:T)';                          % [T x 1]
+    mask   = ~isnan(b);                       % [N x T]
+    T_n    = sum(mask, 2);                    % [N x 1] valid trial count
+
+    b_safe = b;  b_safe(~mask) = 0;           % replace NaN with 0 for dot products
+    t_mean = (mask * t)              ./ T_n;  % [N x 1] per-cell mean of valid t
+    b_mean = sum(b_safe .* mask, 2)  ./ T_n;  % [N x 1] per-cell mean of valid b
+
+    t_c  = (t' - t_mean) .* mask;             % [N x T] centred t, invalid zeroed
+    b_c  = (b_safe - b_mean) .* mask;         % [N x T] centred b, invalid zeroed
+
+    slope = sum(b_c .* t_c, 2) ./ sum(t_c .^ 2, 2);  % [N x 1]
+    slope(T_n < 2) = NaN;
 end
 
 % ----------------------------------------------------------------------
 function [A, Bend] = linearEndpoints(b)
-% Predicted baseline vectors at t=1 and t=T from OLS regression.
-% b: [N x T].  Returns A, Bend: [N x 1].
-    T         = size(b, 2);
-    t         = (1:T)';
-    slope     = olsSlope(b);                              % [N x 1]
-    intercept = mean(b, 2, 'omitmissing') - slope * mean(t);
+% Predicted baseline vectors at t=1 and t=T from NaN-aware OLS regression.
+% b: [N x T].  Returns A, Bend: [N x 1].  NaN for cells with < 2 valid trials.
+    T      = size(b, 2);
+    t      = (1:T)';
+    mask   = ~isnan(b);
+    T_n    = sum(mask, 2);
+    b_safe = b;  b_safe(~mask) = 0;
+    t_mean = (mask * t)              ./ T_n;   % [N x 1] per-cell mean of valid t
+    b_mean = sum(b_safe .* mask, 2)  ./ T_n;   % [N x 1]
+    slope  = olsSlope(b);                      % [N x 1], NaN for T_n < 2
+    intercept = b_mean - slope .* t_mean;
     A    = intercept + slope .* 1;
     Bend = intercept + slope .* T;
 end
@@ -480,6 +524,26 @@ function path = computeSumPath(A, Bend, T)
     dir_sums(bad) = 1;
 
     path = (dirs ./ dir_sums) .* frs;    % scale proportions back to activity
+end
+
+% ----------------------------------------------------------------------
+function b_imp = imputeMean(b)
+% Replace NaN entries with the per-row mean.
+% Rows with < 2 valid (non-NaN) trials are zeroed out entirely so they
+% contribute no drift signal to downstream SVD computations.
+    T_n   = sum(~isnan(b), 2);              % [N x 1]
+    b_imp = b;
+
+    % Zero out rows that have too few valid trials
+    b_imp(T_n < 2, :) = 0;
+
+    % Fill remaining NaN positions with the row mean
+    b_mean    = mean(b, 2, 'omitmissing');           % [N x 1]
+    fill      = isnan(b_imp) & (T_n >= 2);           % [N x T]
+    if any(fill(:))
+        fill_vals = repmat(b_mean, 1, size(b, 2));   % [N x T]
+        b_imp(fill) = fill_vals(fill);
+    end
 end
 
 % ----------------------------------------------------------------------
