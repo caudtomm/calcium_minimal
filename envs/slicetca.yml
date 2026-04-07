@@ -1,0 +1,17 @@
+name: slicetca
+channels:
+  - pytorch         # official PyTorch channel — handles CPU/CUDA builds
+  - conda-forge
+dependencies:
+  - python=3.11     # 3.11 is the widest-tested version against current torch builds
+  - pytorch
+  - cpuonly         # swap for pytorch-cuda=12.1 or pytorch-cuda=12.4 on GPU nodes
+  - numpy
+  - scipy
+  - h5py
+  - tqdm
+  - ipykernel       # for Jupyter use
+  - pip
+  - pip:
+      - mat73                                      # read MATLAB v7.3 / HDF5 .mat files
+      - git+https://github.com/arthur-pe/slicetca.git
