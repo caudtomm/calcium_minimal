@@ -40,7 +40,7 @@ import os
 import sys
 import traceback
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
 import scipy.io
@@ -206,7 +206,9 @@ def process_subject(mat_path: str, args: argparse.Namespace) -> str:
 
     # -- 1. Normalisation ----------------------------------------------------
     data_norm   = normalize_per_neuron(data_raw).astype(np.float32)
-    data_tensor = torch.from_numpy(data_norm)
+    device      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"  Device  : {device}")
+    data_tensor = torch.from_numpy(data_norm).to(device)
 
     # Shared kwargs forwarded to every decompose() call inside grid_search
     decompose_kwargs = dict(
@@ -347,6 +349,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
+
+    # 'fork' (Linux default) + CUDA = deadlock; force 'spawn' when parallelising
+    if args.processes_grid > 1 or args.processes_sample > 1:
+        torch.multiprocessing.set_start_method("spawn", force=True)
 
     if os.path.isfile(args.input_dir):
         input_files = [args.input_dir]
