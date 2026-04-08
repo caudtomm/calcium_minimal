@@ -23,13 +23,17 @@ Usage
 Component convention
 --------------------
 For input tensor shape (T=trials, N=neurons, S=time_bins), sliceTCA with
-number_components=[r0, r1, r2] produces:
+number_components=[r0, r1, r2] produces a 3-element list of partitions,
+each partition being a 2-element list [scores, weights]:
 
-    components[0][0]  shape (r0, N, S)  — trial-slice: r0 (neurons×time) matrices
-    components[1][0]  shape (r1, T, S)  — neuron-slice: r1 (trials×time) matrices
-    components[2][0]  shape (r2, T, N)  — time-slice:   r2 (trials×neurons) matrices
+    components[0][0]  shape (r0, T)     — trial-slice   scores  (one value per trial)
+    components[0][1]  shape (r0, N, S)  — trial-slice   weights (neurons×time pattern)
+    components[1][0]  shape (r1, N)     — neuron-slice  scores  (one value per neuron)
+    components[1][1]  shape (r1, T, S)  — neuron-slice  weights (trials×time pattern)
+    components[2][0]  shape (r2, S)     — time-slice    scores  (one value per time bin)
+    components[2][1]  shape (r2, T, N)  — time-slice    weights (trials×neurons pattern)
 
-Saved as components_0, components_1, components_2 in each output .mat file.
+Saved as components_{k}_scores and components_{k}_weights in each output .mat file.
 """
 
 from __future__ import annotations
@@ -289,16 +293,17 @@ def process_subject(mat_path: str, args: argparse.Namespace) -> str:
         "trial_labels"  : np.array(trial_labs) if trial_labs else np.zeros(0),
     }
 
-    # Components: components[k] is a list with one array of shape
-    #   k=0: (r0, N, S)  — trial-slice  (neurons×time pattern per component)
-    #   k=1: (r1, T, S)  — neuron-slice (trials×time  pattern per component)
-    #   k=2: (r2, T, N)  — time-slice   (trials×neurons pattern per component)
+    # Each partition k: [scores, weights]
+    #   k=0 trial-slice:  scores (r0,T)    weights (r0,N,S)
+    #   k=1 neuron-slice: scores (r1,N)    weights (r1,T,S)
+    #   k=2 time-slice:   scores (r2,S)    weights (r2,T,N)
     for k, comps_k in enumerate(components):
-        key = f"components_{k}"
-        if comps_k and len(comps_k) > 0:
-            results[key] = np.asarray(comps_k[0], dtype=np.float32)
+        if comps_k and len(comps_k) >= 2:
+            results[f"components_{k}_scores"]  = np.asarray(comps_k[0], dtype=np.float32)
+            results[f"components_{k}_weights"] = np.asarray(comps_k[1], dtype=np.float32)
         else:
-            results[key] = np.zeros(0, dtype=np.float32)
+            results[f"components_{k}_scores"]  = np.zeros(0, dtype=np.float32)
+            results[f"components_{k}_weights"] = np.zeros(0, dtype=np.float32)
 
     scipy.io.savemat(out_path, results)
     print(f"  Result → {out_path}")
