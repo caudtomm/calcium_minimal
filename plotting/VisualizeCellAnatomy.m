@@ -174,7 +174,7 @@ classdef VisualizeCellAnatomy
                 end
 
                 %% dF/F mean images per trial -----------------------------
-                try
+                % try
                     [r1, r2, c1, c2, roi_mask_dff_r, roi_lbl_dff] = eca.getCropBounds();
                     t_idx_dff = trial_idx_by_subj{si};
                     n_t       = numel(t_idx_dff);
@@ -194,11 +194,11 @@ classdef VisualizeCellAnatomy
                     dff_stacks{r}    = dff_imgs;
                     roi_masks_dff{r} = roi_mask_dff_r;
                     if isnan(roi_ids(r)); roi_ids(r) = roi_lbl_dff; end
-                catch ME
-                    fprintf('failed\n');
-                    warning('VisualizeCellAnatomy:dffFailed', ...
-                        'Could not extract dF/F images for row %d: %s', r, ME.message);
-                end
+                % catch ME
+                %     fprintf('failed\n');
+                %     warning('VisualizeCellAnatomy:dffFailed', ...
+                %         'Could not extract dF/F images for row %d: %s', r, ME.message);
+                % end
             end
 
             %% -- Build figures --------------------------------------------
@@ -490,7 +490,8 @@ function frame_interval = computeFrameInterval(traces, trial_num, interval_sec)
 %   trial_num is used as a row index into stim_series (clamped to valid range).
     fs            = traces.framerate;
     row           = min(trial_num, height(traces.stim_series));
-    stim_onset_fr = traces.stim_series.frame_onset(row) + round(traces.odor_delay * fs);
+    delay = traces.odor_delay; if isempty(delay); delay = 0; end
+    stim_onset_fr = traces.stim_series.frame_onset(row) + round(delay * fs);
     fr_start      = stim_onset_fr + round(interval_sec(1) * fs);
     fr_end        = stim_onset_fr + round(interval_sec(2) * fs);
     frame_interval = fr_start : fr_end;
