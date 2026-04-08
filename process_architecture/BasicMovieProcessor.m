@@ -9,6 +9,7 @@ classdef BasicMovieProcessor < MovieProcessing
 %   - 'movmean'
 %   - 'downsamplet'
 %   - 'gauss_blur2d'
+%   - 'dff'
 %
     
     properties (SetAccess = private)
@@ -54,6 +55,9 @@ classdef BasicMovieProcessor < MovieProcessing
                 case 'subtract_px_baseline'
                     [movie, obj.operation.baseline] = ...
                         subtract_px_baseline(obj.data_raw);
+
+                case 'dff'
+                    [movie, obj.operation] = compute_dff(obj.data_raw);
 
                 case 'remove_badperiods'
                     [movie, obj.operation.periods_removed] = ...
@@ -357,4 +361,20 @@ end
 % store to results
 movie_result.stack = movie;
 
+end
+
+function [movie_dff, operation] = compute_dff(data_raw)
+% compute_dff  Per-pixel dF/F: F0 = 10th-percentile over time.
+% Frames with missing mean intensity are dropped from the output.
+arguments
+    data_raw Movie
+end
+stack  = data_raw.stack;
+avgval = squeeze(mean(stack, [1,2], 'omitmissing'));
+F0     = quantile(stack, .1, 3);
+valid  = ~ismissing(avgval);
+movie_dff       = data_raw;
+movie_dff.stack = (stack(:,:,valid) - F0) ./ F0;
+operation.F0           = F0;
+operation.valid_frames = valid;
 end

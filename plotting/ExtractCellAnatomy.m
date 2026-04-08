@@ -48,6 +48,70 @@ classdef ExtractCellAnatomy
             obj.neighborhood = options.neighborhood;
         end
 
+        function snip = loadTrialMovieSnippet(obj, trial_num, pre_interval)
+        % loadTrialMovieSnippet  Load a full trial movie, compute dF/F, return a Snippet.
+        %
+        %   snip = loadTrialMovieSnippet(trial_num, pre_interval)
+        %
+        %   trial_num     scalar double  — 1-based trial number
+        %   pre_interval  double array   — frame indices passed to Snippet
+        %
+        %   Returns [] if the movie file is not found or traces_src is unset.
+
+            snip = [];
+
+            loc   = obj.traces.subject_locations;
+            fpath = fullfiletol(loc.subject_datapath, loc.traces_src);
+            fname = [loc.subject_ID, '_', num2str(trial_num, '%05d'), '_*'];
+            files = dir(fullfiletol(fpath, fname));
+
+            if isempty(files)
+                warning('ExtractCellAnatomy:movieNotFound', ...
+                    'No movie file found for trial %d:\n  %s', trial_num, ...
+                    fullfiletol(fpath, fname));
+                return
+            end
+
+            raw_movie = robust_io('load', ...
+                fullfiletol(files(1).folder, files(1).name), 'movie').movie;
+            proc = BasicMovieProcessor('dff', raw_movie);
+            evalc('proc = proc.run();');   % suppress per-call console noise
+            dff = proc.data_processed;
+
+            % Clamp pre_interval to valid frame range
+            valid_fr = pre_interval(pre_interval >= 1 & pre_interval <= dff.nfr);
+            if isempty(valid_fr)
+                warning('ExtractCellAnatomy:intervalOutOfRange', ...
+                    'Frame interval [%d %d] out of movie range [1 %d] for trial %d.', ...
+                    pre_interval(1), pre_interval(end), dff.nfr, trial_num);
+                return
+            end
+            snip = Snippet(dff, valid_fr);
+        end
+
+        function [r1, r2, c1, c2, roi_mask, roi_label] = getCropBounds(obj)
+        % getCropBounds  Bounding box around the ROI in full-frame coordinates.
+        %
+        %   [r1, r2, c1, c2, roi_mask, roi_label] = getCropBounds()
+        %
+        %   Uses traces.ROImap directly — no fish1.mat loading needed.
+
+            if obj.cell_idx > numel(obj.traces.goodNeuron_IDs)
+                error('ExtractCellAnatomy:cellIdxOutOfRange', ...
+                    'cell_idx=%d exceeds goodNeuron_IDs length (%d).', ...
+                    obj.cell_idx, numel(obj.traces.goodNeuron_IDs));
+            end
+            roi_label     = obj.traces.goodNeuron_IDs(obj.cell_idx);
+            roi_mask_full = (obj.traces.ROImap == roi_label);
+            if ~any(roi_mask_full(:))
+                error('ExtractCellAnatomy:roiNotFound', ...
+                    'ROI label %d (cell_idx=%d) not found in ROImap.', ...
+                    roi_label, obj.cell_idx);
+            end
+            [H, W] = size(obj.traces.ROImap);
+            [r1, r2, c1, c2, roi_mask] = obj.computeCropBounds(roi_mask_full, H, W);
+        end
+
         function [anat_imgs, lcorr_imgs, roi_mask, roi_label] = getCroppedStack(obj)
         % getCroppedStack  Load Subject, crop anatomy and localcorr stacks.
         %

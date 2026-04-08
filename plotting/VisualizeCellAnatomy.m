@@ -12,8 +12,8 @@ classdef VisualizeCellAnatomy
 %       vca = VisualizeCellAnatomy(v);
 %       vca.n_cells = 5;            % optional — default 5
 %       vca.neighborhood = 25;      % optional — default 20 px
-%       [hf_a, hf_lc, hf_s, anat, lcorr, tbl] = vca.plot(scores);
-%       [hf_a, hf_lc, hf_s, anat, lcorr, tbl] = vca.plot();   % random cells
+%       [hf_a, hf_lc, hf_dff, hf_s, anat, lcorr, dff, tbl] = vca.plot(scores);
+%       [hf_a, hf_lc, hf_dff, hf_s, anat, lcorr, dff, tbl] = vca.plot();   % random cells
 %
 %   scores must be the {n_filtered_subjects} cell of [N_cells x 1] doubles
 %   returned by BaselineDriftAnalysis.getContributionScores, using the same
@@ -22,9 +22,11 @@ classdef VisualizeCellAnatomy
 %   Outputs:
 %       hf_anat    figure handle — anatomy images
 %       hf_lcorr   figure handle — local correlation maps
+%       hf_dff     figure handle — trial-averaged dF/F images (v.dataFilter.interval)
 %       hf_scores  figure handle — regression lines + score distribution
 %       anat_stacks  {n_rows} cell of [H_c x W_c x T_filtered]
 %       lcorr_stacks {n_rows} cell of [H_c x W_c x T_filtered] ([] per row if unavailable)
+%       dff_stacks   {n_rows} cell of [H_c x W_c x T_filtered] ([] per row if unavailable)
 %       tbl        table with variables:
 %                    row           figure row number
 %                    subject_name  subject identifier string
@@ -48,7 +50,7 @@ classdef VisualizeCellAnatomy
         end
 
         % ------------------------------------------------------------------
-        function [hf_anat, hf_lcorr, hf_scores, anat_stacks, lcorr_stacks, tbl] = plot(obj, scores)
+        function [hf_anat, hf_lcorr, hf_dff, hf_scores, anat_stacks, lcorr_stacks, dff_stacks, tbl] = plot(obj, scores)
         % plot  Main entry point.
         %
         %   [hf_anat, hf_lcorr, hf_scores, anat_stacks, lcorr_stacks, tbl] = plot()
@@ -126,50 +128,93 @@ classdef VisualizeCellAnatomy
                     'No trials pass the current DataFilter settings.');
             end
 
-            %% -- Extract anatomy for each selected cell -------------------
+            %% -- Extract anatomy and dF/F for each selected cell ----------
             subj_names = buildSubjectNames(obj.v, n_subj);
 
-            anat_stacks  = cell(n_rows, 1);
-            lcorr_stacks = cell(n_rows, 1);
-            roi_masks    = cell(n_rows, 1);
-            roi_ids      = nan(n_rows, 1);
-            score_vals   = nan(n_rows, 1);
+            anat_stacks   = cell(n_rows, 1);
+            lcorr_stacks  = cell(n_rows, 1);
+            dff_stacks    = cell(n_rows, 1);
+            roi_masks     = cell(n_rows, 1);
+            roi_masks_dff = cell(n_rows, 1);
+            roi_ids       = nan(n_rows, 1);
+            score_vals    = nan(n_rows, 1);
+            interval_sec  = obj.v.dataFilter.interval;
 
             for r = 1:n_rows
                 pos = sel_pos(r);
                 si  = s_idx_vec(pos);
                 ci  = c_idx_vec(pos);
 
+                fprintf('\n[%d/%d] %s — cell %d\n', r, n_rows, subj_names{si}, ci);
+
                 eca = ExtractCellAnatomy(traces_list{si}, ci, ...
                                          'neighborhood', obj.neighborhood);
+
+                fprintf('  loading anatomy...');
                 [anat_full, lcorr_full, roi_mask, roi_label] = eca.getCroppedStack();
 
                 score_vals(r) = all_s(pos);
 
-                if isempty(anat_full)
-                    % fish1.mat missing or anatomy_imgs empty — row stays blank
-                    continue
+                %% Anatomy + localcorr ------------------------------------
+                if ~isempty(anat_full)
+                    fprintf(' %d trials\n', size(anat_full, 3));
+                    t_idx = trial_idx_by_subj{si};
+                    t_idx = t_idx(t_idx <= size(anat_full, 3));
+
+                    anat_stacks{r}  = anat_full(:, :, t_idx);
+                    roi_masks{r}    = roi_mask;
+                    roi_ids(r)      = roi_label;
+
+                    if ~isempty(lcorr_full)
+                        t_idx_lc        = t_idx(t_idx <= size(lcorr_full, 3));
+                        lcorr_stacks{r} = lcorr_full(:, :, t_idx_lc);
+                    end
+                else
+                    fprintf(' unavailable\n');
                 end
 
-                % Filter to trial indices passing the DataFilter, clamped to
-                % anatomy stack depth (guards ntrials mismatch)
-                t_idx = trial_idx_by_subj{si};
-                t_idx = t_idx(t_idx <= size(anat_full, 3));
-
-                anat_stacks{r}  = anat_full(:, :, t_idx);
-                roi_masks{r}    = roi_mask;
-                roi_ids(r)      = roi_label;
-
-                if ~isempty(lcorr_full)
-                    t_idx_lc        = t_idx(t_idx <= size(lcorr_full, 3));
-                    lcorr_stacks{r} = lcorr_full(:, :, t_idx_lc);
+                %% dF/F mean images per trial -----------------------------
+                try
+                    [r1, r2, c1, c2, roi_mask_dff_r, roi_lbl_dff] = eca.getCropBounds();
+                    t_idx_dff = trial_idx_by_subj{si};
+                    n_t       = numel(t_idx_dff);
+                    dff_imgs  = nan(r2-r1+1, c2-c1+1, n_t);
+                    fprintf('  loading dF/F (%d trials): ', n_t);
+                    for j = 1:n_t
+                        fprintf('%d ', t_idx_dff(j));
+                        fr_int = computeFrameInterval( ...
+                            traces_list{si}, t_idx_dff(j), interval_sec);
+                        snip = eca.loadTrialMovieSnippet(t_idx_dff(j), fr_int);
+                        if ~isempty(snip) && ~isempty(snip.stack)
+                            full_mean       = mean(snip.stack, 3, 'omitmissing');
+                            dff_imgs(:,:,j) = full_mean(r1:r2, c1:c2);
+                        end
+                    end
+                    fprintf('done\n');
+                    dff_stacks{r}    = dff_imgs;
+                    roi_masks_dff{r} = roi_mask_dff_r;
+                    if isnan(roi_ids(r)); roi_ids(r) = roi_lbl_dff; end
+                catch ME
+                    fprintf('failed\n');
+                    warning('VisualizeCellAnatomy:dffFailed', ...
+                        'Could not extract dF/F images for row %d: %s', r, ME.message);
                 end
             end
 
             %% -- Build figures --------------------------------------------
-            hf_anat   = obj.buildFigure(anat_stacks,  roi_masks, max_T, 'Anatomy');
-            hf_lcorr  = obj.buildFigure(lcorr_stacks, roi_masks, max_T, 'Local correlation');
+            fprintf('\nBuilding figures...\n');
+            fprintf('  anatomy...'); drawnow;
+            hf_anat   = obj.buildFigure(anat_stacks,  roi_masks,     max_T, 'Anatomy');
+            fprintf(' done\n');
+            fprintf('  local correlation...'); drawnow;
+            hf_lcorr  = obj.buildFigure(lcorr_stacks, roi_masks,     max_T, 'Local correlation');
+            fprintf(' done\n');
+            fprintf('  dF/F mean...'); drawnow;
+            hf_dff    = obj.buildFigure(dff_stacks,   roi_masks_dff, max_T, 'dF/F mean');
+            fprintf(' done\n');
+            fprintf('  score summary...'); drawnow;
             hf_scores = obj.buildScoreFigure(n, sel_pos, all_s, s_idx_vec, c_idx_vec, have_scores);
+            fprintf(' done\n');
 
             %% -- Output table ---------------------------------------------
             row_nums  = (1:n_rows)';
@@ -433,6 +478,22 @@ function plotRegression(ax, y, color, row_num, score_val)
     end
     axis(ax, 'tight');
     box(ax, 'off');
+end
+
+% ======================================================================
+
+function frame_interval = computeFrameInterval(traces, trial_num, interval_sec)
+% computeFrameInterval  Convert a [t_start, t_end] interval (seconds relative
+%   to effective stimulus onset) into movie frame indices.
+%
+%   Effective stimulus onset = stim_series.frame_onset + odor_delay * fs.
+%   trial_num is used as a row index into stim_series (clamped to valid range).
+    fs            = traces.framerate;
+    row           = min(trial_num, height(traces.stim_series));
+    stim_onset_fr = traces.stim_series.frame_onset(row) + round(traces.odor_delay * fs);
+    fr_start      = stim_onset_fr + round(interval_sec(1) * fs);
+    fr_end        = stim_onset_fr + round(interval_sec(2) * fs);
+    frame_interval = fr_start : fr_end;
 end
 
 % ======================================================================
