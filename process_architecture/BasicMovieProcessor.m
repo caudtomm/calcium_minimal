@@ -372,9 +372,11 @@ end
 stack  = data_raw.stack;
 avgval = squeeze(mean(stack, [1,2], 'omitmissing'));
 F0     = quantile(stack, .1, 3);
+minF0val = min(F0,[],"all",'omitmissing');
+F0 = F0-minF0val; stack = stack-minF0val;
 valid  = ~ismissing(avgval);
 movie_dff       = data_raw;
-movie_dff.stack = (stack(:,:,valid) - F0) ./ F0;
+movie_dff.stack = (stack(:,:,valid) - F0) ./ (F0+1);
 operation.F0           = F0;
 operation.valid_frames = valid;
 end

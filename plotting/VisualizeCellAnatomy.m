@@ -1,10 +1,15 @@
 classdef VisualizeCellAnatomy
 % VisualizeCellAnatomy  Visualize per-trial anatomy for top/bottom scored cells.
 %
-%   Picks n_cells from the top and n_cells from the bottom of a pre-computed
+%   Picks n_cells randomly from the upper and lower tails of a pre-computed
 %   score distribution and plots, for each cell, its cropped anatomy image
 %   with ROI boundary overlay across all filter-passing trials.
-%   If scores are omitted the cells are picked at random.
+%   If scores are omitted the cells are picked uniformly at random.
+%
+%   The 'quant' argument controls the tail size: quant=0.8 means the upper
+%   pool is cells with score >= 80th percentile, and the lower pool is cells
+%   with score <= 20th percentile.  Within each pool cells are drawn
+%   uniformly at random (no score bias).
 %
 %   Three figures are produced: anatomy_imgs, localcorr_imgs, and score summary.
 %
@@ -12,8 +17,9 @@ classdef VisualizeCellAnatomy
 %       vca = VisualizeCellAnatomy(v);
 %       vca.n_cells = 5;            % optional — default 5
 %       vca.neighborhood = 25;      % optional — default 20 px
-%       [hf_a, hf_lc, hf_dff, hf_s, anat, lcorr, dff, tbl] = vca.plot(scores);
-%       [hf_a, hf_lc, hf_dff, hf_s, anat, lcorr, dff, tbl] = vca.plot();   % random cells
+%       [hf_a, hf_lc, hf_dff, hf_s, anat, lcorr, dff, tbl] = vca.plot(scores);        % quant=0.8
+%       [hf_a, hf_lc, hf_dff, hf_s, anat, lcorr, dff, tbl] = vca.plot(scores, 0.9);   % custom quant
+%       [hf_a, hf_lc, hf_dff, hf_s, anat, lcorr, dff, tbl] = vca.plot();              % random cells
 %
 %   scores must be the {n_filtered_subjects} cell of [N_cells x 1] doubles
 %   returned by BaselineDriftAnalysis.getContributionScores, using the same
@@ -50,14 +56,20 @@ classdef VisualizeCellAnatomy
         end
 
         % ------------------------------------------------------------------
-        function [hf_anat, hf_lcorr, hf_dff, hf_scores, anat_stacks, lcorr_stacks, dff_stacks, tbl] = plot(obj, scores)
+        function [hf_anat, hf_lcorr, hf_dff, hf_scores, anat_stacks, lcorr_stacks, dff_stacks, tbl] = plot(obj, scores, quant)
         % plot  Main entry point.
         %
         %   [hf_anat, hf_lcorr, hf_scores, anat_stacks, lcorr_stacks, tbl] = plot()
         %   [hf_anat, hf_lcorr, hf_scores, anat_stacks, lcorr_stacks, tbl] = plot(scores)
+        %   [hf_anat, hf_lcorr, hf_scores, anat_stacks, lcorr_stacks, tbl] = plot(scores, quant)
+        %
+        %   quant  scalar in [0,1]: cells are drawn randomly from scores >=
+        %          quantile(scores, quant) and scores <= quantile(scores, 1-quant).
+        %          Default 0.8.  Ignored when scores is empty.
             arguments
                 obj    VisualizeCellAnatomy
                 scores = {}
+                quant  (1,1) double {mustBeInRange(quant, 0, 1)} = 0.8
             end
             have_scores = ~isempty(scores) && iscell(scores);
 
@@ -92,20 +104,27 @@ classdef VisualizeCellAnatomy
             c_idx_vec = c_idx_vec(valid);
 
             N_total = numel(all_s);
-            n = min(obj.n_cells, floor(N_total / 2));
-            if n == 0
-                error('VisualizeCellAnatomy:notEnoughCells', ...
-                    'Need at least 2 valid cells to visualise; found %d.', N_total);
-            end
 
             %% -- Select cells ---------------------------------------------
             if have_scores
-                [~, sort_ord] = sort(all_s);
-                % top n: highest scores, shown in descending order (row 1 = highest)
-                top_pos = flipud(sort_ord(end - n + 1 : end));
-                % bottom n: lowest scores, shown in ascending order (row n+1 = most negative)
-                bot_pos = sort_ord(1 : n);
+                q_hi    = quantile(all_s, quant);
+                q_lo    = quantile(all_s, 1 - quant);
+                pool_hi = find(all_s >= q_hi);
+                pool_lo = find(all_s <= q_lo);
+                n = min(obj.n_cells, min(numel(pool_hi), numel(pool_lo)));
+                if n == 0
+                    error('VisualizeCellAnatomy:notEnoughCells', ...
+                        'No cells found in the %.0f%% quantile pool; lower quant or provide more cells.', ...
+                        quant * 100);
+                end
+                top_pos = pool_hi(randperm(numel(pool_hi), n));
+                bot_pos = pool_lo(randperm(numel(pool_lo), n));
             else
+                n = min(obj.n_cells, floor(N_total / 2));
+                if n == 0
+                    error('VisualizeCellAnatomy:notEnoughCells', ...
+                        'Need at least 2 valid cells to visualise; found %d.', N_total);
+                end
                 perm    = randperm(N_total, 2 * n);
                 top_pos = perm(1:n)';
                 bot_pos = perm(n+1:end)';
@@ -174,7 +193,7 @@ classdef VisualizeCellAnatomy
                 end
 
                 %% dF/F mean images per trial -----------------------------
-                % try
+                try
                     [r1, r2, c1, c2, roi_mask_dff_r, roi_lbl_dff] = eca.getCropBounds();
                     t_idx_dff = trial_idx_by_subj{si};
                     n_t       = numel(t_idx_dff);
@@ -194,11 +213,11 @@ classdef VisualizeCellAnatomy
                     dff_stacks{r}    = dff_imgs;
                     roi_masks_dff{r} = roi_mask_dff_r;
                     if isnan(roi_ids(r)); roi_ids(r) = roi_lbl_dff; end
-                % catch ME
-                %     fprintf('failed\n');
-                %     warning('VisualizeCellAnatomy:dffFailed', ...
-                %         'Could not extract dF/F images for row %d: %s', r, ME.message);
-                % end
+                catch ME
+                    fprintf('failed\n');
+                    warning('VisualizeCellAnatomy:dffFailed', ...
+                        'Could not extract dF/F images for row %d: %s', r, ME.message);
+                end
             end
 
             %% -- Build figures --------------------------------------------
