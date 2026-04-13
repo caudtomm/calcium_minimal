@@ -82,10 +82,11 @@ cfg.saveFigure(gcf,'allgroups PC variance explained', saveType)
 
 %% plot PCA lines
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'all';
+v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.stims_allowed = 'all stimuli';
-v.dataFilter.interval = [.5, 20];
+v.dataFilter.interval = [-22, -2];
 v.dataFilter.repetitions = 1:5;
+cfg.useNatureColors = true;
 
 [~,events,labs] = ModeSelector(v).extract;
 proj = computeLDE(events,labs,'pooldata',true,'nans2zeros',true, 'method','pca');
@@ -95,14 +96,14 @@ legend off
 cfg.setLines = false;
 cfg.figSize = 'small';
 cfg.setFigure;
-cfg.saveFigure(gcf,'allgroups PCA 2d raw', saveType)
+cfg.saveFigure(gcf,'trained baseline PCA 2d raw', saveType)
 
 
 %% plot UMAP lines
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'all';
 v.dataFilter.stims_allowed = 'all stimuli';
-v.dataFilter.interval = [1, 20];
+v.dataFilter.interval = [-22, -2];
 v.dataFilter.repetitions = 1:5;
 
 % v.dataFilter.mode_name = 'dpca';
@@ -128,7 +129,7 @@ legend off
 cfg.setLines = false;
 cfg.figSize = 'small';
 cfg.setFigure;
-cfg.saveFigure(gcf,'allgroups UMAP 2d raw', saveType)
+cfg.saveFigure(gcf,'trained baseline UMAP 2d raw', saveType)
 
 
 %%
