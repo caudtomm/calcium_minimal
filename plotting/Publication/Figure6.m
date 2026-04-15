@@ -41,27 +41,27 @@ dft = v.dataFilter;
 %% FIGURE 6
 
 %% stimulus dPCs except #1
-grouptag = 'trained';
+grouptag = 'naive';
 
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'stimulus';
 v.dataFilter.mode_method = 'subtract';
-v.dataFilter.subjectGroup = 'trained';
-v.dataFilter.mode_file = ['dpca_',grouptag,'.mat'];
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = ['dpca_',grouptag,'_BS.mat'];
 hf = figure;
 outMat_dn = v.plotDistancesHead;
 title([]); xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
 cfg.figSize = 'large';
 cfg.aspRatioType = 'square';
 cfg.setFigure;
-cfg.saveFigure(gcf,[grouptag,' identity subtract intertrial corr'], saveType)
+cfg.saveFigure(gcf,[grouptag,' identity BS subtract intertrial corr'], saveType)
 hf = figure;
 outMat_dn = v.plotDistancesHead('plotType','repetitions');
 title([]); xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
 cfg.figSize = 'medium';
 cfg.setFigure;
-cfg.saveFigure(gcf,[grouptag,' identity subtract intertrial corr repetitions'], saveType)
+cfg.saveFigure(gcf,[grouptag,' identity BS subtract intertrial corr repetitions'], saveType)
 
 v.dataFilter.mode_method = 'isolate';
 hf = figure;
@@ -70,13 +70,13 @@ title([]); xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
 cfg.figSize = 'large';
 cfg.aspRatioType = 'square';
 cfg.setFigure;
-cfg.saveFigure(gcf,[grouptag,' identity isolate intertrial corr'], saveType)
+cfg.saveFigure(gcf,[grouptag,' identity BS isolate intertrial corr'], saveType)
 hf = figure;
 outMat_dn = v.plotDistancesHead('plotType','repetitions');
 title([]); xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
 cfg.figSize = 'medium';
 cfg.setFigure;
-cfg.saveFigure(gcf,[grouptag,' identity isolate intertrial corr repetitions'], saveType)
+cfg.saveFigure(gcf,[grouptag,' identity BS isolate intertrial corr repetitions'], saveType)
 
 v.dataFilter.mode_method = 'mode_values';
 hf = figure;
@@ -145,8 +145,8 @@ v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'novelty';
 v.dataFilter.mode_method = 'isolate';
 v.dataFilter.interval = [];
-v.dataFilter.subjectGroup = 'naïve';
-v.dataFilter.mode_file = 'dpca_naive.mat';
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.mode_file = 'dpca_trained_BS.mat';
 % v.dataFilter.stims_allowed = {'Ala','His','Trp','Ser','Leu'};
 closeup_interval = [-1 3];
 [~,events,labs] = ModeSelector(v).extract;

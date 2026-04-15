@@ -82,13 +82,27 @@ cfg.saveFigure(gcf,'allgroups PC variance explained', saveType)
 
 %% plot PCA lines
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.subjectGroup = 'naïve';
 v.dataFilter.stims_allowed = 'all stimuli';
-v.dataFilter.interval = [-22, -2];
+v.dataFilter.interval = [.5 20];
 v.dataFilter.repetitions = 1:5;
 cfg.useNatureColors = true;
 
+% v.dataFilter.mode_name = 'dpca';
+% v.dataFilter.mode_OI = 'stimulus';
+% v.dataFilter.mode_method = 'isolate';
+% v.dataFilter.mode_file = 'dpca_naive_BS.mat';
+
 [~,events,labs] = ModeSelector(v).extract;
+events = filterEventsByScore(events,v,[.1 .9],'linear');
+
+% [~,odor_events,all_labs] = ModeSelector(v).extract;
+% L = height(odor_events{1});
+% v.dataFilter.interval = [-22 -2];
+% [~,base_events] = ModeSelector(v).extract;
+% base_events = cellfun(@(x) repmat(mean(x,1,'omitmissing'),L,1,1),base_events,'UniformOutput',false);
+% events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
+
 proj = computeLDE(events,labs,'pooldata',true,'nans2zeros',true, 'method','pca');
 figure; out = plotLDE(proj.embedding{1}.reduction(:,1:2,:),'lines',proj.labs{1},cfg, 'ldetype',proj.name); % plot
 xlabel('PC 1'); ylabel('PC 2');
@@ -96,22 +110,24 @@ legend off
 cfg.setLines = false;
 cfg.figSize = 'small';
 cfg.setFigure;
-cfg.saveFigure(gcf,'trained baseline PCA 2d raw', saveType)
+cfg.saveFigure(gcf,'naive low-drifters PCA 2d raw', saveType)
 
 
 %% plot UMAP lines
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'all';
+v.dataFilter.subjectGroup = 'naïve';
 v.dataFilter.stims_allowed = 'all stimuli';
-v.dataFilter.interval = [-22, -2];
+v.dataFilter.interval = [1, 20];
 v.dataFilter.repetitions = 1:5;
+cfg.useNatureColors = true;
 
 % v.dataFilter.mode_name = 'dpca';
 % v.dataFilter.mode_OI = 'stimulus';
 % v.dataFilter.mode_method = 'isolate';
-% v.dataFilter.mode_file = 'dpca_trained.mat';
+% v.dataFilter.mode_file = 'dpca_naive_BS.mat';
 
 [~,events,labs] = ModeSelector(v).extract;
+events = filterEventsByScore(events,v,[.1 .9],'linear');
 
 % [~,odor_events,all_labs] = ModeSelector(v).extract;
 % L = height(odor_events{1});
@@ -129,7 +145,7 @@ legend off
 cfg.setLines = false;
 cfg.figSize = 'small';
 cfg.setFigure;
-cfg.saveFigure(gcf,'trained baseline UMAP 2d raw', saveType)
+cfg.saveFigure(gcf,'naive low-drifters UMAP 2d raw', saveType)
 
 
 %%

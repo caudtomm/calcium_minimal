@@ -105,6 +105,13 @@ v.dataFilter.trial_sorting = 'chronological';
 hf = figure;
 subplot(121)
 C = v.plotDistancesHead;
+
+hold on; % to take out the strongest drifting cells
+[~,events,labs] = ModeSelector(v).extract;
+events = filterEventsByScore(events,v,[0 1],'linear');
+C.distMat3d = plotDistances(events,'full','correlation',labs{1},cfg);
+hold off
+
 xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
 C= 1-C.distMat3d;
 [~,ntrials,nsubjects] = size(C);
@@ -126,6 +133,75 @@ cfg.setFigure;
 cfg.saveFigure(gcf,'uncoupled base intertrial corr', saveType)
 cfg = v.plotConfig;
 v.dataFilter = dft;
+
+%% intertrial baseline correlation drop, depending on how many high-drifting cells are cut off
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = 'all';
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.interval = [-22 -2];
+v.dataFilter.trial_sorting = 'chronological';
+
+th = 0:0.01:.5;
+
+G = nan(numel(th),2);
+for i_th = 1:numel(th)
+    thisth = th(i_th);
+    score_range = [thisth 1-thisth];
+
+    disp(['Quantile range: ',num2str(score_range(1)),'-',num2str(score_range(2)),' ...'])
+    
+    hf = figure;
+    C = v.plotDistancesHead;
+    
+    hold on; % to take out the strongest drifting cells
+    [~,events,labs] = ModeSelector(v).extract;
+    events = filterEventsByScore(events,v,score_range,'linear');
+    C.distMat3d = plotDistances(events,'full','correlation',labs{1},cfg);
+    hold off
+    
+    xticks([]); yticks([]); xlabel([]); ylabel([]); colorbar off
+    C= 1-C.distMat3d;
+    [~,ntrials,nsubjects] = size(C);
+    y = [];
+    for i = 1:ntrials-1
+        idx = triu(true(ntrials),i)-triu(true(ntrials),i+1);
+        idx = logical(repmat(idx,1,1,nsubjects));
+        y_avg = mean(C(idx),'omitmissing');
+        y_std = std(C(idx),[],'omitmissing');
+        y = [y; y_avg y_std];
+    end
+
+    % linear regression
+    G(i_th,:) = polyfit(1:ntrials-1,y(:,1),1);
+    
+    close(hf)
+end
+disp('done.')
+
+hf = figure;
+
+% Left y-axis: slopes
+yyaxis left;
+plot(th, G(:,1), 'b');
+hold on;
+ylabel('Slopes');
+set(gca, 'YColor', 'b');
+
+% Right y-axis: intercepts
+yyaxis right;
+hold on;
+plot(th, G(:,2), 'r');
+ylabel('Slopes');
+set(gca, 'YColor', 'r');
+
+% Shared decorations (drawn on whichever side is active — cosmetic only)
+xline(0, '--', 'Color', cfg.axcol, 'LineWidth', 1);
+xlabel('Threshold percentile on each side');
+axis tight; box off;
+set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+
+
 
 %% corr between stimulus activity and post - prestimulus activity
 post_interval = [115.5 135];
@@ -250,10 +326,6 @@ b(2) = histogram(y_post(:),edges);
 legend(b,{'stim vs pre','stim vs post'})
 
 set(gcf,'color','w')
-
-%%
-
-
 
 %% naive corr with prestimulus in time
 windows = defineTimeWindows(window_duration,t_lim_sec,overlap);
