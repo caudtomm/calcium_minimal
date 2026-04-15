@@ -1,5 +1,4 @@
-
-function events = filterEventsByScore(events,v,quant,method)
+function [events, idx] = filterEventsByScore(events,v,quant,method)
 arguments
     events cell
     v ExperimentViewer
@@ -19,4 +18,5 @@ for sj = 1:nSubjects
     max_val = quantile(dt, quant(2));
     
     idx{sj} = dt<=max_val & dt>=min_val;
+    events{sj} = events{sj}(:,idx{sj},:);
 end
