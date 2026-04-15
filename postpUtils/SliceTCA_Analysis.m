@@ -162,13 +162,16 @@ classdef SliceTCA_Analysis
         end
 
         % ------------------------------------------------------------------
-        function hf = plotSubject(obj, results, fish_idx) %#ok<INUSL>
+        function hf = plotSubject(obj, results, fish_idx, opts) %#ok<INUSL>
         % plotSubject  Plot scores and weights for one subject.
         %
         %   hf = plotSubject(results, fish_idx)
+        %   hf = plotSubject(results, fish_idx, normalize=true)
         %
         %   results    {n_subj} cell from loadResults
         %   fish_idx   1-based index into results
+        %   normalize  (optional, default false) — min-max scale each component
+        %              independently so low-amplitude components remain visible.
         %
         %   Figure layout — 3 rows (partition) x 2 columns:
         %     Col 1: score matrix    [r_k x sliced_dim]   (imagesc)
@@ -182,6 +185,7 @@ classdef SliceTCA_Analysis
                 obj      SliceTCA_Analysis
                 results  cell
                 fish_idx (1,1) double {mustBePositive, mustBeInteger}
+                opts.normalize (1,1) logical = true
             end
 
             if fish_idx > numel(results) || isempty(results{fish_idx})
@@ -223,12 +227,38 @@ classdef SliceTCA_Analysis
 
                 if r_k == 0;  nexttile; nexttile; continue;  end
 
+                % Per-component min-max normalization (each row of scores,
+                % each [:,:] slice of weights scaled independently to [0,1])
+                if opts.normalize
+                    for c = 1:r_k
+                        sv = scores(c,:);
+                        lo = min(sv);  hi = max(sv);
+                        if hi > lo;  scores(c,:) = (sv - lo) / (hi - lo);
+                        else;        scores(c,:) = zeros(size(sv));  end
+
+                        wv = weights(c,:,:);
+                        lo = min(wv(:));  hi = max(wv(:));
+                        if hi > lo;  weights(c,:,:) = (wv - lo) / (hi - lo);
+                        else;        weights(c,:,:) = zeros(size(wv));  end
+                    end
+                end
+
                 % ---- Scores ----------------------------------------------
                 ax_s = nexttile;
-                if score_use_t(k+1) && numel(t) == size(scores, 2)
-                    imagesc(ax_s, t, 1:r_k, scores);
+                % k=1 (neuron-slice): each component's neurons sorted independently
+                % by descending score magnitude — no shared neuron axis across rows
+                scores_disp = scores;
+                if k == 1
+                    % Single sort order for all components: group neurons by
+                    % dominant component, then descending magnitude within group
+                    [max_sc, best_comp] = max(scores, [], 1);          % [1 x neurons]
+                    [~, neu_ord] = sortrows([best_comp', -max_sc'], [1 2]);
+                    scores_disp = scores(:, neu_ord);
+                end
+                if score_use_t(k+1) && numel(t) == size(scores_disp, 2)
+                    imagesc(ax_s, t, 1:r_k, scores_disp);
                 else
-                    imagesc(ax_s, scores);
+                    imagesc(ax_s, scores_disp);
                 end
                 colorbar(ax_s);
                 xlabel(ax_s, score_xlbls{k+1});
@@ -240,9 +270,26 @@ classdef SliceTCA_Analysis
                 % ---- Weights ---------------------------------------------
                 ax_w = nexttile;
 
-                % Stack r_k weight matrices vertically: [r_k*dim_j x dim_l]
-                % permute [r_k,dim_j,dim_l] → [dim_j,r_k,dim_l] then reshape
-                stacked = reshape(permute(weights, [2 1 3]), dim_j * r_k, dim_l);
+                % Stack r_k weight matrices vertically: [r_k*dim_j x dim_l].
+                % For k=0 (neuron y-axis) and k=2 (neuron x-axis), each
+                % component's neuron axis is sorted independently by its own
+                % peak — so neuron position is NOT shared across component blocks.
+                stacked = zeros(dim_j * r_k, dim_l);
+                for c = 1:r_k
+                    w_c = reshape(weights(c,:,:), dim_j, dim_l);
+                    if k == 0
+                        % neurons on y-axis: sort by time of peak |weight|
+                        [~, peak_bin] = max(abs(w_c), [], 2);  % [neurons x 1]
+                        [~, neu_ord]  = sort(peak_bin);
+                        w_c = w_c(neu_ord, :);
+                    elseif k == 2
+                        % neurons on x-axis: sort by trial of peak |weight|
+                        [~, peak_bin] = max(abs(w_c), [], 1);  % [1 x neurons]
+                        [~, neu_ord]  = sort(peak_bin);
+                        w_c = w_c(:, neu_ord);
+                    end
+                    stacked((c-1)*dim_j + (1:dim_j), :) = w_c;
+                end
 
                 if weight_use_t(k+1) && numel(t) == dim_l
                     imagesc(ax_w, t, 1:dim_j*r_k, stacked);
