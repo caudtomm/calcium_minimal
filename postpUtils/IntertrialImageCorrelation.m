@@ -34,7 +34,7 @@ classdef IntertrialImageCorrelation
 %   % optional score-based cell selection
 %   scores = BaselineDriftAnalysis(v).getContributionScores('linear');
 %   iic.scores = scores;
-%   iic.score_quantile_range = [0, 0.2];       % keep lowest-drift 20 %
+%   iic.score_quantile_range = [0, 0.2];       % keep lowest drift scores 20 % (high negative drift)
 %
 %   iic = iic.compute();
 %   iic.plot();
@@ -151,15 +151,15 @@ classdef IntertrialImageCorrelation
             ax = axes(hf);
             hold(ax, 'on');
 
-            plotCurve(ax, obj.corr_sheared_dff,  T, distances, ...
+            b(1) = plotCurve(ax, obj.corr_sheared_dff,  T, distances, ...
                 options.color_dff,  options.cfg);
-            plotCurve(ax, obj.corr_sheared_anat, T, distances, ...
+            b(2) = plotCurve(ax, obj.corr_sheared_anat, T, distances, ...
                 options.color_anat, options.cfg);
 
             xline(ax, 0, '--k', 'Alpha', 0.4);
             xlabel(ax, 'Trial distance');
             ylabel(ax, 'Correlation (r)');
-            legend(ax, {'dF/F', 'Anatomy'}, 'Location', 'best');
+            legend(b, {'dF/F', 'Anatomy'}, 'Location', 'best');
             box(ax, 'off');
         end
 
@@ -229,16 +229,28 @@ classdef IntertrialImageCorrelation
             N         = traces.N;
             roi_corr  = nan(T, T, N);
 
-            for ci = 1 : N
+            % Extract plain arrays before parfor — workers cannot broadcast
+            % arbitrary class objects.
+            goodNeuron_IDs = traces.goodNeuron_IDs;
+            ROImap         = traces.ROImap;
+
+            parfor ci = 1 : N
                 if ~cell_mask(ci); continue; end
 
-                roi_id        = traces.goodNeuron_IDs(ci);
-                roi_mask_full = (traces.ROImap == roi_id);
+                roi_id        = goodNeuron_IDs(ci);
+                roi_mask_full = (ROImap == roi_id);
                 if ~any(roi_mask_full(:)); continue; end
 
-                [r1, r2, c1, c2] = cropBounds(roi_mask_full, H, W, neighborhood);
-                crop             = stack(r1:r2, c1:c2, :);   % [H_c x W_c x T]
+                % Inline cropBounds: file-private functions are not reliably
+                % accessible inside parfor workers.
+                row_coords = find(any(roi_mask_full, 2));
+                col_coords = find(any(roi_mask_full, 1));
+                r1 = max(1, min(row_coords) - neighborhood);
+                r2 = min(H, max(row_coords) + neighborhood);
+                c1 = max(1, min(col_coords) - neighborhood);
+                c2 = min(W, max(col_coords) + neighborhood);
 
+                crop   = stack(r1:r2, c1:c2, :);              % [H_c x W_c x T]
                 pixels = reshape(crop, (r2-r1+1)*(c2-c1+1), T);  % [n_px x T]
                 roi_corr(:, :, ci) = corr(pixels, 'rows', 'complete');
             end
@@ -305,7 +317,7 @@ end
 
 % ----------------------------------------------------------------------
 
-function plotCurve(ax, S, T, distances, color, cfg)
+function h = plotCurve(ax, S, T, distances, color, cfg)
 % Compute mean ± SEM over the 3rd dim of sheared stack S and plot.
     if isempty(S); return; end
     n_dist = 2*T - 1;
@@ -318,5 +330,5 @@ function plotCurve(ax, S, T, distances, color, cfg)
         mu(r)  = mean(vals);
         sem(r) = std(vals) / sqrt(numel(vals));
     end
-    plotLineNShade(distances', mu', sem', color, cfg);
+    h = plotLineNShade(distances', mu', sem', color, cfg);
 end

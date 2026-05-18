@@ -82,8 +82,9 @@ cfg.saveFigure(gcf,'allgroups PC variance explained', saveType)
 
 %% plot PCA lines
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.trial_sorting = 'chronological';
 v.dataFilter.interval = [.5 20];
 v.dataFilter.repetitions = 1:5;
 cfg.useNatureColors = true;
@@ -93,24 +94,24 @@ cfg.useNatureColors = true;
 % v.dataFilter.mode_method = 'isolate';
 % v.dataFilter.mode_file = 'dpca_naive_BS.mat';
 
-[~,events,labs] = ModeSelector(v).extract;
-events = filterEventsByScore(events,v,[.1 .9],'linear');
+% [~,events,labs] = ModeSelector(v).extract;
+% events = filterEventsByScore(events,v,[.1 .9],'linear');
 
-% [~,odor_events,all_labs] = ModeSelector(v).extract;
-% L = height(odor_events{1});
-% v.dataFilter.interval = [-22 -2];
-% [~,base_events] = ModeSelector(v).extract;
-% base_events = cellfun(@(x) repmat(mean(x,1,'omitmissing'),L,1,1),base_events,'UniformOutput',false);
-% events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
+[~,odor_events,all_labs] = ModeSelector(v).extract;
+L = height(odor_events{1});
+v.dataFilter.interval = [-22 -2];
+[~,base_events] = ModeSelector(v).extract;
+base_events = cellfun(@(x) repmat(mean(x,1,'omitmissing'),L,1,1),base_events,'UniformOutput',false);
+events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
 
 proj = computeLDE(events,labs,'pooldata',true,'nans2zeros',true, 'method','pca');
-figure; out = plotLDE(proj.embedding{1}.reduction(:,1:2,:),'lines',proj.labs{1},cfg, 'ldetype',proj.name); % plot
+figure; out = plotLDE(proj.embedding{1}.reduction(:,1:2,:),'trialNum',proj.labs{1},cfg, 'ldetype',proj.name); % plot
 xlabel('PC 1'); ylabel('PC 2');
 legend off
 cfg.setLines = false;
 cfg.figSize = 'small';
 cfg.setFigure;
-cfg.saveFigure(gcf,'naive low-drifters PCA 2d raw', saveType)
+cfg.saveFigure(gcf,'trained BS PCA trialNum 2d raw', saveType)
 
 
 %% plot UMAP lines
@@ -435,6 +436,229 @@ v.dataFilter.subjectGroup = 'all';
 [R, ira] = driftMetricsFigure(v);
 close all
 angdiff_sham = getAngleDiff(ira);
+
+%% Cell-level scatter: odor responsiveness vs baseline FR / corr. contribution / identity dPC score
+groups_sc     = {'naïve', 'trained', 'uncoupled'};
+dpca_files_sc = {'dpca_naive.mat', 'dpca_trained.mat', 'dpca_uncoupled.mat'};
+fav_idx       = [84, 85, 73];   % lapaz indices for naive / trained / uncoupled
+
+resp_sc = []; baseline_sc = []; cm_sc = []; mx_sc = []; dpc_sc = [];
+gidx_sc = [];
+
+for g = 1:numel(groups_sc)
+    v.dataFilter = dft;
+    v.dataFilter.subjectGroup  = groups_sc{g};
+    v.dataFilter.stims_allowed = 'all stimuli';
+    v.dataFilter.repetitions   = 1:5;
+
+    % odor responsiveness: (mean_odor_FR - session_mean) / session_std
+    v.dataFilter.interval = [1, 20];
+    ifr_odor = v.plotUnitActivityMetricHead('method', 'avg intensity');
+    ifr_odor = cell2mat(cellfun(@(x) mean(x,2,'omitmissing'), ifr_odor, 'UniformOutput',false));
+    v.dataFilter.interval = [];
+    ifr_var  = v.plotUnitActivityMetricHead('method', 'variance');
+    ifr_mu   = v.plotUnitActivityMetricHead('method', 'avg intensity');
+    ifr_std  = cell2mat(cellfun(@(x) sqrt(mean(x,2,'omitmissing')), ifr_var, 'UniformOutput',false));
+    ifr_mu   = cell2mat(cellfun(@(x) mean(x,2,'omitmissing'), ifr_mu, 'UniformOutput',false));
+    resp_g   = (ifr_odor - ifr_mu) ./ ifr_std;
+
+    % mean baseline FR (pre-stimulus window)
+    v.dataFilter.interval = [-22, -2];
+    ifr_base = v.plotUnitActivityMetricHead('method', 'avg intensity');
+    base_g   = cell2mat(cellfun(@(x) mean(x,2,'omitmissing'), ifr_base, 'UniformOutput',false));
+
+    % per-cell contribution to inter-stimulus correlations: c_i = x_i*y_i / (||x||*||y||)
+    v.dataFilter.interval    = [1, 20];
+    v.dataFilter.repetitions = 1:5;
+    tc_g = v.plotUnitActivityMetricHead('method', 'tuning curves');  % {sj}: [N x nS x nR]
+    cmean_g = []; cmax_g = [];
+    for sj = 1:numel(tc_g)
+        tc = tc_g{sj};  [N, nS, nR] = size(tc);
+        if nS < 2
+            cmean_g = [cmean_g; nan(N,1)];
+            cmax_g  = [cmax_g;  nan(N,1)];
+            continue
+        end
+        pairs = nchoosek(1:nS, 2);
+        C     = nan(N, size(pairs,1) * nR);
+        col   = 0;
+        for r = 1:nR
+            for p = 1:size(pairs,1)
+                col = col + 1;
+                x = tc(:, pairs(p,1), r);
+                y = tc(:, pairs(p,2), r);
+                % d = sqrt(nansum(x.^2) * nansum(y.^2));
+                % if d > eps; C(:,col) = x .* y / d; end
+                xmean = mean(x,'omitmissing');
+                ymean = mean(y,'omitmissing');
+                C(:,col) = (x-xmean).*(y-ymean);
+            end
+        end
+        cmean_g = [cmean_g; mean(C, 2, 'omitmissing')];
+        cmax_g  = [cmax_g;  max(C, [], 2)];
+    end
+
+    % mean abs identity dPC loading
+    v.dataFilter.mode_name   = 'dpca';
+    v.dataFilter.mode_OI     = 'stimulus';
+    v.dataFilter.mode_method = 'mode_values';
+    v.dataFilter.mode_file   = dpca_files_sc{g};
+    v.dataFilter.interval    = [1, 20];
+    m_d   = ModeSelector(v).extract;
+    dpc_g = nan(numel(resp_g), 1);
+    ptr   = 0;
+    for i = 1:numel(m_d.coeffs)
+        if isempty(m_d.coeffs{i}); continue; end
+        ids   = m_d.parseModeOI(i);
+        W_id  = m_d.coeffs{i}(:, ids);   % [N x n_identity_modes]
+        n     = size(W_id, 1);
+        if ptr + n > numel(dpc_g); break; end
+        dpc_g(ptr + (1:n)) = mean(abs(W_id), 2);
+        ptr = ptr + n;
+    end
+
+    resp_sc     = [resp_sc;     resp_g];
+    baseline_sc = [baseline_sc; base_g];
+    cm_sc       = [cm_sc;       cmean_g];
+    mx_sc       = [mx_sc;       cmax_g];
+    dpc_sc      = [dpc_sc;      dpc_g];
+    gidx_sc     = [gidx_sc;     repmat(g, numel(resp_g), 1)];
+end
+
+gcols_sc = cfg.c(fav_idx, :);   % [3 x 3] group colors
+
+ydata_sc   = {baseline_sc,       cm_sc,                      mx_sc,                     dpc_sc};
+col_titles = {'Mean baseline FR', 'Mean corr. contribution', 'Max corr. contribution',  'Mean |identity dPC|'};
+
+hf_sc = figure;
+tl = tiledlayout(3, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
+xlabel(tl, 'Odor responsiveness (z)');
+
+ax_sc = gobjects(3, 4);
+for g = 1:3
+    for k = 1:4
+        ax_sc(g,k) = nexttile((g-1)*4 + k);
+        mask = gidx_sc == g;
+        scatter(ax_sc(g,k), resp_sc(mask), ydata_sc{k}(mask), 10, ...
+            'filled', 'MarkerFaceAlpha', 0.4, 'MarkerFaceColor', gcols_sc(g,:));
+        if g == 1; title(ax_sc(g,k), col_titles{k}); end
+        if k == 1; ylabel(ax_sc(g,k), groups_sc{g}); end
+        axis(ax_sc(g,k), 'square');  box(ax_sc(g,k), 'off');
+        set(ax_sc(g,k), 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
+    end
+end
+
+% equalize y-limits per column across groups
+for k = 1:4
+    yl = cell2mat(arrayfun(@(g) ylim(ax_sc(g,k)), (1:3)', 'UniformOutput', false));
+    shared_ylim = [min(yl(:,1)), max(yl(:,2))];
+    for g = 1:3; ylim(ax_sc(g,k), shared_ylim); end
+end
+
+set(hf_sc, 'color', cfg.bgcol);
+cfg.figSize = 'large';  cfg.aspRatioType = 'tall';  cfg.setLines = false;
+cfg.setFigure;
+cfg.saveFigure(hf_sc, 'odor resp vs cell metrics scatter', saveType)
+
+%% Scatter correlation statistics: r and R² per subplot
+stat_rows = cell(numel(groups_sc) * numel(col_titles), 6);
+row = 0;
+for g = 1:numel(groups_sc)
+    for k = 1:numel(col_titles)
+        row = row + 1;
+        mask = gidx_sc == g;
+        x = resp_sc(mask);
+        y = ydata_sc{k}(mask);
+        ok = isfinite(x) & isfinite(y);
+        n = sum(ok);
+        if n >= 3
+            [r, p] = corr(x(ok), y(ok));
+        else
+            r = NaN;  p = NaN;
+        end
+        stat_rows(row,:) = {groups_sc{g}, col_titles{k}, n, r, r^2, p};
+    end
+end
+corr_tab = cell2table(stat_rows, ...
+    'VariableNames', {'Group', 'Metric', 'n', 'r', 'R2', 'p'});
+disp(corr_tab)
+
+
+%% PC1 trajectory vs trial number
+group_pc1 = 'naïve';
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup  = group_pc1;
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.trial_sorting = 'chronological';
+v.dataFilter.interval      = [.5, 20];
+v.dataFilter.repetitions   = 1:5;
+
+[~, oe_pc1, labs_pc1] = ModeSelector(v).extract;
+L_pc1 = height(oe_pc1{1});
+v.dataFilter.interval = [-22, -2];
+[~, be_pc1] = ModeSelector(v).extract;
+be_pc1 = cellfun(@(x) repmat(mean(x,1,'omitmissing'), L_pc1, 1, 1), be_pc1, 'UniformOutput', false);
+% ev_pc1 = cellfun(@(b,o) o - b, be_pc1, oe_pc1, 'UniformOutput', false);
+ev_pc1 = oe_pc1;
+
+proj_pc1 = computeLDE(ev_pc1, labs_pc1, 'pooldata', true, 'nans2zeros', true, 'method', 'pca');
+
+% mean PC1 per trial from pooled embedding (for scatter)
+mean_pc1_all = squeeze(mean(proj_pc1.embedding{1}.reduction(:,1,:), 1, 'omitmissing'));
+mean_pc1_all = mean_pc1_all(:);   % [nTrials_total x 1]
+
+% per-subject embeddings for mean ± SEM, sign-aligned to pooled PC1
+n_per_subj = cellfun(@(x) size(x,3), ev_pc1);
+nSubj_pc1  = numel(ev_pc1);
+pc1_mat = nan(max(n_per_subj),nSubj_pc1);
+pc1_cols   = cell(1, nSubj_pc1);
+ptr = 0;
+for i = 1:nSubj_pc1
+    proj_i     = computeLDE(ev_pc1(i), labs_pc1(i), 'pooldata', false, 'nans2zeros', true, 'method', 'pca');
+    pc1_i      = squeeze(mean(proj_i.embedding{1}.reduction(:,1,:), 1, 'omitmissing'));
+    pc1_i      = pc1_i(:);   % [ni x 1]
+    pc1_mat(1:numel(pc1_i),i) = pc1_i;
+end
+nT_pc1  = size(pc1_mat, 1);
+
+t_ax_pc1 = (1:nT_pc1)';
+mu_pc1   = mean(pc1_mat, 2, 'omitmissing');
+sem_pc1  = std(pc1_mat, [], 2, 'omitmissing') ./ sqrt(sum(isfinite(pc1_mat), 2));
+
+hf_pc1 = figure; hold on;
+scatter(repmat(t_ax_pc1, 1, nSubj_pc1), mean_pc1_all, 15, [.6 .6 .6], 'filled', 'MarkerFaceAlpha', 0.3);
+errorbar(t_ax_pc1, mu_pc1, sem_pc1, '-', 'LineWidth', 1.5, 'CapSize', 0, 'Color', cfg.axcol);
+xlabel('Trial number');  ylabel('Mean PC1');
+title(group_pc1);  box off;
+set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+cfg.figSize = 'small';  cfg.aspRatioType = 'square';  cfg.setLines = false;
+cfg.setFigure;
+cfg.saveFigure(hf_pc1, ['PC1 vs trial num ', group_pc1, ' raw'], saveType)
+
+% R² between each subject's PC1 trajectory and trial number
+t_vec = (1:nT_pc1)';
+r2_subj = nan(nSubj_pc1, 1);
+for i = 1:nSubj_pc1
+    y  = pc1_mat(:, i);
+    ok = isfinite(y);
+    if sum(ok) >= 2
+        r2_subj(i) = corr(t_vec(ok), y(ok))^2;
+    end
+end
+
+figure;
+histogram(r2_subj, 'FaceColor', cfg.axcol, 'EdgeAlpha', 0);
+xlabel('R² (PC1 vs trial number)');  ylabel('Subjects');
+box off;
+set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+cfg.figSize = 'small';  cfg.aspRatioType = 'square';  cfg.setLines = false;
+cfg.setFigure;
+cfg.saveFigure(gcf, ['PC1 vs trial R2 hist ', group_pc1, ' raw'], saveType)
+
+mean(r2_subj)
 
 function y = getAngleDiff(ira)
     [nstims, nangles, nsubj] = size(ira);
