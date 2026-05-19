@@ -82,7 +82,7 @@ cfg.saveFigure(gcf,'allgroups PC variance explained', saveType)
 
 %% plot PCA lines
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.subjectGroup = 'all';
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.trial_sorting = 'chronological';
 v.dataFilter.interval = [.5 20];
@@ -94,18 +94,18 @@ cfg.useNatureColors = true;
 % v.dataFilter.mode_method = 'isolate';
 % v.dataFilter.mode_file = 'dpca_naive_BS.mat';
 
-% [~,events,labs] = ModeSelector(v).extract;
+[~,events,labs] = ModeSelector(v).extract;
 % events = filterEventsByScore(events,v,[.1 .9],'linear');
 
-[~,odor_events,all_labs] = ModeSelector(v).extract;
-L = height(odor_events{1});
-v.dataFilter.interval = [-22 -2];
-[~,base_events] = ModeSelector(v).extract;
-base_events = cellfun(@(x) repmat(mean(x,1,'omitmissing'),L,1,1),base_events,'UniformOutput',false);
-events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
+% [~,odor_events,all_labs] = ModeSelector(v).extract;
+% L = height(odor_events{1});
+% v.dataFilter.interval = [-22 -2];
+% [~,base_events] = ModeSelector(v).extract;
+% base_events = cellfun(@(x) repmat(mean(x,1,'omitmissing'),L,1,1),base_events,'UniformOutput',false);
+% events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
 
 proj = computeLDE(events,labs,'pooldata',true,'nans2zeros',true, 'method','pca');
-figure; out = plotLDE(proj.embedding{1}.reduction(:,1:2,:),'trialNum',proj.labs{1},cfg, 'ldetype',proj.name); % plot
+figure; out = plotLDE(proj.embedding{1}.reduction(:,1:2,:),'lines',proj.labs{1},cfg, 'ldetype',proj.name); % plot
 xlabel('PC 1'); ylabel('PC 2');
 legend off
 cfg.setLines = false;

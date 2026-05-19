@@ -12,7 +12,7 @@ t_lim_sec = [-5 35]; % from 5 sec before to 35 seconds after stimulus onset
 overlap = .1; % [seconds]
 
 %% Load dataset
-filename = 'odorexp004_raw_090725.mat';
+filename = 'odorexp004_manICconservative_090725.mat';
 
 %
 experiment = load(filename).a; % Experiment object

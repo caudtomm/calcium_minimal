@@ -24,8 +24,8 @@ c0 = min(y);
 p0 = [a0, b0, c0];
 
 % Fit using fminsearch
-% options = optimset('MaxFunEvals',1e30);
-params = fminsearch(loss, p0);
+options = optimset('MaxFunEvals', 10000, 'MaxIter', 10000);
+params = fminsearch(loss, p0, options);
 
 % Compute fitted curve
 y_fit = model(params, t);
