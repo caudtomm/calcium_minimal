@@ -23,6 +23,8 @@ function out = plotTopographic(all_metrics, all_traces, plotType, events, cfg, v
 similarityMetric = 'correlation';
 nShuffles = 1000;
 nBins = 10;
+aa = [];            % AnatomyAlignment object (optional)
+subjectIndices = []; % experiment-level subject indices corresponding to each entry
 for k = 1:2:numel(varargin)
     switch lower(varargin{k})
         case 'similaritymetric'
@@ -31,6 +33,10 @@ for k = 1:2:numel(varargin)
             nShuffles = varargin{k+1};
         case 'nbins'
             nBins = varargin{k+1};
+        case 'anatomyalignment'
+            aa = varargin{k+1};
+        case 'subjectindices'
+            subjectIndices = varargin{k+1};
     end
 end
 
@@ -41,6 +47,18 @@ out = struct();
 tas = cell(nsubjects, 1);
 for i = 1:nsubjects
     tas{i} = TopographicAnalysis(all_traces{i});
+end
+
+% If an AnatomyAlignment is provided, affine-transform each subject's centroids
+% into the common aligned reference space before any density-map computation.
+if ~isempty(aa)
+    assert(~isempty(subjectIndices) && numel(subjectIndices) == nsubjects, ...
+        'plotTopographic: subjectIndices must be provided alongside anatomyAlignment');
+    for i = 1:nsubjects
+        phys_sz = fliplr(size(tas{i}.at.ROImap, [1 2])); % [W, H]
+        tas{i}.centroids = aa.transformPhysCentroids( ...
+            subjectIndices(i), tas{i}.centroids, phys_sz);
+    end
 end
 
 % normalize metrics per subject: z-score
@@ -73,40 +91,52 @@ switch lower(plotType)
             all_y = [all_y; c(:,2)]; %#ok<AGROW>
             all_v = [all_v; norm_metrics{i}]; %#ok<AGROW>
         end
+        coordUnit = 'px';
+        if ~isempty(aa); coordUnit = 'µm'; end
+
         scatter(all_x, all_y, 30, all_v, 'filled', 'CData', all_v);
         colormap(gca, 'parula'); axis square; clim([-1 1])
         colorbar;
         set(gca, 'YDir', 'reverse', 'Color', cfg.bgcol, ...
             'XColor', cfg.axcol, 'YColor', cfg.axcol);
         axis equal tight; box off;
-        xlabel('x (px)'); ylabel('y (px)');
+        xlabel(['x (' coordUnit ')']); ylabel(['y (' coordUnit ')']);
         title('All subjects (normalized)', 'Color', cfg.textcol);
         set(hf2, 'Color', cfg.bgcol);
         hold off;
         out.hf_overlay = hf2;
 
-        
         % --- Figure 3: spatial heatmap of interpolated metric values ---
         hf3 = figure;
-        
+
         % spatial grid
         gridSize = 50;
+        minCentroids = 3; % minimum centroids per bin to show a value
         xEdges = linspace(min(all_x), max(all_x), gridSize + 1);
         yEdges = linspace(min(all_y), max(all_y), gridSize + 1);
-        [XI, YI] = meshgrid((xEdges(1:end-1) + xEdges(2:end)) / 2, ...
-                    (yEdges(1:end-1) + yEdges(2:end)) / 2);
-        
-        % Interpolate metric values onto grid using scatteredInterpolant
+        xCenters = (xEdges(1:end-1) + xEdges(2:end)) / 2;
+        yCenters = (yEdges(1:end-1) + yEdges(2:end)) / 2;
+        [XI, YI] = meshgrid(xCenters, yCenters);
+
+        % Count centroids per bin and mask sparse bins
+        binX = discretize(all_x, xEdges);
+        binY = discretize(all_y, yEdges);
+        density = accumarray([binY, binX], 1, [gridSize, gridSize]);
+        denseMask = density >= minCentroids;
+
+        % Interpolate metric values onto grid; mask low-density bins with NaN
         F = scatteredInterpolant(all_x, all_y, all_v, 'linear', 'none');
         ZI = F(XI, YI);
-        
-        imagesc(xEdges([1 end]), fliplr(yEdges([1 end])), ZI);
+        ZI(~denseMask) = NaN;
+
+        imagesc(xEdges([1 end]), yEdges([1 end]), ZI, 'AlphaData', ~isnan(ZI));
         axis square; clim([-1 1])
-        set(gca, 'YDir', 'normal');
+        set(gca, 'YDir', 'reverse', 'Color', cfg.bgcol);
         colormap(gca, 'parula');
         colorbar;
-        set(gca, 'Color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
-        xlabel('x (px)'); ylabel('y (px)');
+        set(gca, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
+        xlabel(['x (' coordUnit ')']); ylabel(['y (' coordUnit ')']);
+        if ~isempty(aa); axis equal; end
         title('Spatial heatmap (normalized)', 'Color', cfg.textcol);
         set(hf3, 'Color', cfg.bgcol);
         out.hf_heatmap = hf3;

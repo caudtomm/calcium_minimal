@@ -598,9 +598,9 @@ v.dataFilter.repetitions   = 1:5;
 L_pc1 = height(oe_pc1{1});
 v.dataFilter.interval = [-22, -2];
 [~, be_pc1] = ModeSelector(v).extract;
-be_pc1 = cellfun(@(x) repmat(mean(x,1,'omitmissing'), L_pc1, 1, 1), be_pc1, 'UniformOutput', false);
+% be_pc1 = cellfun(@(x) repmat(mean(x,1,'omitmissing'), L_pc1, 1, 1), be_pc1, 'UniformOutput', false);
 % ev_pc1 = cellfun(@(b,o) o - b, be_pc1, oe_pc1, 'UniformOutput', false);
-ev_pc1 = oe_pc1;
+ev_pc1 = be_pc1;
 
 proj_pc1 = computeLDE(ev_pc1, labs_pc1, 'pooldata', true, 'nans2zeros', true, 'method', 'pca');
 
@@ -635,7 +635,7 @@ set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
 cfg.figSize = 'small';  cfg.aspRatioType = 'square';  cfg.setLines = false;
 cfg.setFigure;
-cfg.saveFigure(hf_pc1, ['PC1 vs trial num ', group_pc1, ' raw'], saveType)
+cfg.saveFigure(hf_pc1, ['PC1 vs trial num ', group_pc1, ' baseline raw'], saveType)
 
 % R² between each subject's PC1 trajectory and trial number
 t_vec = (1:nT_pc1)';
@@ -656,9 +656,187 @@ set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
 cfg.figSize = 'small';  cfg.aspRatioType = 'square';  cfg.setLines = false;
 cfg.setFigure;
-cfg.saveFigure(gcf, ['PC1 vs trial R2 hist ', group_pc1, ' raw'], saveType)
+cfg.saveFigure(gcf, ['PC1 vs trial R2 hist ', group_pc1, ' baseline raw'], saveType)
+
+figure;
+RF_mkBoxPlot3(r2_subj,[],[],.1,.5,.5,2,[])
 
 mean(r2_subj)
+
+
+%% PC1 R² across groups and activity types
+groups_r2       = {'naïve', 'trained'};
+group_labels_r2 = {'Naïve', 'Trained'};
+fav_idx_r2      = [84, 85];   % lapaz palette indices: naïve / trained
+act_labels_r2   = {'Odor response', 'Baseline', 'BS response'};
+
+odor_int_r2      = [.5, 20];
+base_int_r2      = [-22, -2];
+use_avg_patterns = true;  % if true, PCA axes from trial-averaged activity; trials projected onto those axes
+
+nG_r2 = numel(groups_r2);
+nA_r2 = numel(act_labels_r2);
+
+% ---- Collect per-subject R² for each (group, activity type) ----------
+% r2_data{g, a} = [nSubj x 1] R² of linear trend in mean PC1 vs trial number
+r2_data = cell(nG_r2, nA_r2);
+
+for g = 1:nG_r2
+    v.dataFilter = dft;
+    v.dataFilter.subjectGroup  = groups_r2{g};
+    v.dataFilter.stims_allowed = 'all stimuli';
+    v.dataFilter.trial_sorting = 'chronological';
+    v.dataFilter.repetitions   = 1:5;
+
+    % Odor events
+    v.dataFilter.interval = odor_int_r2;
+    [~, oe_g, labs_g] = ModeSelector(v).extract;
+    L_g = height(oe_g{1});
+
+    % Baseline events (actual traces, for baseline PCA)
+    v.dataFilter.interval = base_int_r2;
+    [~, be_g, labs_be_g] = ModeSelector(v).extract;
+
+    % Mean baseline per trial replicated to odor length (for subtraction)
+    be_rep_g = cellfun(@(x) repmat(mean(x, 1, 'omitmissing'), L_g, 1, 1), ...
+        be_g, 'UniformOutput', false);
+
+    if use_avg_patterns
+        oe_g = cellfun(@(x) mean(x, 1, 'omitmissing'), oe_g, ...
+            'UniformOutput',false);
+        be_g = cellfun(@(x) mean(x, 1, 'omitmissing'), be_g, ...
+            'UniformOutput',false);
+        be_rep_g = cellfun(@(x) mean(x, 1, 'omitmissing'), be_rep_g, ...
+            'UniformOutput',false); % with averaging, this is the same as be_g
+    end
+
+    ev_sets  = {oe_g, ...
+                be_g, ...
+                cellfun(@(o, b) o - b, oe_g, be_rep_g, 'UniformOutput', false)};
+    lab_sets = {labs_g, labs_be_g, labs_g};
+
+    for a = 1:nA_r2
+        ev     = ev_sets{a};
+        labs_a = lab_sets{a};
+        nS     = numel(ev);
+        r2_vec = nan(nS, 1);
+        for i = 1:nS
+            proj_i = computeLDE(ev(i), labs_a(i), ...
+                'pooldata', false, 'nans2zeros', true, 'method', 'pca');
+            pc1_i = squeeze(mean(proj_i.embedding{1}.reduction(:, 1, :), 1, 'omitmissing'));
+            pc1_i = pc1_i(:);
+            nT_i = numel(pc1_i);
+            t_i  = (1:nT_i)';
+            ok   = isfinite(pc1_i);
+            if sum(ok) >= 2
+                r2_vec(i) = corr(t_i(ok), pc1_i(ok))^2;
+            end
+        end
+        r2_data{g, a} = r2_vec;
+    end
+end
+
+% ---- Group colors ----------------------------------------------------
+gcols_r2 = cfg.c(fav_idx_r2, :);   % [nG_r2 x 3]
+
+% X positions: groups clustered by activity type with a gap between clusters
+type_spacing = nG_r2 + 2;
+xpos_r2 = zeros(nA_r2, nG_r2);
+for a = 1:nA_r2
+    xpos_r2(a, :) = (a-1)*type_spacing + (1:nG_r2);
+end
+
+% ---- Figure: all groups and activity types on a single axes ----------
+hf_r2 = figure; hold on;
+stats_between_r2 = cell(1, nA_r2);
+
+for a = 1:nA_r2
+    datacells_a = r2_data(:, a);
+    x_a = xpos_r2(a, :);
+
+    % Boxplots with per-group colors
+    RF_mkBoxPlot3(datacells_a, gcols_r2, x_a, .1, .5, .5, 2, []);
+
+    % Jittered individual data points on top
+    for g = 1:nG_r2
+        dat = datacells_a{g};
+        dat = dat(isfinite(dat));
+        jit = (rand(numel(dat), 1) - .5) * .25;
+        scatter(x_a(g) + jit, dat, 20, gcols_r2(g, :), 'filled', 'MarkerFaceAlpha', .5);
+    end
+
+    % Between-group pairwise Mann-Whitney (FDR-corrected)
+    mw_a = statsUtils.pairwiseMannWhitney(datacells_a, group_labels_r2);
+    stats_between_r2{a} = mw_a;
+
+    fprintf('\n=== Between-group MW: %s ===\n', act_labels_r2{a});
+    for k = 1:numel(mw_a)
+        fprintf('  %s vs %s: p_raw=%.4g, p_adj=%.4g %s\n', ...
+            mw_a(k).group1, mw_a(k).group2, ...
+            mw_a(k).p_raw, mw_a(k).p_adj, statsUtils.pvalToStars(mw_a(k).p_adj));
+    end
+end
+
+% Significance brackets (computed after all data so ylim is stable)
+yl = ylim;
+y_range      = yl(2) - yl(1);
+bracket_step = 0.08 * y_range;
+max_bracket_y = yl(2);
+for a = 1:nA_r2
+    mw_a      = stats_between_r2{a};
+    x_a       = xpos_r2(a, :);
+    bracket_y = yl(2) + 0.05 * y_range;
+    for k = 1:numel(mw_a)
+        if mw_a(k).significant
+            addSignificanceAnnotation(gca, [x_a(mw_a(k).i), x_a(mw_a(k).j)], ...
+                bracket_y, mw_a(k).p_adj, 'style', 'bracket', 'color', cfg.axcol);
+            bracket_y = bracket_y + bracket_step;
+        end
+    end
+    max_bracket_y = max(max_bracket_y, bracket_y);
+end
+ylim([0, max_bracket_y + 0.02 * y_range]);
+
+% X-axis: group name ticks, activity type labels below clusters
+all_x  = xpos_r2(:);
+all_xl = repmat(group_labels_r2', nA_r2, 1);
+xticks(sort(all_x)); xticklabels(all_xl); xtickangle(45);
+
+yl2 = ylim;
+for a = 1:nA_r2
+    text(mean(xpos_r2(a, :)), yl2(1) - 0.18*(yl2(2)-yl2(1)), act_labels_r2{a}, ...
+        'HorizontalAlignment', 'center', 'Color', cfg.axcol, 'Clipping', 'off');
+end
+
+xlim([min(all_x)-1, max(all_x)+1]);
+ylabel('R² (PC1 vs trial number)'); box off;
+set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
+set(gcf, 'color', cfg.bgcol);
+cfg.figSize = 'small'; cfg.aspRatioType = 'square'; cfg.setLines = false;
+cfg.setFigure;
+cfg.saveFigure(hf_r2, 'PC1 R2 by group and activity type trialavg', saveType);
+
+% ---- Paired Wilcoxon signed-rank: across activity types per group ----
+% Each subject contributes one R² per activity type → paired test
+fprintf('\n=== Paired Wilcoxon (R² across activity types, within each group) ===\n');
+act_pairs_r2 = nchoosek(1:nA_r2, 2);
+for g = 1:nG_r2
+    fprintf('\n--- %s ---\n', groups_r2{g});
+    r2_mat = cell2mat(r2_data(g, :));   % [nSubj x nA_r2]
+    for pi = 1:size(act_pairs_r2, 1)
+        a1 = act_pairs_r2(pi, 1);
+        a2 = act_pairs_r2(pi, 2);
+        ok = all(isfinite(r2_mat(:, [a1, a2])), 2);
+        if sum(ok) >= 5
+            p_sr = signrank(r2_mat(ok, a1), r2_mat(ok, a2));
+        else
+            p_sr = NaN;
+        end
+        fprintf('  %s vs %s: p = %.4g %s\n', ...
+            act_labels_r2{a1}, act_labels_r2{a2}, p_sr, statsUtils.pvalToStars(p_sr));
+    end
+end
+
 
 function y = getAngleDiff(ira)
     [nstims, nangles, nsubj] = size(ira);

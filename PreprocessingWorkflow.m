@@ -70,7 +70,8 @@ p = p.selectROIs; % manual input required
 p.sj = p.sj.setManually; % manual input required
 p.sj.save2mat(p.autosave);
 
-tracesfolder = 'traces\manICliberal';
+tracesfolder = 'traces\raw2';
+if ~isfolder(tracesfolder); mkdir(tracesfolder); end
 p = p.extractCalciumTraces(tracesfolder,true);
 
 p = p.TracesQC; % manual input required
@@ -88,7 +89,7 @@ clear all
 thisdrive = '\\tachyon.fmi.ch\tachyon\';
 datafolder = 'groups\scratch\gfriedri\processed-data\250129_TC_invivoCaIMG_odorexp004_005';
 
-tracesfolder = 'traces\manIC_conservative';
+tracesfolder = 'traces\raw';
 
 a = Experiment(fullfiletol(thisdrive,'\groups\scratch\gfriedri\caudtomm\data_record2.xlsx'),tracesfolder,'odorexp004_analysis');
 a.locations = a.locations.setDrive(thisdrive);
@@ -98,7 +99,7 @@ a.locations = a.locations.setDataFolder(datafolder);
 % load 'light' traces (without single px values)
 a = a.loadSubjectTraces;
 
-a.name = "odorexp004_manICliberal_080825";
+a.name = "odorexp004_raw_200526";
 save(a.name,'a','-v7.3')
 
 %% output backward compatible experiment structure and save to file

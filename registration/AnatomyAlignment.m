@@ -384,6 +384,49 @@ classdef AnatomyAlignment < handle
 
             addScalebar(ax, px_x_um);
         end
+
+        %% transformPhysCentroids
+        function aligned_xy = transformPhysCentroids(obj, subj_idx, centroids_phys, phys_sz)
+            % TRANSFORMPHYSCENTROIDS Map physiology-space centroids to aligned anatomy space.
+            %
+            %   aligned_xy = transformPhysCentroids(obj, subj_idx, centroids_phys, phys_sz)
+            %
+            %   INPUTS:
+            %       subj_idx        - scalar index of the subject (into obj.tforms)
+            %       centroids_phys  - [N x 2] centroid positions [x, y] in physiology pixels
+            %       phys_sz         - [W_phys, H_phys]: physiology image dimensions in pixels
+            %
+            %   OUTPUT:
+            %       aligned_xy  - [N x 2] positions [x, y] in aligned canvas pixel space
+            %
+            %   The pipeline is:
+            %     phys px  →  anatomy px  →  affine transform  →  canvas pixel indices
+            arguments
+                obj         AnatomyAlignment
+                subj_idx    (1,1) double
+                centroids_phys (:,2) double
+                phys_sz     (1,2) double
+            end
+
+            [px_x_anat, px_y_anat] = obj.getAnatomyPxSizes();
+            [px_x_phys, px_y_phys] = obj.getPhysPxSizes();
+
+            [H_raw, W_raw] = size(obj.stack, [1 2]);
+            W_phys = phys_sz(1);
+            H_phys = phys_sz(2);
+
+            % Scale centroid coords from physiology pixels to anatomy pixels,
+            % anchored to the shared physical centre of both FOVs.
+            cx_anat = (centroids_phys(:,1) - W_phys/2) * (px_x_phys/px_x_anat) + W_raw/2;
+            cy_anat = (centroids_phys(:,2) - H_phys/2) * (px_y_phys/px_y_anat) + H_raw/2;
+
+            % Apply per-subject affine transform → canvas world coordinates.
+            canvas_world = transformPointsForward(obj.tforms{subj_idx}, [cx_anat, cy_anat]);
+
+            % Convert canvas world coordinates to canvas pixel indices, then to µm.
+            aligned_xy = [(canvas_world(:,1) - obj.canvas.xmin + 1) * px_x_anat, ...
+                          (canvas_world(:,2) - obj.canvas.ymin + 1) * px_y_anat];
+        end
     end
 
     %% Private helpers
@@ -405,6 +448,18 @@ classdef AnatomyAlignment < handle
             end
             px_x_um = obj.px_sizes(row, 2);
             px_y_um = obj.px_sizes(row, 3);
+        end
+
+        function [px_x_um, px_y_um] = getPhysPxSizes(obj)
+            zoom_col = obj.px_sizes_phys(:,1);
+            row = abs(zoom_col - obj.close_up_zoom) < 1e-9;
+            if ~any(row)
+                error('AnatomyAlignment:zoomNotFound', ...
+                    'close_up_zoom %.4g not found in px_sizes_phys column 1.', ...
+                    obj.close_up_zoom);
+            end
+            px_x_um = obj.px_sizes_phys(row, 2);
+            px_y_um = obj.px_sizes_phys(row, 3);
         end
     end
 end

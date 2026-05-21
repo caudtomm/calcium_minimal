@@ -61,11 +61,12 @@ xlabel('iFR (Hz)'); ylabel('Log portion of frames')
 %% topography of the activity
 
 % different single-unit metrics vs anatomy
-out = v.plotTopographicHead('plotType','maps','method','avg intensity')
-out = v.plotTopographicHead('plotType','maps','method','variance')
-out = v.plotTopographicHead('plotType','maps','method','selectivity of tuning')
-out = v.plotTopographicHead('plotType','maps','method','stability of tuning')
-out = v.plotTopographicHead('plotType','maps','method','general suppression score')
+load('anatomy_aligned_01.mat', 'aa');
+out = v.plotTopographicHead('plotType','maps','method','avg intensity','anatomyAlignment',aa)
+out = v.plotTopographicHead('plotType','maps','method','variance','anatomyAlignment',aa)
+out = v.plotTopographicHead('plotType','maps','method','selectivity of tuning','anatomyAlignment',aa)
+out = v.plotTopographicHead('plotType','maps','method','stability of tuning','anatomyAlignment',aa)
+out = v.plotTopographicHead('plotType','maps','method','general suppression score','anatomyAlignment',aa)
 
 
 % response cosine sim vs anatomy
@@ -95,6 +96,33 @@ end
 res_pre = res;
 mantelRs = cellfun(@(x) x.mantelR,res);
 figure; histogram(mantelRs,10)
+
+%% Favourite stimulus topo maps
+v.dataFilter = dft;
+v.dataFilter.subjectGroup  = 'all';
+v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.interval      = [1, 20];
+v.dataFilter.repetitions   = 1:5;
+
+[~, events, all_labs] = ModeSelector(v).extract;
+nSubjects = numel(events);
+
+% Run per subject
+clear quant
+for i = 1:nSubjects
+  ta = TopographicAnalysis(v.filtered_traces{i});
+  [hf, tc, quant(i)] = ta.plotFavouriteStimulus( ...
+      events{i}, all_labs{i}, cfg, 500, 20, false);
+  % cfg.saveFigure(hf, sprintf('fav_stim_topo_subj%d', i), saveType);
+end
+
+% Pooled quantification: avg ± SEM across subjects
+hf_pool = figure('Color', cfg.bgcol);
+plotFavStimulusCurves(quant, cfg, gca, true);
+title(gca, sprintf('Pooled (n=%d)', nSubjects), 'Color', cfg.textcol);
+cfg.figSize = 'small'; cfg.aspRatioType = 'square'; cfg.setLines = true;
+cfg.setFigure;
+cfg.saveFigure(gcf, 'fav_stim_quant_pooled all subj relative prob', saveType);
 
 %% naive intertrial baseline correlation
 v.dataFilter = dft;

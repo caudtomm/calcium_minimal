@@ -10,6 +10,7 @@ new_ax  = copyobj(ax, hf_new);
 new_ax.Position = [0.13, 0.11, 0.775, 0.815];
 
 if ~isempty(ax.Legend)
-    copyobj(ax.Legend, hf_new);
+    copies = copyobj([ax.Legend, ax], hf_new);
+    delete(copies(2));  % remove duplicate axes; keep only the legend copy
 end
 end

@@ -651,11 +651,14 @@ classdef ExperimentViewer
         %                                  'plotType', 'maps')
         %
         %   NAME-VALUE PAIR ARGUMENTS:
-        %       'method'           - activity metric (default: 'selectivity of tuning')
-        %       'plotType'         - 'maps' or 'stats' (default: 'maps')
-        %       'similarityMetric' - for 'stats' mode (default: 'correlation')
-        %       'nShuffles'        - for 'stats' mode (default: 1000)
-        %       'nBins'            - for 'stats' mode (default: 10)
+        %       'method'            - activity metric (default: 'selectivity of tuning')
+        %       'plotType'          - 'maps' or 'stats' (default: 'maps')
+        %       'anatomyAlignment'  - AnatomyAlignment object with pre-computed tforms;
+        %                            when provided, centroids are affine-transformed to a
+        %                            common reference before density maps are computed
+        %       'similarityMetric'  - for 'stats' mode (default: 'correlation')
+        %       'nShuffles'         - for 'stats' mode (default: 1000)
+        %       'nBins'             - for 'stats' mode (default: 10)
             arguments
                 obj
             end
@@ -667,6 +670,7 @@ classdef ExperimentViewer
             plotType = 'maps';
             method = 'selectivity of tuning';
             n_equals = 'cells';
+            aa = [];
             extraArgs = {};
 
             % Parse name-value pairs
@@ -679,6 +683,8 @@ classdef ExperimentViewer
                             n_equals = varargin{k+1};
                         case 'plottype'
                             plotType = varargin{k+1};
+                        case 'anatomyalignment'
+                            aa = varargin{k+1};
                         case {'similaritymetric', 'nshuffles', 'nbins'}
                             extraArgs = [extraArgs, varargin(k:k+1)]; %#ok<AGROW>
                     end
@@ -694,6 +700,11 @@ classdef ExperimentViewer
 
             % useful metrics
             nsubjects = numel(obj.filtered_traces);
+
+            % Track experiment-level subject indices (= indices into aa.tforms) for
+            % each entry in filtered_traces, so transforms can be matched after further
+            % filtering of empty subjects below.
+            all_subj_indices = find(obj.subjects_to_use);
 
             % call low-level processor (compute per-unit metric)
             all_metrics = cell(nsubjects, 1);
@@ -715,13 +726,21 @@ classdef ExperimentViewer
             idx = cellfun(@isempty, all_metrics);
             all_metrics(idx) = [];
             events(idx) = [];
+            all_subj_indices(idx) = [];
             traces = obj.filtered_traces;
             traces(idx) = [];
             if isempty(all_metrics); return; end
 
             % call low-level plotter
-            out = plotTopographic(all_metrics, traces, plotType, ...
-                events, obj.plotConfig, extraArgs{:});
+            if ~isempty(aa)
+                out = plotTopographic(all_metrics, traces, plotType, ...
+                    events, obj.plotConfig, ...
+                    'anatomyAlignment', aa, 'subjectIndices', all_subj_indices, ...
+                    extraArgs{:});
+            else
+                out = plotTopographic(all_metrics, traces, plotType, ...
+                    events, obj.plotConfig, extraArgs{:});
+            end
         end
 
         %% complex and idiosyncratic high-level plotters are saved in external files
