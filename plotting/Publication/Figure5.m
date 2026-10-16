@@ -82,24 +82,48 @@ v.dataFilter = dft;
 %% stimulus dPC weights
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
-v.dataFilter.mode_OI = 'stimulus';
+v.dataFilter.mode_OI = 'novelty';
 v.dataFilter.mode_method = 'mode_values';
+
 v.dataFilter.subjectGroup = 'naïve';
 v.dataFilter.mode_file = 'dpca_naive.mat';
 m = ModeSelector(v).extract;
-c = []; % [w1 N; w2 N; ...]
-for i= 1:numel(m.coeffs)
-    thisdata = m.coeffs{i}(:,m.parseModeOI(i));
-    thisdata = sum(thisdata);
-    c = [c; thisdata(:)];
-end
+c_naive = extractWeights(m);
+
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.mode_file = 'dpca_trained.mat';
+m = ModeSelector(v).extract;
+c_trained = extractWeights(m);
+
 %histogram
-figure; histogram(c, 100, 'FaceColor','k','EdgeAlpha',0);
+minval = min([c_naive(:);c_trained]);
+maxval = max([c_naive(:);c_trained]);
+edges = linspace(minval,maxval,100);
+figure; clear b;
+b(1) = histogram(c_naive, 100, 'FaceColor',cfg.c(1,:),'EdgeAlpha',0,'Normalization','pdf','BinEdges',edges);
+hold on;
+b(2) = histogram(c_trained, 100, 'FaceColor',cfg.c(2,:),'EdgeAlpha',0,'Normalization','pdf','BinEdges',edges);
 box off; axis square
 axis tight
-xlabel('sum of weights'); ylabel('histogram')
+xlabel('Loadings'); ylabel('PDF')
+yscale log
+legend(b,{'naive','trained'})
 set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
+
+function c = extractWeights(m)
+    c = []; % [w1 N; w2 N; ...]
+    for i= 1:numel(m.coeffs)
+        thisdata = m.coeffs{i}(:,m.parseModeOI(i));
+        
+        %thisdata = sum(thisdata); % this can be interesting. reconstruction
+        %loadings are not guaranteed to have sum=1, or to be orthogonal even
+        %within marginalizations. those reqs are satisfied for decomposition
+        %weights.
+    
+        c = [c; thisdata(:)];
+    end
+end
 
 
 %% stimulus dPC weights
@@ -107,8 +131,8 @@ v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'stimulus';
 v.dataFilter.mode_method = 'mode_values';
-v.dataFilter.subjectGroup = 'all';
-v.dataFilter.mode_file = 'dpca_shuffle_all.mat';
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = 'dpca_naive.mat';
 m = ModeSelector(v).extract;
 c = [];
 for i= 1:numel(m.coeffs)

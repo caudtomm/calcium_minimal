@@ -129,6 +129,9 @@ classdef Experiment
             nsubjects = numel(subjectnames);
             if do_overwrite; obj.traces = {}; end
 
+            % header
+            disp(['Traces subfolder: ',obj.tracesfolder])
+
             % execute
             for i_subject = 1:nsubjects
                 disp('')

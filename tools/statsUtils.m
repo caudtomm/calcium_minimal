@@ -10,6 +10,7 @@ classdef statsUtils
     %   stars = statsUtils.pvalToStars(0.003);  % '**'
     %   p_adj = statsUtils.fdr([0.01, 0.04, 0.06]);  % FDR correction
     %   result = statsUtils.friedman(data_matrix);  % Friedman test
+    %   result = statsUtils.bootstrapMeanTest(data, 0);  % one-sample bootstrap test
 
     methods (Static)
 
@@ -290,6 +291,67 @@ classdef statsUtils
             result.r2_marginal = max(0, 1 - ss_res / ss_tot);
 
             result.lme = lme_obj;
+        end
+
+        function result = bootstrapMeanTest(data, mu0, nboot, alpha)
+            % One-sample bootstrap test: is the true mean different from mu0?
+            %
+            % Nonparametric alternative to a one-sample t-test - makes no
+            % normality assumption. Resamples the data with replacement to
+            % build an empirical sampling distribution of the mean, then
+            % checks where mu0 falls relative to it.
+            %
+            % Inputs:
+            %   data  - vector of observations
+            %   mu0   - value to test the mean against (default: 0)
+            %   nboot - number of bootstrap resamples (default: 10000)
+            %   alpha - significance level for the CI (default: 0.05)
+            %
+            % Output:
+            %   result - struct with fields:
+            %       .mean        - observed sample mean
+            %       .mu0         - tested value
+            %       .ci          - [1x2] percentile bootstrap CI,
+            %                      [alpha/2, 1-alpha/2] quantiles
+            %       .p           - two-sided bootstrap p-value
+            %       .n           - sample size (non-NaN observations)
+            %       .nboot       - number of resamples used
+            %       .significant - true if p < alpha (equivalently, mu0
+            %                      falls outside the CI)
+
+            arguments
+                data double
+                mu0 double = 0
+                nboot double = 10000
+                alpha double = 0.05
+            end
+
+            data = data(:);
+            data = data(~isnan(data));
+            n = numel(data);
+
+            result = struct('mean', NaN, 'mu0', mu0, 'ci', [NaN NaN], ...
+                'p', NaN, 'n', n, 'nboot', nboot, 'significant', false);
+
+            if n < 2
+                return;
+            end
+
+            result.mean = mean(data);
+
+            % vectorized resampling: [n x nboot] index matrix
+            idx = randi(n, n, nboot);
+            boot_means = median(data(idx), 1)';
+
+            result.ci = prctile(boot_means, 100*[alpha/2, 1-alpha/2]);
+
+            % two-sided p-value: how much of the bootstrap mass lies on
+            % the far side of mu0 from the observed mean, doubled
+            p_lo = mean(boot_means <= mu0);
+            p_hi = mean(boot_means >= mu0);
+            result.p = min(1, 2 * min(p_lo, p_hi));
+
+            result.significant = result.p < alpha;
         end
 
         function [means, sems, ns] = groupStats(data_cell)

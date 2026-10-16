@@ -2,10 +2,16 @@
 function [hf, out, subject_groups, stim_groups] = plotRepetitionDistances(v, method, subject_groups, stim_groups, repetitions)
     arguments
         v ExperimentViewer
-        method string = 'correlation'
+        method = 'correlation'  % char/string or DistanceMetric
         subject_groups cell = {'naïve', 'trained'}
         stim_groups cell = {{'Arg','Ala','His'}, {'Trp','Ser','Leu'}, 'all stimuli'}
         repetitions double = 1:5
+    end
+
+    if isa(method, 'DistanceMetric')
+        methodLabel = char(method.name);
+    else
+        methodLabel = char(method);
     end
 
     ngroups    = numel(subject_groups);
@@ -48,12 +54,18 @@ function [hf, out, subject_groups, stim_groups] = plotRepetitionDistances(v, met
     for i = 1:nplots
         if isempty(out{i}); continue; end
 
-        thismat  = 1 - out{i}.distMat3d;
-        nslices  = size(thismat, 3);
-        thismat  = thismat(repetitions, repetitions, :);
-        tri_mask = triu(true(numel(repetitions)), 1);
+        thismat = 1 - out{i}.distMat3d;
+        nslices = size(thismat, 3);
+        thismat = thismat(repetitions, repetitions, :);
 
-        out{i}.data = nan(sum(tri_mask, "all"), nslices);
+        n_rep = numel(repetitions);
+        if isfield(out{i}, 'metric') && ~out{i}.metric.isSymmetric
+            tri_mask = ~eye(n_rep, 'logical');   % all off-diagonal pairs
+        else
+            tri_mask = triu(true(n_rep), 1);     % upper triangle only
+        end
+
+        out{i}.data = nan(sum(tri_mask, 'all'), nslices);
         for j = 1:nslices
             thisslice        = thismat(:,:,j);
             out{i}.data(:,j) = thisslice(tri_mask);
@@ -69,7 +81,7 @@ function [hf, out, subject_groups, stim_groups] = plotRepetitionDistances(v, met
     box off
     set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
     set(gcf, 'color', cfg.bgcol);
-    xlabel(method, 'Color', cfg.textcol)
+    xlabel(methodLabel, 'Color', cfg.textcol)
     set(gcf, 'Position', [1 1 2000 1000])
     hold off
 end

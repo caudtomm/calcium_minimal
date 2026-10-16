@@ -82,9 +82,9 @@ cfg.saveFigure(gcf,'allgroups PC variance explained', saveType)
 
 %% plot PCA lines
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'all';
+v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.stims_allowed = 'all stimuli';
-v.dataFilter.trial_sorting = 'chronological';
+% v.dataFilter.trial_sorting = 'chronological';
 v.dataFilter.interval = [.5 20];
 v.dataFilter.repetitions = 1:5;
 cfg.useNatureColors = true;
@@ -105,18 +105,38 @@ cfg.useNatureColors = true;
 % events = cellfun(@(x,y) y-x,base_events,odor_events,'UniformOutput',false);
 
 proj = computeLDE(events,labs,'pooldata',true,'nans2zeros',true, 'method','pca');
-figure; out = plotLDE(proj.embedding{1}.reduction(:,1:2,:),'lines',proj.labs{1},cfg, 'ldetype',proj.name); % plot
+
+% reorder trials in the reduction into chronological order (proj.labs{1}
+% is currently in v.dataFilter.trial_sorting order, e.g. 'stim_id' blocks)
+orig_sorting = v.dataFilter.trial_sorting;
+v.dataFilter.trial_sorting = 'chronological';
+[~,~,labs_chrono] = ModeSelector(v).extract;
+v.dataFilter.trial_sorting = orig_sorting;
+
+chrono_order = nan(size(proj.labs{1}));
+for stim = unique(proj.labs{1},'stable')'
+    chrono_order(strcmp(labs_chrono{1},stim)) = find(strcmp(proj.labs{1},stim));
+end
+proj.embedding{1}.reduction = proj.embedding{1}.reduction(:,:,chrono_order);
+proj.labs{1} = labs_chrono{1};
+
+v.dataFilter.interval = [-22 -2];
+[~,base_events] = ModeSelector(v).extract;
+proj = computeLDE(base_events,labs,'pooldata',true,'nans2zeros',true, 'method','pca','loadings',proj);
+
+figure; out = plotLDE(proj.embedding{1}.reduction(:,1:2,:),'trialNum',proj.labs{1},cfg, 'ldetype',proj.name, ...
+    'shownumbers',false,'showreplines',false); % plot
 xlabel('PC 1'); ylabel('PC 2');
 legend off
 cfg.setLines = false;
 cfg.figSize = 'small';
 cfg.setFigure;
-cfg.saveFigure(gcf,'trained BS PCA trialNum 2d raw', saveType)
+cfg.saveFigure(gcf,'trained PCA 2d trialNum BS overlay', saveType)
 
 
 %% plot UMAP lines
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.interval = [1, 20];
 v.dataFilter.repetitions = 1:5;
@@ -128,7 +148,7 @@ cfg.useNatureColors = true;
 % v.dataFilter.mode_file = 'dpca_naive_BS.mat';
 
 [~,events,labs] = ModeSelector(v).extract;
-events = filterEventsByScore(events,v,[.1 .9],'linear');
+% events = filterEventsByScore(events,v,[.1 .9],'linear');
 
 % [~,odor_events,all_labs] = ModeSelector(v).extract;
 % L = height(odor_events{1});
@@ -149,7 +169,7 @@ cfg.setFigure;
 cfg.saveFigure(gcf,'naive low-drifters UMAP 2d raw', saveType)
 
 
-%%
+%% interrep angles boxplots
 
 grouptag = 'naive';
 
@@ -429,7 +449,7 @@ cfg.aspRatioType = "square";
 cfg.setFigure;
 cfg.saveFigure(gcf,['template ',grouptag, ' ',stimtag,' mat'], saveType)
 
-%%
+%% interrep angle diffs
 
 v.plotConfig.theme = 'many colors';
 v.dataFilter.subjectGroup = 'all';
@@ -585,7 +605,7 @@ disp(corr_tab)
 
 
 %% PC1 trajectory vs trial number
-group_pc1 = 'naïve';
+group_pc1 = 'trained';
 
 v.dataFilter = dft;
 v.dataFilter.subjectGroup  = group_pc1;
@@ -598,9 +618,9 @@ v.dataFilter.repetitions   = 1:5;
 L_pc1 = height(oe_pc1{1});
 v.dataFilter.interval = [-22, -2];
 [~, be_pc1] = ModeSelector(v).extract;
-% be_pc1 = cellfun(@(x) repmat(mean(x,1,'omitmissing'), L_pc1, 1, 1), be_pc1, 'UniformOutput', false);
-% ev_pc1 = cellfun(@(b,o) o - b, be_pc1, oe_pc1, 'UniformOutput', false);
-ev_pc1 = be_pc1;
+be_pc1 = cellfun(@(x) repmat(mean(x,1,'omitmissing'), L_pc1, 1, 1), be_pc1, 'UniformOutput', false);
+ev_pc1 = cellfun(@(b,o) o - b, be_pc1, oe_pc1, 'UniformOutput', false);
+% ev_pc1 = oe_pc1;
 
 proj_pc1 = computeLDE(ev_pc1, labs_pc1, 'pooldata', true, 'nans2zeros', true, 'method', 'pca');
 
@@ -627,15 +647,29 @@ mu_pc1   = mean(pc1_mat, 2, 'omitmissing');
 sem_pc1  = std(pc1_mat, [], 2, 'omitmissing') ./ sqrt(sum(isfinite(pc1_mat), 2));
 
 hf_pc1 = figure; hold on;
-scatter(repmat(t_ax_pc1, 1, nSubj_pc1), mean_pc1_all, 15, [.6 .6 .6], 'filled', 'MarkerFaceAlpha', 0.3);
+x_scatter_pc1 = repmat(t_ax_pc1, 1, nSubj_pc1);
+scatter(t_ax_pc1, mean_pc1_all, 15, [.6 .6 .6], 'filled', 'MarkerFaceAlpha', 1);
 errorbar(t_ax_pc1, mu_pc1, sem_pc1, '-', 'LineWidth', 1.5, 'CapSize', 0, 'Color', cfg.axcol);
+
+% linear regression of pooled PC1 vs trial number
+x_reg_pc1  = t_ax_pc1(:);
+y_reg_pc1  = mean_pc1_all(:);
+ok_reg_pc1 = isfinite(x_reg_pc1) & isfinite(y_reg_pc1);
+[r_pc1, p_pc1] = corr(x_reg_pc1(ok_reg_pc1), y_reg_pc1(ok_reg_pc1));
+b_pc1      = polyfit(x_reg_pc1(ok_reg_pc1), y_reg_pc1(ok_reg_pc1), 1);
+x_line_pc1 = [min(x_reg_pc1(ok_reg_pc1)), max(x_reg_pc1(ok_reg_pc1))];
+plot(x_line_pc1, polyval(b_pc1, x_line_pc1), '-', 'LineWidth', 2, 'Color', 'r');
+text(0.05, 0.95, sprintf('r = %.3f, p = %.3g', r_pc1, p_pc1), 'Units', 'normalized', ...
+    'VerticalAlignment', 'top', 'Color', cfg.axcol);
+fprintf('PC1 vs trial number (%s): r = %.4f, p = %.4g\n', group_pc1, r_pc1, p_pc1);
+
 xlabel('Trial number');  ylabel('Mean PC1');
 title(group_pc1);  box off;
 set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
 cfg.figSize = 'small';  cfg.aspRatioType = 'square';  cfg.setLines = false;
 cfg.setFigure;
-cfg.saveFigure(hf_pc1, ['PC1 vs trial num ', group_pc1, ' baseline raw'], saveType)
+cfg.saveFigure(hf_pc1, ['PC1 vs trial num ', group_pc1, ' BS'], saveType)
 
 % R² between each subject's PC1 trajectory and trial number
 t_vec = (1:nT_pc1)';
@@ -655,8 +689,8 @@ box off;
 set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
 cfg.figSize = 'small';  cfg.aspRatioType = 'square';  cfg.setLines = false;
-cfg.setFigure;
-cfg.saveFigure(gcf, ['PC1 vs trial R2 hist ', group_pc1, ' baseline raw'], saveType)
+% cfg.setFigure;
+% cfg.saveFigure(gcf, ['PC1 vs trial R2 hist ', group_pc1, ' baseline raw'], saveType)
 
 figure;
 RF_mkBoxPlot3(r2_subj,[],[],.1,.5,.5,2,[])
@@ -813,8 +847,8 @@ ylabel('R² (PC1 vs trial number)'); box off;
 set(gca, 'color', cfg.bgcol, 'XColor', cfg.axcol, 'YColor', cfg.axcol);
 set(gcf, 'color', cfg.bgcol);
 cfg.figSize = 'small'; cfg.aspRatioType = 'square'; cfg.setLines = false;
-cfg.setFigure;
-cfg.saveFigure(hf_r2, 'PC1 R2 by group and activity type trialavg', saveType);
+% cfg.setFigure;
+% cfg.saveFigure(hf_r2, 'PC1 R2 by group and activity type trialavg', saveType);
 
 % ---- Paired Wilcoxon signed-rank: across activity types per group ----
 % Each subject contributes one R² per activity type → paired test

@@ -1,6 +1,5 @@
-function out = plotDistances(traces,plotType,method,labs,cfg)
-% <Low level symmetric distance plotter>
-% plotDistances - Plots symmetric distance matrices for trial data
+function out = plotDistances(traces,plotType,metric,labs,cfg)
+% plotDistances - Plots distance matrices for trial data
 % 
 % Usage:
 %   out = plotDistances(traces, plotType, method, labs, cfg)
@@ -8,7 +7,7 @@ function out = plotDistances(traces,plotType,method,labs,cfg)
 % Inputs:
 %   traces   - cell array [nsubjects x 1] of double [t, cells, trials] (sorted)
 %   plotType - char, 'full' or 'repetitions'
-%   method   - char, distance metric for pdist (e.g., 'correlation')
+%   metric   - char/string (pdist method) or DistanceMetric object
 %   labs     - cell array, stimulus names (sorted)
 %   cfg      - PlotConfig object with plotting parameters
 %
@@ -17,9 +16,14 @@ function out = plotDistances(traces,plotType,method,labs,cfg)
 arguments
     traces cell % cell array [nsubjects 1] of double [t, cells, trials] (sorted!)
     plotType char = 'full'
-    method char = 'correlation'
-    labs = [] % stimulus names (sorted!)
+    metric = 'correlation'  % char/string or DistanceMetric
+    labs = []               % stimulus names (sorted!)
     cfg = PlotConfig()
+end
+
+% Normalize metric argument
+if ischar(metric) || isstring(metric)
+    metric = DistanceMetric.fromPdist(char(metric));
 end
 
 % Knobs
@@ -87,7 +91,7 @@ function [distanceMAT3D] = plotRepetitionSimilarity(C,stims,pl)
     clim(crange)
     colormap(cfg.colormapName)
     a = colorbar('Color',cfg.axcol);
-    a.Label.String = method;
+    a.Label.String = metric.name;
     a.Label.FontSize= gca().FontSize;
     set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
     set(gcf, 'color', cfg.bgcol); 
@@ -98,14 +102,18 @@ end
 function [distanceMAT3D] = plotDiffStimSimilarity(C,stims,pl)
     nstims = numel(stims);
     n_repetitions = 5; % # TODO : should be max available repetition
-    n_layers = max(cumsum([1:nstims]-1));
-    distanceMAT3D = nan(n_repetitions,n_repetitions,nsubjects*n_layers);
+    if metric.isSymmetric
+        n_layers = nstims * (nstims - 1) / 2;
+        ks_mask  = ~triu(true(nstims));       % lower triangle only
+    else
+        n_layers = nstims * (nstims - 1);     % all ordered off-diagonal pairs
+        ks_mask  = ~eye(nstims, 'logical');
+    end
+    distanceMAT3D = nan(n_repetitions, n_repetitions, nsubjects*n_layers);
 
-    % isolate lower-triangle stimulus-pair squares
-    % idx = ones(nstims);
-    k = reshape(1:nstims^2,[nstims,nstims]);
-    ks = k(~triu(k));
-    k = repelem(k,n_repetitions,n_repetitions);
+    k = reshape(1:nstims^2, [nstims, nstims]);
+    ks = k(ks_mask);
+    k = repelem(k, n_repetitions, n_repetitions);
 
     n=0;
     for i_fish = 1:nsubjects
@@ -130,7 +138,7 @@ function [distanceMAT3D] = plotDiffStimSimilarity(C,stims,pl)
     clim(crange)
     colormap(cfg.colormapName)
     a = colorbar('Color',cfg.axcol);
-    a.Label.String = method;
+    a.Label.String = metric.name;
     a.Label.FontSize= gca().FontSize;
     set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
     set(gcf, 'color', cfg.bgcol); 
@@ -145,7 +153,7 @@ function [distanceMAT3D] = plotFullMat(pl)
     for i = 1:nsubjects
         % compress into avg activity vectors
         avg_actvect = squeeze(mean(traces{i},1,'omitmissing')); % [N,trials]
-        distanceMAT3D(:,:,i) = squareform(pdist(avg_actvect', method)); % [trials, trials]
+        distanceMAT3D(:,:,i) = metric.compute(avg_actvect'); % [trials, trials]
     end
 
     % (optional) plot full avg intertrial distance matrix
@@ -160,7 +168,7 @@ function [distanceMAT3D] = plotFullMat(pl)
     clim(crange)
     colormap(cfg.colormapName)
     a = colorbar('Color',cfg.axcol);
-    a.Label.String = method;
+    a.Label.String = metric.name;
     a.Label.FontSize= gca().FontSize;
     set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
     set(gcf, 'color', cfg.bgcol); 

@@ -75,9 +75,9 @@ end
 
 ngroups=length(datacells);
 for a1=1:ngroups;
-    m=mean(datacells{a1});
-    sd=std(datacells{a1});
-    med=median(datacells{a1});
+    m=mean(datacells{a1}, 'omitmissing');
+    sd=std(datacells{a1},[],'omitmissing');
+    med=median(datacells{a1}, 'omitmissing');
     pctles=prctile(datacells{a1},percentiledefs);
     if ngroups==1;
         if isempty(boxwidth);

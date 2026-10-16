@@ -13,6 +13,7 @@ params.poolData = false; % pool data across subjects
 params.zscoreData = true; % z-score data before LDE computation
 params.zscoreDim = 2; % dimension along which to z-score
 params.nans2zeros = false; % replace NaNs with zeros before z-scoring
+params.loadings = []; % pass a prior computeLDE output to project into its space
 % UMAP-specific parameters
 params.metric = 'cosine'; % metric for UMAP
 params.min_dist = 0.8; % min_dist for UMAP
@@ -34,6 +35,8 @@ if ~isempty(varargin)
                 params.zscoreDim = varargin{k+1};
             case 'nans2zeros'
                 params.nans2zeros = varargin{k+1};
+            case 'loadings'
+                params.loadings = varargin{k+1};
             case 'metric'
                 params.metric = varargin{k+1};
             case 'min_dist'
@@ -67,11 +70,30 @@ if params.poolData
 end
 
 % Compute LDE
+ref = params.loadings; % [] or a prior computeLDE output struct
+if ~isempty(ref)
+    assert(strcmp(ref.params.method, params.method), ...
+        'loadings method (%s) does not match current method (%s)', ...
+        ref.params.method, params.method);
+    assert(numel(ref.embedding) == numel(data), ...
+        'loadings has %d subject(s) but data has %d', numel(ref.embedding), numel(data));
+end
+
 switch params.method
     case 'pca'
-        embedding = cellfun(@(x) computePCA(x.traces), data, 'UniformOutput', false);
+        if isempty(ref)
+            embedding = cellfun(@(x) computePCA(x.traces), data, 'UniformOutput', false);
+        else
+            embedding = arrayfun(@(i) applyPCA(data{i}.traces, ref.embedding{i}), ...
+                1:numel(data), 'UniformOutput', false);
+        end
     case 'umap'
-        embedding = cellfun(@(x) computeUMAP(x.traces, params), data, 'UniformOutput', false);
+        if isempty(ref)
+            embedding = cellfun(@(x) computeUMAP(x.traces, params), data, 'UniformOutput', false);
+        else
+            embedding = arrayfun(@(i) applyUMAP(data{i}.traces, ref.embedding{i}), ...
+                1:numel(data), 'UniformOutput', false);
+        end
     case 'returnonly'
         embedding = data; % skip computation, return preprocessed data only
         for i = 1:numel(embedding)
@@ -149,6 +171,26 @@ function embedding = computeUMAP(data, params)
     embedding.reduction = reduction;
     embedding.umap = umap;
     embedding.clusterIdentifiers = clusterIdentifiers;
+end
+
+function embedding = applyPCA(data, ref)
+    score = (data - ref.mu) * ref.coeff;
+    embedding.coeff = ref.coeff;
+    embedding.mu = ref.mu;
+    embedding.latent = ref.latent;
+    embedding.explained = ref.explained;
+    embedding.reduction = score;
+end
+
+function embedding = applyUMAP(data, ref)
+    idx_nan = any(isnan(data), 2);
+    data_clean = data;
+    data_clean(idx_nan, :) = [];
+    reduction = ref.umap.transform(data_clean);
+    reduction = insert_rows(reduction, find(idx_nan));
+    embedding.reduction = reduction;
+    embedding.umap = ref.umap;
+    embedding.clusterIdentifiers = ref.clusterIdentifiers;
 end
 
 function mat_out = insert_rows(mat_in,original_idx,original_rows)

@@ -42,10 +42,10 @@ dft = v.dataFilter;
 
 
 %% intertrial euclidean distances
-grouptag = 'trained3';
+grouptag = 'naive';
 
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'trained1 (T-R-S-H-A-ACSF/L)';
+v.dataFilter.subjectGroup = 'naïve';
 
 % full matrix
 hf = figure;
@@ -207,10 +207,10 @@ v.dataFilter.subjectGroup = 'all';
 hf = figure;
 C = v.plotDistancesHead;
 xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
-cfg.figSize = 'small';
+cfg.figSize = 'medium';
 cfg.aspRatioType = 'square';
 cfg.setFigure;
-cfg.saveFigure(gcf,[grouptag,' stim intertrial corr full raw'], saveType)
+cfg.saveFigure(gcf,[grouptag,' stim intertrial corr full conservative'], saveType)
 
 % repetitions
 hf = figure;
@@ -219,12 +219,12 @@ xticks([]); yticks([]); xlabel(''); ylabel(''); title('')
 cfg.figSize = 'small';
 cfg.aspRatioType = 'wide';
 cfg.setFigure;
-cfg.saveFigure(gcf,[grouptag,' stim intertrial corr reps raw'], saveType)
+cfg.saveFigure(gcf,[grouptag,' stim intertrial corr reps conservative'], saveType)
 v.dataFilter = dft;
 
 
 
-%% intertrial correlations, without pre-stimulus correlations
+%% intertrial correlations, without pre-stimulus correlations composite figure
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.stims_allowed = 'all stimuli';
@@ -258,14 +258,14 @@ clim([-.2 .2])
 v.dataFilter = dft;
 
 
-%% intertrial correlations, without pre-stimulus correlations
+%% intertrial correlations, without pre-stimulus correlations including stats
 
-shuffle_trials_base = true;
+shuffle_trials_base = false;
 
-grouptag = 'trained';
+grouptag = 'naive';
 
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.subjectGroup = 'naïve';
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.interval = [-22 -2];
 [~,base_events] = ModeSelector(v).extract;
@@ -356,6 +356,69 @@ cfg.figSize = "tiny";
 cfg.aspRatioType = 'tall';
 cfg.setFigure;
 cfg.saveFigure(gcf,[grouptag,' ',shuf_tag,'stim-prestim intertrial corr decay'], saveType)
+cfg = v.plotConfig;
+
+
+% native vs baseline-subtr. intertrial corrs, same vs different stimuli
+figure;
+C_odor = 1-plotDistances(odor_events,'full','correlation',all_labs{1},cfg);
+C_diff = 1-plotDistances(diff_events,'full','correlation',all_labs{1},cfg);
+close;
+[~,ntrials,nsubj] = size(C_odor);
+lab = string(all_labs{1});
+is_same = (lab(:)==lab(:)') & triu(true(ntrials),1);
+is_diff = (lab(:)~=lab(:)') & triu(true(ntrials),1);
+idx_same = repmat(is_same,1,1,nsubj);
+idx_diff = repmat(is_diff,1,1,nsubj);
+datacells = {C_odor(idx_same), C_diff(idx_same), C_odor(idx_diff), C_diff(idx_diff)};
+xpos = [1 2 4 5];
+show_violins = true; % split violins under the boxes (native left, BS right)
+
+figure; hold on
+if show_violins
+    width = 0.5; % half-violin max width -> reaches the box centre
+    colors = cfg.c([1 2 1 2],:); % native, BS (as in the decay plot)
+    side = [-1 1 -1 1]; % left half for native, right half for BS
+    for k = 1:numel(datacells)
+        vv = datacells{k}; vv = vv(~isnan(vv));
+        if numel(unique(vv))<2, continue; end
+        xc = mean(xpos(2*ceil(k/2)-[1 0])); % shared centre of the pair
+        vgrid = linspace(min(vv), max(vv), 200);
+        f = ksdensity(vv, vgrid);
+        f = f / max(f) * width;
+        patch([xc + side(k)*f, xc*ones(size(f))], [vgrid, fliplr(vgrid)], ...
+            colors(k,:), 'FaceAlpha', .35, 'EdgeColor', 'none');
+    end
+end
+RF_mkBoxPlot3(datacells,[],xpos,.1,.5,.5,2,[])
+xlim([0 6]); ylim([-1 1.2])
+xticks(xpos); xticklabels({'native','BS','native','BS'})
+ylabel('r')
+text(1.5,-.95,'same stim.','HorizontalAlignment','center','Color',cfg.textcol)
+text(4.5,-.95,'diff. stim.','HorizontalAlignment','center','Color',cfg.textcol)
+
+% paired (same trial pairs) native vs baseline-subtr.
+p_same = signrank(datacells{1},datacells{2});
+p_diffstim = signrank(datacells{3},datacells{4});
+
+addSignificanceAnnotation(gca,xpos(1:2),1.05,p_same,'style','bracket','color',cfg.textcol);
+
+
+
+
+
+addSignificanceAnnotation(gca,xpos(3:4),1.05,p_diffstim,'style','bracket','color',cfg.textcol);
+fprintf('Native vs BS intertrial corr (signrank, pooled trial pairs):\n')
+fprintf('  same stim.:  median %.3f vs %.3f, n=%d pairs, p = %.3g\n', ...
+    median(datacells{1},'omitmissing'), median(datacells{2},'omitmissing'), sum(~isnan(datacells{1})), p_same)
+fprintf('  diff. stim.: median %.3f vs %.3f, n=%d pairs, p = %.3g\n', ...
+    median(datacells{3},'omitmissing'), median(datacells{4},'omitmissing'), sum(~isnan(datacells{3})), p_diffstim)
+
+cfg.figSize = "small";
+cfg.aspRatioType = 'square';
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag,' ',shuf_tag,'stim-prestim intertrial corr same-diff boxplot'], saveType)
+cfg = v.plotConfig;
 
 
 
@@ -590,10 +653,10 @@ disp(classif_tab);
 
 %% intertrial correlations for trials of the same and different odors, quantification
 v.dataFilter = dft;
-stimclass = 'all';
-v.dataFilter.stims_allowed = 'all stimuli';
+stimclass = 'novel';
+% v.dataFilter.stims_allowed = 'all stimuli';
 % v.dataFilter.stims_allowed = {'Arg','Ala','His'};
-% v.dataFilter.stims_allowed = {'Trp','Ser','Leu'};
+v.dataFilter.stims_allowed = {'Trp','Ser','Leu'};
 
 
 % native units repetition correlations for same and different stimuli
@@ -618,7 +681,7 @@ cv_labels = [repmat({'naive'},numel(cv_naive),1); repmat({'trained'},numel(cv_tr
 boxplot(cv_all, cv_labels); hold on;
 ylabel('CV of intertrial correlations');
 cfg.figSize = 'small'; cfg.aspRatioType = 'square'; cfg.setFigure;
-cfg.saveFigure(gcf,['correlation stability CV ',stimclass], saveType);
+% cfg.saveFigure(gcf,['correlation stability CV ',stimclass], saveType);
 cfg = v.plotConfig;
 
 y = [C_naive;C_trained;C_uncoupled];
@@ -629,7 +692,7 @@ hf = figure;
 boxplot(y,g);
 ylim([-1 1]); ylabel('r')
 cfg.figSize = 'tiny'; cfg.aspRatioType = 'tall'; cfg.setFigure;
-cfg.saveFigure(gcf,['same stim correlation ',stimclass], saveType);
+% cfg.saveFigure(gcf,['same stim correlation ',stimclass], saveType);
 cfg = v.plotConfig;
 supp_stats = statsUtils.pairwiseMannWhitney({C_naive,C_trained}, {'naive','trained'}, true);
 [p,~,stats] = kruskalwallis(y,g,'off');
@@ -719,7 +782,7 @@ function [C_vals_same, cv_per_slice] = prova(v, saveType, groupname, tag,stimcla
     cfg.figSize = 'tiny';
     cfg.aspRatioType = 'square';
     cfg.setFigure;
-    cfg.saveFigure(gcf,[groupname, ' intertrial corr ',stimclass,' pooled adjecent',tag], saveType)
+    % cfg.saveFigure(gcf,[groupname, ' intertrial corr ',stimclass,' pooled adjecent',tag], saveType)
     cfg = v.plotConfig;
 
     hf = figure;
@@ -734,7 +797,7 @@ function [C_vals_same, cv_per_slice] = prova(v, saveType, groupname, tag,stimcla
     cfg.figSize = 'tiny';
     cfg.aspRatioType = 'square';
     cfg.setFigure;
-    cfg.saveFigure(gcf,[groupname, ' intertrial corr ',stimclass,' pooled CDF',tag], saveType)
+    % cfg.saveFigure(gcf,[groupname, ' intertrial corr ',stimclass,' pooled CDF',tag], saveType)
     cfg = v.plotConfig;
 
     supp_stats = statsUtils.pairwiseMannWhitney({C_vals_same,C_vals_diff,C_vals_same_FTE}, {'same','diff','rep1'}, true);

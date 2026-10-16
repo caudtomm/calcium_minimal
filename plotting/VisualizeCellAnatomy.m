@@ -17,6 +17,7 @@ classdef VisualizeCellAnatomy
 %       vca = VisualizeCellAnatomy(v);
 %       vca.n_cells = 5;            % optional — default 5
 %       vca.neighborhood = 25;      % optional — default 20 px
+%       vca.flattening = 'max';     % optional — default 'max'
 %       [hf_a, hf_lc, hf_dff, hf_s, anat, lcorr, dff, tbl] = vca.plot(scores);        % quant=0.8
 %       [hf_a, hf_lc, hf_dff, hf_s, anat, lcorr, dff, tbl] = vca.plot(scores, 0.9);   % custom quant
 %       [hf_a, hf_lc, hf_dff, hf_s, anat, lcorr, dff, tbl] = vca.plot();              % random cells
@@ -44,8 +45,9 @@ classdef VisualizeCellAnatomy
         v            ExperimentViewer
         n_cells      double = 5    % cells drawn from each end of score distribution
         neighborhood double = 20   % pixel padding around ROI (passed to ExtractCellAnatomy)
+        flattening   char {mustBeMember(flattening, {'max', 'avg'})} = 'max'   % how to flatten the anatomy stack (default: 'max')
     end
-
+    
     methods
 
         function obj = VisualizeCellAnatomy(v)
@@ -192,7 +194,7 @@ classdef VisualizeCellAnatomy
                     fprintf(' unavailable\n');
                 end
 
-                %% dF/F mean images per trial -----------------------------
+                %% dF/F images per trial -----------------------------
                 try
                     [r1, r2, c1, c2, roi_mask_dff_r, roi_lbl_dff] = eca.getCropBounds();
                     t_idx_dff = trial_idx_by_subj{si};
@@ -205,8 +207,13 @@ classdef VisualizeCellAnatomy
                             traces_list{si}, t_idx_dff(j), interval_sec);
                         snip = eca.loadTrialMovieSnippet(t_idx_dff(j), fr_int);
                         if ~isempty(snip) && ~isempty(snip.stack)
-                            full_mean       = mean(snip.stack, 3, 'omitmissing');
-                            dff_imgs(:,:,j) = full_mean(r1:r2, c1:c2);
+                            switch obj.flattening
+                                case 'max'
+                                    full_flat       = max(snip.stack, [], 3, 'omitmissing');
+                                case 'avg'
+                                    full_flat       = mean(snip.stack, 3, 'omitmissing');
+                            end
+                            dff_imgs(:,:,j) = full_flat(r1:r2, c1:c2);
                         end
                     end
                     fprintf('done\n');

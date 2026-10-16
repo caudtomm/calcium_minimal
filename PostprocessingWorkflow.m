@@ -27,7 +27,7 @@ end
 
 %% initialize output figure saving
 cfg = PlotConfig('colormapName','lapaz','favouriteColors',[84,85,73,86:99]); % (test1, test2, ctrl)
-cfg.custom.crange = [.3 .7];
+cfg.custom.crange = [.1 .7];
 cfg.savePath = savepath;
 
 figs = FigureSaver;
@@ -258,11 +258,11 @@ v.dataFilter = dft; % recover
 
 v.dataFilter.subjectGroup = 'naïve';
 % v.dataFilter.mode_file = 'dpca_naive.mat';
-compareModeMetricsFigure(v);
+[hf, GSS, SeT, StT, Tuning, vals] = compareModeMetricsFigure(v);
 
 v.dataFilter.subjectGroup = 'trained';
 % v.dataFilter.mode_file = 'dpca_trained.mat';
-vals = compareModeMetricsFigure(v);
+[hf, GSS, SeT, StT, Tuning, vals] = compareModeMetricsFigure(v);
 
 v.dataFilter.subjectGroup = 'uncoupled';
 % v.dataFilter.mode_file = 'dpca_uncoupled.mat';

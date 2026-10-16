@@ -11,7 +11,7 @@ t_lim_sec = [-5 35]; % from 5 sec before to 35 seconds after stimulus onset
 overlap = .1; % [seconds]
 
 %% Load dataset
-filename = 'odorexp004_IC1_130625.mat';
+filename = 'odorexp004_raw_150726.mat';
 
 %
 experiment = load(filename).a; % Experiment object
@@ -47,7 +47,7 @@ v.dataFilter = dft;
 v.dataFilter.interval = [];
 [~,events] = ModeSelector(v).extract;
 events = cellfun(@(x) x(:),events,'UniformOutput',false);
-events = cell2mat(events);
+
 x = 0:.1:40;
 y = nan(numel(events),numel(x)-1);
 for i = 1:numel(events)
@@ -122,12 +122,12 @@ plotFavStimulusCurves(quant, cfg, gca, true);
 title(gca, sprintf('Pooled (n=%d)', nSubjects), 'Color', cfg.textcol);
 cfg.figSize = 'small'; cfg.aspRatioType = 'square'; cfg.setLines = true;
 cfg.setFigure;
-cfg.saveFigure(gcf, 'fav_stim_quant_pooled all subj relative prob', saveType);
+cfg.saveFigure(gcf, 'fav_stim_quant_pooled all subj absolute prob zoom', saveType);
 
 %% naive intertrial baseline correlation
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'all';
-v.dataFilter.stims_allowed = 'all stimuli';
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.stims_allowed = 'all trials';
 v.dataFilter.interval = [-22 -2];
 v.dataFilter.trial_sorting = 'chronological';
 hf = figure;
@@ -153,23 +153,24 @@ for i = 1:ntrials-1
 end
 subplot(122)
 plotLineNShade(1:ntrials-1,y(:,1),y(:,2),'k',cfg)
+axis tight
 ylim([0 1])
 xlabel('Distance (trials)'); ylabel('r')
 cfg.figSize = 'large';
 cfg.aspRatioType = 'wide';
-cfg.setFigure;
-cfg.saveFigure(gcf,'uncoupled base intertrial corr', saveType)
+% cfg.setFigure;
+% cfg.saveFigure(gcf,'naive base intertrial corr', saveType)
 cfg = v.plotConfig;
 v.dataFilter = dft;
 
 %% intertrial baseline correlation drop, depending on how many high-drifting cells are cut off
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'all';
+v.dataFilter.subjectGroup = {'naïve','trained'};
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.interval = [-22 -2];
 v.dataFilter.trial_sorting = 'chronological';
 
-th = 0:0.01:.5;
+th = 0:0.01:.45;
 
 G = nan(numel(th),2);
 for i_th = 1:numel(th)
@@ -184,6 +185,7 @@ for i_th = 1:numel(th)
     hold on; % to take out the strongest drifting cells
     [~,events,labs] = ModeSelector(v).extract;
     events = filterEventsByScore(events,v,score_range,'linear');
+    events(cellfun(@width,events)<2) = []; % kick out fish which only have one cell left
     C.distMat3d = plotDistances(events,'full','correlation',labs{1},cfg);
     hold off
     
@@ -212,14 +214,14 @@ hf = figure;
 yyaxis left;
 plot(th, G(:,1), 'b');
 hold on;
-ylabel('Slopes');
+ylabel('Slope');
 set(gca, 'YColor', 'b');
 
 % Right y-axis: intercepts
 yyaxis right;
 hold on;
 plot(th, G(:,2), 'r');
-ylabel('Slopes');
+ylabel('Intercept');
 set(gca, 'YColor', 'r');
 
 % Shared decorations (drawn on whichever side is active — cosmetic only)
@@ -236,7 +238,7 @@ post_interval = [115.5 135];
 pre_interval = [-22.5 -2];
 stim_interval = [.5 20];
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.subjectGroup = 'naïve';
 v.dataFilter.stims_allowed = 'all stimuli';
 v.dataFilter.trial_sorting = 'chronological';
 
@@ -413,8 +415,8 @@ a = colorbar('Color',cfg.axcol);
 a.Label.String = 'Count';
 a.Label.FontSize= cfg.fontSize;
 cfg.figSize = 'medium';
-cfg.setFigure
-cfg.saveFigure(gcf,'naive corr with prestimulus', saveType)
+% cfg.setFigure
+% cfg.saveFigure(gcf,'naive corr with prestimulus', saveType)
 cfg = v.plotConfig;
 
 
@@ -474,25 +476,26 @@ cfg = v.plotConfig;
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'naïve';
 v.dataFilter.stims_allowed = 'all stimuli';
-v.dataFilter.interval = [-5 35];
+v.dataFilter.interval = [-20 40];
 v.dataFilter.repetitions = [1:5];
 [~,events,all_labs] = ModeSelector(v).extract;
 events = cellfun(@(x) permute(x,[3,2,1]),events,'UniformOutput',false);
 events = separateTrials(events);
 T = size(events{1},3);
 figure; C = plotDistances(events,'full','correlation',1:T,cfg);
-t = -5:5:35;
+t = -20:20:40;
 x = linspace(1,T,numel(t));
 xticks(x);xticklabels(t)
 yticks(x);yticklabels(t)
 clim([.1 .7])
 xlabel('Time (s)')
 ylabel('Time (s)')
+colorbar off
 
 cfg = v.plotConfig;
 cfg.figSize = 'medium';
 cfg.setFigure;
-cfg.saveFigure(gcf,'naive singletrial corr in time imagesc', saveType)
+cfg.saveFigure(gcf,'naive singletrial corr in time imagesc extended', saveType)
 
 
 hasnan = squeeze(sum(isnan(C),[1,2]));
@@ -541,12 +544,16 @@ cfg = v.plotConfig;
 %% motion responsiveness vs odor responsiveness
 resp_by_odor = false;
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'all';
-has_beh2p_data = ~cellfun(@(x) isempty(x.behavior2p),v.filtered_traces);
-idx = find(has_beh2p_data); idx([4,17])=[];
-v.dataFilter.subjectIDs = v.subjectTab.name(idx);
+v.dataFilter.subjectGroup = {'naïve','trained'};
+has_beh2p_data = ~cellfun(@(x) isempty(x.behavior2p),v.traces);
+idx_2p = find(has_beh2p_data); idx_2p([4,17])=[];
+names_2p = v.subjectTab.name(idx_2p);
+names_ingroup = v.dataFilter.getSubjectIDs(v.subjectTab);
+names_filter = ismember(names_ingroup,names_2p);
+v.dataFilter.subjectIDs = names_ingroup(names_filter);
 v.dataFilter.interval  = [.5 20]; % get intensity during odor window
 iFR_odor = v.plotUnitActivityMetricHead('method','avg intensity');
+N = cellfun(@height,iFR_odor); N = cumsum(N);
 v.dataFilter.interval = []; % get cellwise mean and std from all data
 iFR_var = v.plotUnitActivityMetricHead('method','variance');
 iFR_var = cell2mat(iFR_var);
@@ -615,7 +622,7 @@ for i = 1:numel(snips)
 end
 xlabel('Motion responsiveness (STD)'); ylabel('CDF'); title('')
 cfg.setFigure
-cfg.saveFigure(gcf,'motion responsiveness CDF', saveType)
+% cfg.saveFigure(gcf,'motion responsiveness CDF', saveType)
 
 % LME: motion responsiveness ~ odor responsiveness + (1|subject)
 % split flat resp back into per-subject cells; exclude subjects with no motion data
@@ -637,19 +644,16 @@ disp(['Pearson corr: ', num2str(r(2)),' - p-value: ', num2str(p(2))])
 fprintf('LME (motion ~ odor): slope = %.3g,  r_rm = %.3f,  p = %s\n', ...
     lme_result.slope, lme_result.r_rm, statsUtils.pvalToStars(lme_result.p))
 cfg.setFigure
-cfg.saveFigure(gcf,'odor vs motion responsiveness', saveType)
+% cfg.saveFigure(gcf,'odor vs motion responsiveness', saveType)
 
 
 
 %% naive individual response traces (pooled imagesc)
 
-has_beh2p_data = ~cellfun(@(x) isempty(x.behavior2p),v.filtered_traces);
-
-
 resp_by_odor = false;
 Nshow = 1000; % n of cells to randomly subsample for visualization
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'all';
+v.dataFilter.subjectGroup = {'naïve','trained'};
 v.dataFilter.interval  = [.5 20]; % get intensity during odor window
 iFR_odor = v.plotUnitActivityMetricHead('method','avg intensity');
 N = cellfun(@height,iFR_odor); N = cumsum(N);
@@ -709,7 +713,7 @@ events = events(idx,:,:); % sort by responsiveness
 idx = false(N,1); idx(randperm(N,Nshow)) = true; % random subsample
 y = mean(events(idx,:,:),3,'omitmissing')-mean(events(idx,1:38,:),[2,3],'omitmissing');
 figure; imagesc(t,1:Nshow,y)
-clim([-0.2 .5])
+clim([-0.5 .5])
 xlabel('Time from stim. onset (s)')
 ylabel('Cell #')
 a = colorbar('Color',cfg.axcol);
@@ -728,9 +732,176 @@ cfg.saveFigure(gcf,'naive subsample responsiveness', saveType)
 cfg = v.plotConfig;
 v.dataFilter = dft;
 
+
+%% single fish pre + response example raster
+
+Nshow = 100; % n of cells to randomly subsample for visualization
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = {'naïve'};
+v.dataFilter.interval  = [-22 22]; % get intensity before and during odor window
+[~,iFR_odor,labs] = ModeSelector(v).extract;
+
+% one figure per subject
+% for isub = 1:numel(iFR_odor)
+%     fr0 = iFR_odor{isub}; thislabs = labs{isub};
+%     hf = figure;
+%     for itr = 1:size(fr0,3)
+%         fr = fr0(:,:,itr);
+% 
+%         subplot(6,5,itr)
+%         plotActivity(fr)
+%         title(thislabs{itr})
+%     end
+% end
+
+fishid = 4; trialid = 27;
+fr0 = iFR_odor{fishid}; thislabs = labs{fishid};
+hf = figure;
+fr = fr0(:,:,trialid);
+plotActivity(fr); hold on
+xline(0,'w'); xline(20,'w');
+ylim([1,Nshow])
+colorbar
+axis square
+xlabel('Time (s)')
+ylabel('Cell #')
+% title(thislabs{itr})
+
+cfg.figSize = 'medium';
+cfg.setFigure
+colormap(flipud(lapaz))
+clim([0 2])
+cfg.saveFigure(gcf,'naive single response subsample', saveType)
+cfg = v.plotConfig;
+v.dataFilter = dft;
+
+function plotActivity(fr)
+    % input fr [T,N] (single trial)
+
+    [~,idx] = sort(max(fr),'descend'); % sort by max activity
+    
+    [T,N] = size(fr);
+    t = linspace(-22,22,T);
+
+    imagesc(t,1:N,fr(:,idx)')
+end
+
+%% PDFs of pre-stimulus vs stimuls firing rates
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = {'naïve'};
+ 
+v.dataFilter.interval  = [-22.5 -2]; % get intensity before odor window
+[~,pre_fr,~] = ModeSelector(v).extract;
+
+v.dataFilter.interval  = [.5 20]; % get intensity during odor window
+[~,odor_fr,labs] = ModeSelector(v).extract;
+
+% per-subject PDFs of iFR, pooled over frames x cells x trials.
+% binned in log10 space -> density per log10(Hz); zero-rate frames can't be
+% placed on a log axis, so their fraction is reported separately
+edges = linspace(-2, log10(40), 61); % log10(iFR) bin edges
+ctrs = 10.^(edges(1:end-1) + diff(edges)/2);
+nsubjects = numel(pre_fr);
+pdf_pre = nan(nsubjects,numel(ctrs));
+pdf_odor = nan(nsubjects,numel(ctrs));
+frac0 = nan(nsubjects,2); % fraction of sub-threshold frames [pre, odor]
+mu_fr = nan(nsubjects,2); % mean iFR per subject [pre, odor]
+for i = 1:nsubjects
+    x_pre = pre_fr{i}(:);  x_pre = x_pre(~isnan(x_pre));
+    x_odor = odor_fr{i}(:); x_odor = x_odor(~isnan(x_odor));
+    pdf_pre(i,:) = histcounts(log10(x_pre(x_pre>0)),edges)./(numel(x_pre)*diff(edges));
+    pdf_odor(i,:) = histcounts(log10(x_odor(x_odor>0)),edges)./(numel(x_odor)*diff(edges));
+    frac0(i,:) = [mean(x_pre<10^edges(1)), mean(x_odor<10^edges(1))];
+    mu_fr(i,:) = [mean(x_pre), mean(x_odor)];
+end
+
+sem = @(y) std(y,[],1,'omitmissing')./sqrt(sum(~isnan(y),1));
+hf = figure; clear b
+b(1) = plotLineNShade(ctrs,mean(pdf_pre,1,'omitmissing'),sem(pdf_pre),cfg.c(3,:),cfg);
+hold on
+b(2) = plotLineNShade(ctrs,mean(pdf_odor,1,'omitmissing'),sem(pdf_odor),cfg.c(1,:),cfg);
+xscale log; axis square tight
+xlabel('iFR (Hz)'); ylabel('Probability density (per log_{10} Hz)')
+legend(b,{'pre-stimulus','odor'},'Location','best','Box','off','TextColor',cfg.textcol)
+
+% paired comparison across subjects
+p_mu = signrank(mu_fr(:,1),mu_fr(:,2));
+fprintf('Mean iFR pre = %.3g +- %.3g Hz, odor = %.3g +- %.3g Hz (mean +- SEM, n=%d); signrank p = %.3g\n', ...
+    mean(mu_fr(:,1)), sem(mu_fr(:,1)), mean(mu_fr(:,2)), sem(mu_fr(:,2)), nsubjects, p_mu)
+fprintf('Fraction of frames < %.2g Hz: pre = %.3f, odor = %.3f\n', 10^edges(1), mean(frac0,1))
+
+cfg.setFigure
+cfg.saveFigure(gcf,'naive pre vs odor iFR PDF', saveType)
+cfg = v.plotConfig;
+v.dataFilter = dft;
+
+%% raster baseline over trials
+
+normalize = false; % scale each cell to its max across trials (else raw iFR)
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = {'naïve'};
+v.dataFilter.stims_allowed = 'all trials';
+v.dataFilter.trial_sorting = 'chronological';
+v.dataFilter.interval = [-22 -2]; % pre-stimulus baseline
+[~,base_fr,labs] = ModeSelector(v).extract;
+
+% avg baseline vector per trial -> [trials x N], cells sorted by peak trial
+nsubjects = numel(base_fr);
+base_raster = cell(nsubjects,1);
+for i = 1:nsubjects
+    B = squeeze(mean(base_fr{i},1,'omitmissing'))'; % [trials x N]
+    [pk,pk_trial] = max(B,[],1,'omitmissing');
+    [~,idx] = sortrows([pk_trial(:), -pk(:)]); % by peak trial, then peak value
+    B = B(:,idx);
+    if normalize
+        B = B./max(B,[],1,'omitmissing');
+    end
+    base_raster{i} = B;
+end
+
+% all fish side by side
+hf = figure('Color',cfg.bgcol);
+tl = tiledlayout('flow','TileSpacing','compact','Padding','compact');
+for i = 1:nsubjects
+    nexttile
+    imagesc(nanzscore(base_raster{i},[],2)')
+    colormap(cfg.colormapName)
+    title(sprintf('fish #%d', i), 'Color', cfg.textcol)
+    xticks([]); yticks([])
+end
+ylabel(tl,'Cell # (sorted by peak trial)')
+xlabel(tl,'Trial #')
+v.dataFilter = dft;
+
+%% raster baseline over trials: single fish (run previous section first)
+
+fishid = 13;
+hf = figure;
+imagesc(base_raster{fishid})
+colormap(cfg.colormapName)
+% a = colorbar('Color',cfg.axcol);
+% if normalize
+%     a.Label.String = 'Norm. baseline iFR';
+% else
+%     a.Label.String = 'Baseline iFR (Hz)';
+% end
+% a.Label.FontSize = cfg.fontSize;
+colorbar off
+axis square
+xlabel('Cell # (sorted by peak trial)')
+ylabel('Trial #')
+
+cfg.setFigure
+cfg.saveFigure(gcf,sprintf('naive baseline raster over trials fish%d', fishid), saveType)
+cfg = v.plotConfig;
+v.dataFilter = dft;
+
+
 %% firing rate distributions
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = {'naïve','trained'};
+v.dataFilter.stims_allowed = 'all trials';
 v.dataFilter.traceType = 'pSpike';
 v.dataFilter.interval  = []; % all data
 [~,iFR_odor] = ModeSelector(v).extract;
@@ -750,8 +921,8 @@ xscale log; yscale log
 xlabel('iFR (Hz)')
 ylabel('Portion of frames')
 axis square
-cfg.setFigure
-cfg.saveFigure(gcf,'naive firing rate distributions', saveType)
+% cfg.setFigure
+% cfg.saveFigure(gcf,'naive firing rate distributions', saveType)
 cfg = v.plotConfig;
 v.dataFilter = dft;
 

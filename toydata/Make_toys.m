@@ -1,14 +1,14 @@
 p = ToyParams;
 
 p.D = 80;
-p.A = 1;
-p.lambda_A = 3;
+p.A = 6;
+p.lambda_A = 0;
 p.tau_A = 1.5;
-p.B = 4;
+p.B = 0;
 p.tau = 1;
 p.gamma = 0;
-p.C = 5;
-p.lambda_C = 4;
+p.C = 0;
+p.lambda_C = 0;
 p.tau_C = 10;
 p.theta = .06;
 p.alpha =  0;
@@ -93,7 +93,7 @@ end
 %% batch generate toys
 
 outdir = 'toys\hyp';
-rmdir(outdir,'s')
+if isfolder(outdir); rmdir(outdir,'s'); end
 
 ToyDataGenerator.generate_batch(p,outdir,5)
 % ToyDataGenerator.generate_batch(p.makeNull,'toys\null',5)

@@ -45,7 +45,8 @@ dft = v.dataFilter;
 
 baseline_interval = [-22 -2];
 odor_interval = dft.interval;
-yrange = [-.2 .3];
+yrange = [-.025 .3];
+yt = [0 .1 .2 .3];
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.trial_sorting = 'chronological';
@@ -58,16 +59,16 @@ data = cell2mat(out) - cell2mat(outbase);
 [~,~, labs] = ModeSelector(v).extract; labs = labs{1};
 hf = figure; b = prettyBoxplot(data,labs,'scatterSize',5,'plotLine',true);
 ylabel('Cellwise delta iFR (Hz)')
-ylim(yrange)
+ylim(yrange); yticks(yt)
 cfg.figSize = "large";
 cfg.aspRatioType = "wide";
 cfg.lineWidth = .5;
 cfg.setFigure
-cfg.saveFigure(gcf,'trained1 unit delta firing distribution', saveType)
-cfg = v.plotConfig;
+% cfg.saveFigure(gcf,'trained unit delta firing distribution', saveType)
+% cfg = v.plotConfig;
 % overall
 v.dataFilter.stims_allowed = 'all stimuli';
-v.dataFilter.subjectGroup = 'trained1';
+v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.interval = odor_interval;
 out = v.plotUnitActivityMetricHead('method','avg intensity');
 v.dataFilter.interval = baseline_interval;
@@ -162,7 +163,8 @@ disp(['Trained - naive difference in mean iFR: ' num2str(y), ' Hz'])
 % unit firing distributions (repetitions)
 baseline_interval = [-22 -2];
 odor_interval = dft.interval;
-yrange = [-.3 .4];
+yrange = [-.025 .2];
+yt = [0 .1 .2];
 v.dataFilter = dft;
 v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.trial_sorting = 'chronological';
@@ -183,7 +185,7 @@ data = data_trained_allstim;
 hf = figure;
 subplot(121); b = prettyBoxplot(data,{'1','2','3','4','5'},'scatterSize',5,'plotLine',true);
 ylabel('Cellwise delta iFR (Hz)')
-ylim(yrange)
+ylim(yrange); yticks(yt)
 % Leu
 v.dataFilter.stims_allowed = {'Leu'};
 v.dataFilter.interval = odor_interval;
@@ -192,7 +194,7 @@ v.dataFilter.interval = baseline_interval;
 outbase = v.plotUnitActivityMetricHead('method','avg intensity');
 data_trained_leu = cell2mat(out) - cell2mat(outbase);
 subplot(122); b = prettyBoxplot(data_trained_leu,{'1','2','3','4','5'},'scatterSize',5,'plotLine',true);
-ylim(yrange)
+ylim(yrange); yticks(yt)
 ylabel('Cellwise delta iFR (Hz)')
 cfg.figSize = "medium";
 cfg.aspRatioType = "square";
@@ -265,6 +267,9 @@ v.dataFilter = dft;
 supp_stats = statsUtils.pairwiseMannWhitney({supp_naive, supp_trained}, {'naive','trained'}, true);
 fprintf('Suppression score (naive vs trained): p_raw=%.4g, p_adj=%.4g, %s\n', ...
     supp_stats.p_raw, supp_stats.p_adj, statsUtils.pvalToStars(supp_stats.p_adj));
+fprintf('Suppression score (trained - naive): diff_mean=%.4g, diff_median=%.4g\n', ...
+    mean(supp_trained,'omitnan')-mean(supp_naive,'omitnan'), ...
+    median(supp_trained,'omitnan')-median(supp_naive,'omitnan'));
 hf = figure; splitViolin({supp_naive, supp_trained},cfg,yrange);
 
 cfg.figSize = 'small'; cfg.aspRatioType = 'square'; cfg.setFigure;
@@ -282,6 +287,9 @@ v.dataFilter = dft;
 supp_stats = statsUtils.pairwiseMannWhitney({supp_naive, supp_trained}, {'naive','trained'}, true);
 fprintf('Suppression score (naive vs trained): p_raw=%.4g, p_adj=%.4g, %s\n', ...
     supp_stats.p_raw, supp_stats.p_adj, statsUtils.pvalToStars(supp_stats.p_adj));
+fprintf('Suppression score (trained - naive): diff_mean=%.4g, diff_median=%.4g\n', ...
+    mean(supp_trained,'omitnan')-mean(supp_naive,'omitnan'), ...
+    median(supp_trained,'omitnan')-median(supp_naive,'omitnan'));
 hf = figure; splitViolin({supp_naive, supp_trained},cfg,yrange);
 
 cfg.figSize = 'small'; cfg.aspRatioType = 'square'; cfg.setFigure;
@@ -291,11 +299,15 @@ cfg = v.plotConfig;
 
 
 function splitViolin(data,cfg,yrange)
-    % split violin for naive (left) and trained (right)
-    xcenter = 1;
-    width = 0.25; % half-violin max width
+    % split violin (naive left, trained right) + boxplot + jittered scatter,
+    % the latter two placed outward from each half-violin (raincloud-style)
+    xcenter   = 1;
+    width     = 0.25; % half-violin max width
+    gap       = 0.05; % gap between violin/scatter/box
+    box_width = 0.35;
+    scatter_width = 0.25;
     colors = cfg.c(1:2,:);
-    
+
     hold on;
     for i = 1:2
         d = data{i};
@@ -305,28 +317,32 @@ function splitViolin(data,cfg,yrange)
         f = f / max(f) * width;
         if i == 1 % left (naive)
             X = [xcenter - f, xcenter*ones(1,numel(f))];
+            side = -1;
         else % right (trained)
             X = [xcenter + f, xcenter*ones(1,numel(f))];
+            side = 1;
         end
         Y = [xi, fliplr(xi)];
         patch(X, Y, colors(i,:), 'EdgeColor', 'none', 'FaceAlpha', 0.6);
-        % % median line
-        % med = median(d);
-        % if i == 1
-        %     plot([xcenter - width*0.9, xcenter], [med med], 'k', 'LineWidth', 1.5);
-        % else
-        %     plot([xcenter, xcenter + width*0.9], [med med], 'k', 'LineWidth', 1.5);
-        % end
-        % % jittered points
-        % jitter = (rand(size(d)) - 0.5) * width * 0.6;
-        % if i == 1
-        %     xs = xcenter - 0.02 + jitter;
-        % else
-        %     xs = xcenter + 0.02 + jitter;
-        % end
-        % scatter(xs, d, 8, 'k', 'filled', 'MarkerFaceAlpha', 0.25);
+
+        % median (black) and mean (red) lines across the half-violin
+        med = median(d);
+        mu  = mean(d);
+        if i == 1
+            xline_half = [xcenter - width*0.95, xcenter];
+        else
+            xline_half = [xcenter, xcenter + width*0.95];
+        end
+        plot(xline_half, [med med], 'k', 'LineWidth', 1.5);
+        plot(xline_half, [mu mu], 'r', 'LineWidth', 1.5);
+
+        % jittered scatter and boxplot, overlapping at the same x outside the violin
+        x_data = xcenter + side*(width + gap + box_width/2);
+        jitter = (rand(size(d)) - 0.5) * scatter_width;
+        scatter(x_data + jitter, d, 1, colors(i,:), 'filled', 'MarkerFaceAlpha', 0.35, 'MarkerEdgeColor', 'none');
+        RF_mkBoxPlot3({d}, 'k', x_data, box_width, .5, .5, 2, []);
     end
-    xlim([xcenter-0.6, xcenter+0.6]);
+    xlim([xcenter - (width+gap+box_width+0.15), xcenter + (width+gap+box_width+0.15)]);
     set(gca, 'XTick', xcenter, 'XTickLabel', {'naive    |    trained'});
     ylim(yrange); ylabel('Suppression (a.u.)');
     box off; axis square;
@@ -397,7 +413,7 @@ set(gcf, 'color', cfg.bgcol);
 
 %% drift strength vs activity
 v.dataFilter = dft;
-v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.subjectGroup = {'naïve','trained'};
 R = driftMetricsFigure(v,'plot',true);
 drift = R.driftStrength3d;
 close all
@@ -457,3 +473,37 @@ cfg.aspRatioType = "square";
 cfg.setFigure;
 cfg.saveFigure(gcf,'trained drift vs activity', saveType)
 cfg = v.plotConfig;
+
+%% drift vector correlations and interrep. angles + stats
+
+grouptag = 'allgroups(nu)';
+
+v.dataFilter = dft;
+v.dataFilter.subjectGroup = {'naïve','trained'};
+R = driftMetricsFigure(v,'plot',false);
+
+% correlation across drift vectors
+cm = R.corrMat;
+clear stats1;
+for i = 1:width(cm)
+    stats1(i) = statsUtils.bootstrapMeanTest(cm(:,i),0,1e6);
+end
+[stats1(:).p]
+figure; prettyBoxplot(cm);
+hold on; yline(0,'r--'); ylim([-1 1]); yticks([-1 0 1])
+ylabel('Drift vector correlation')
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag, ' drift vect corrs'],saveType)
+
+% inter-rep. angles
+ira = R.interRepAngle;
+clear stats2;
+for i = 1:width(ira)
+    stats2(i) = statsUtils.bootstrapMeanTest(ira(:,i),pi/2,1e6);
+end
+[stats2(:).p]
+figure; prettyBoxplot(ira./pi.*180);
+hold on; yline(90,'r--'); ylim([0 180]); yticks([0 90 180])
+ylabel('Inter-rep. angle')
+cfg.setFigure;
+cfg.saveFigure(gcf,[grouptag, ' inter-rep angles'],saveType)

@@ -145,8 +145,8 @@ v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'novelty';
 v.dataFilter.mode_method = 'isolate';
 v.dataFilter.interval = [];
-v.dataFilter.subjectGroup = 'trained';
-v.dataFilter.mode_file = 'dpca_trained_BS.mat';
+v.dataFilter.subjectGroup = 'naïve';
+v.dataFilter.mode_file = 'dpca_naive_BS.mat';
 % v.dataFilter.stims_allowed = {'Ala','His','Trp','Ser','Leu'};
 closeup_interval = [-1 3];
 [~,events,labs] = ModeSelector(v).extract;
@@ -223,8 +223,8 @@ v.dataFilter.mode_name = 'dpca';
 v.dataFilter.mode_OI = 'novelty';
 v.dataFilter.mode_method = 'isolate';
 v.dataFilter.interval = [-5 35];
-v.dataFilter.subjectGroup = 'uncoupled';
-v.dataFilter.mode_file = 'dpca_uncoupled.mat';
+v.dataFilter.subjectGroup = 'trained';
+v.dataFilter.mode_file = 'dpca_trained_BS.mat';
 [~,~,labs] = ModeSelector(v).extract;
 stims = unique(labs{1});
 
@@ -258,7 +258,7 @@ set(gcf, 'color', cfg.bgcol);
 %% unit firing distributions (recontructed data from novelty mode)
 
 yrange = [0 .07];
-dPCtag = 'stimulus';
+dPCtag = 'novelty';
 %
 v.dataFilter = dft;
 v.dataFilter.mode_name = 'dpca';
@@ -271,23 +271,23 @@ v.dataFilter.subjectGroup = 'naïve';
 v.dataFilter.mode_file = 'dpca_naive.mat';
 v.dataFilter.stims_allowed = 'all stimuli';
 firingDistribBoxplots(v,cfg,saveType,'naive',dPCtag,yrange)
-% naive
+% trained
 v.dataFilter.subjectGroup = 'trained';
 v.dataFilter.mode_file = 'dpca_trained.mat';
 v.dataFilter.stims_allowed = 'all stimuli';
 firingDistribBoxplots(v,cfg,saveType,'trained',dPCtag,yrange)
-% naive
-v.dataFilter.subjectGroup = 'uncoupled';
-v.dataFilter.mode_file = 'dpca_uncoupled.mat';
-v.dataFilter.stims_allowed = 'all stimuli';
-firingDistribBoxplots(v,cfg,saveType,'uncoupled',dPCtag,yrange)
+% % uncoupled
+% v.dataFilter.subjectGroup = 'uncoupled';
+% v.dataFilter.mode_file = 'dpca_uncoupled.mat';
+% v.dataFilter.stims_allowed = 'all stimuli';
+% firingDistribBoxplots(v,cfg,saveType,'uncoupled',dPCtag,yrange)
 
 
 function firingDistribBoxplots(v,cfg,saveType,grouptag,dPCtag,yrange)
     hf = figure;
     c = v.plotTrialActivityMetricHead('method','avg intensity', 'plotType', 'boxplot_repetitions');
     close(hf)
-    c = abs(c);
+    % c = abs(c);
 
     % Friedman test for overall effect of repetition
     result = statsUtils.friedman(c);
@@ -311,9 +311,9 @@ function firingDistribBoxplots(v,cfg,saveType,grouptag,dPCtag,yrange)
 
     cfg.figSize = 'tiny';
     cfg.aspRatioType = 'tall';
-    cfg.setFigure;
-    cfg.saveFigure(gcf,[grouptag,' ',dPCtag,' dPC isolate intensity over reps'], saveType)
-    close(hf)
+    % cfg.setFigure;
+    % cfg.saveFigure(gcf,[grouptag,' ',dPCtag,' dPC isolate intensity over reps'], saveType)
+    % close(hf)
 end
 
 

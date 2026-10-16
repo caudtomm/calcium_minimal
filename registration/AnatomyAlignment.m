@@ -28,6 +28,7 @@ classdef AnatomyAlignment < handle
         px_sizes            double  = []        % [n_zoom × 3]: [zoom, px_x_um, px_y_um] for anatomy
         px_sizes_phys       double  = []        % [n_zoom × 3]: same for physiology
         close_up_zoom       double  = []        % zoom factor of the physiology recording
+        plottingFilter      logical = []        % (N×1) boolean mask: subjects to include in plots (empty → all)
     end
 
     properties (Access = private)
@@ -86,16 +87,17 @@ classdef AnatomyAlignment < handle
 
         %% glance
         function glance(obj)
-            % Show all max-projections packed side by side, grayscale, no labels.
-            N     = size(obj.stack, 3);
-            nCols = min(5, N);
-            nRows = ceil(N / nCols);
+            % Show max-projections (subject to plottingFilter) packed side by
+            % side, grayscale, no labels.
+            subs  = find(obj.resolvePlottingFilter(size(obj.stack, 3)));
+            nCols = min(5, numel(subs));
+            nRows = ceil(numel(subs) / nCols);
 
             fig = figure('Color', 'k');
             set(fig, 'Units', 'normalized', 'OuterPosition', [0 0 1 1]);
             tl = tiledlayout(fig, nRows, nCols, 'Padding', 'none', 'TileSpacing', 'none');
 
-            for i = 1:N
+            for i = subs(:)'
                 ax = nexttile(tl);
                 imagesc(ax, obj.stack(:,:,i));
                 colormap(ax, 'gray');
@@ -287,10 +289,12 @@ classdef AnatomyAlignment < handle
         %% showAvgAnatomy
         function [img, px_x_um, px_y_um] = showAvgAnatomy(obj)
             % Show (and return) the mean aligned anatomy with a 100 µm scalebar.
-            %   img      – mean of stack_aligned (no scalebar, NaN-safe)
+            %   img      – mean of stack_aligned over subjects passing
+            %              plottingFilter (no scalebar, NaN-safe)
             %   px_x_um  – anatomy pixel size in x (µm/px)
             %   px_y_um  – anatomy pixel size in y (µm/px)
-            img = mean(obj.stack_aligned, 3, 'omitmissing');
+            idx = obj.resolvePlottingFilter(size(obj.stack_aligned, 3));
+            img = mean(obj.stack_aligned(:,:,idx), 3, 'omitmissing');
             [px_x_um, px_y_um] = obj.getAnatomyPxSizes();
 
             fig = figure('Color', 'k');
@@ -322,6 +326,12 @@ classdef AnatomyAlignment < handle
                 class_labels (:,1) double
                 cfg          PlotConfig = PlotConfig()
             end
+
+            % class_labels is assumed to cover ALL subjects; filter it down
+            % to the plottingFilter subset without touching the numeric
+            % label values, so colors stay consistent across filterings.
+            subj_idx     = find(obj.resolvePlottingFilter(numel(class_labels)));
+            class_labels = class_labels(subj_idx);
 
             [img, px_x_um, px_y_um] = obj.getRefImg();
             [px_x_anat,  px_y_anat]  = obj.getAnatomyPxSizes();
@@ -355,9 +365,9 @@ classdef AnatomyAlignment < handle
             clim(ax, c);
             hold(ax, 'on');
 
-            N = numel(class_labels);
-            for i = 1:N
-                lbl = class_labels(i);
+            for k = 1:numel(class_labels)
+                i   = subj_idx(k);       % original (unfiltered) subject index
+                lbl = class_labels(k);
                 if isnan(lbl) || lbl < 1; continue; end
 
                 % FOV corners centred on subject i's raw anatomy (world coords, [x y])
@@ -383,6 +393,7 @@ classdef AnatomyAlignment < handle
             end
 
             addScalebar(ax, px_x_um);
+            %legend()
         end
 
         %% transformPhysCentroids
@@ -436,7 +447,23 @@ classdef AnatomyAlignment < handle
             if ~isempty(obj.ref_subject)
                 img = obj.stack_aligned(:,:,obj.ref_subject);
             else
-                img = mean(obj.stack_aligned, 3, 'omitmissing');
+                idx = obj.resolvePlottingFilter(size(obj.stack_aligned, 3));
+                img = mean(obj.stack_aligned(:,:,idx), 3, 'omitmissing');
+            end
+        end
+
+        function idx = resolvePlottingFilter(obj, N)
+            % Resolve plottingFilter to a logical index of length N.
+            % Empty plottingFilter (default) → include all N subjects.
+            if isempty(obj.plottingFilter)
+                idx = true(N, 1);
+            else
+                idx = logical(obj.plottingFilter(:));
+                if numel(idx) ~= N
+                    error('AnatomyAlignment:plottingFilterSize', ...
+                        'plottingFilter has %d elements; expected %d (number of subjects).', ...
+                        numel(idx), N);
+                end
             end
         end
 

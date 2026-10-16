@@ -100,7 +100,7 @@ classdef ExperimentViewer
             xlabel('Time from stimulus onset (s)')
             ylabel('iFR (Hz)')
             axis tight; box off
-            legend(b,{'baseline', 'odor'})
+            legend(b,{'Baseline', 'Odor'})
             set(gca, 'color', cfg.bgcol, 'XColor',cfg.axcol, 'YColor',cfg.axcol, 'ZColor',cfg.axcol);
             set(gcf, 'color', cfg.bgcol);
             set(gcf, 'Position', [50 50 400 280]);
@@ -243,9 +243,16 @@ classdef ExperimentViewer
                 end
             end
 
+            % Normalize method to DistanceMetric
+            if ischar(method) || isstring(method)
+                metric = DistanceMetric.fromPdist(char(method));
+            else
+                metric = method; % already a DistanceMetric
+            end
+
             % initialize output
             out = [];
-            
+
             % Isolating relevant data
             dft = obj.dataFilter;
             [~, events, all_labs] = ModeSelector(obj).extract;
@@ -268,7 +275,8 @@ classdef ExperimentViewer
             end
 
             % call low-level plotter
-            out.distMat3d = plotDistances(events,plotType,method,labs,obj.plotConfig);
+            out.distMat3d = plotDistances(events, plotType, metric, labs, obj.plotConfig);
+            out.metric = metric;
             ps_lim = dft.interval; % actual interval used
             title([num2str(ps_lim(1)),'-',num2str(ps_lim(2)), ' s'], ...
                 'Color',obj.plotConfig.textcol)

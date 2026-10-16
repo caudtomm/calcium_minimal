@@ -107,10 +107,20 @@ ylim([-2 3])
 [~,p] = ttest(sham(:,5), sham(:,6), 'Tail', 'right')
 %xticklabels({'before surgery','after surgery'});
 cfg.figSize = 'small';
-cfg.setFigure
-cfg.saveFigure(gcf,'ablation learning index', saveType)
+% cfg.setFigure
+% cfg.saveFigure(gcf,'ablation learning index', saveType)
 
 %% N over groups
+v.dataFilter.subjectGroup = {'naïve', 'trained'};
+[subjectIDs, ids] = v.dataFilter.getSubjectIDs(v.subjectTab);
+group = v.subjectTab.group(ids);
+group(ismember(group,{'trained1 (T-R-S-H-A-ACSF/L)'})) = {'trained3'};
+N = cellfun(@(x) x.N, v.filtered_traces);
+[group, ids] = sort(group);
+subjectIDs = subjectIDs(ids);
+N = N(ids);
+data = table(subjectIDs,group,N)
+
 
 %% trained and uncoupled response traces
 v.dataFilter = dft;

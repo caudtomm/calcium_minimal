@@ -1,4 +1,4 @@
-function hf = compareModeMetricsFigure(v)
+function [hf, GSS, SeT, StT, Tuning, vals] = compareModeMetricsFigure(v)
     cfg = v.plotConfig;
     
     v.dataFilter.mode_name = 'native_units';
@@ -223,8 +223,6 @@ function hf = compareModeMetricsFigure(v)
         ylabel('suppressed')
         
         set(gcf, 'color', cfg.bgcol);
-
-        vals
     end
 
 end

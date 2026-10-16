@@ -215,8 +215,8 @@ for i_fs = 1:n_fit_stims
         if isempty(fit_params{k}); continue; end
         pk = fit_params{k};
         b_fit(k) = errorbar(t, pk.y_avg, pk.err, 'vertical', 'LineStyle', 'none', ...
-            'Color', cfg.c(k,:), 'Marker', 'o', 'MarkerSize', 4, ...
-            'MarkerFaceColor', cfg.c(k,:), 'MarkerEdgeColor', cfg.c(k,:), 'CapSize', 4);
+            'Color', cfg.c(k,:), 'Marker', 'o', 'MarkerSize', 2, ...
+            'MarkerFaceColor', cfg.c(k,:), 'MarkerEdgeColor', cfg.c(k,:), 'CapSize', 2);
         plot(pk.avgfit.t, pk.avgfit.vals, '--', 'Color', cfg.c(k,:))
     end
     axis tight; xlim([-1 3])
